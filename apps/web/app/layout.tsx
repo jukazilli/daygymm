@@ -22,6 +22,7 @@ const themeVariables: CssVariables = {
   "--color-text-secondary": dayGymTokens.color.light.textSecondary,
   "--radius-card": `${dayGymTokens.radius.card}px`,
   "--radius-control": `${dayGymTokens.radius.control}px`,
+  "--space-2": `${dayGymTokens.space[2]}px`,
   "--space-4": `${dayGymTokens.space[4]}px`,
   "--space-6": `${dayGymTokens.space[6]}px`,
   "--space-8": `${dayGymTokens.space[8]}px`,

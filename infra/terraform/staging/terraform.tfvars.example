@@ -1,0 +1,9 @@
+project_id         = "pex-gsc"
+region             = "southamerica-east1"
+github_repository  = "jukazilli/daygymm"
+monthly_budget_brl = 50
+container_image    = "southamerica-east1-docker.pkg.dev/pex-gsc/daygym-containers/api:<immutable-tag>"
+provision_cloud_run = false
+
+# Supply billing_account_id through TF_VAR_billing_account_id or an ignored
+# local tfvars file. Never commit the actual identifier.

@@ -1,0 +1,17 @@
+{
+  "name": "@daygym/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "dev": "tsx watch src/server.ts",
+    "lint": "eslint src",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "fastify": "5.11.3"
+  }
+}

@@ -1,0 +1,23 @@
+steps:
+  - id: build-api-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - apps/api/Dockerfile
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:${_IMAGE_TAG}
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:${_IMAGE_TAG}
+
+serviceAccount: projects/${PROJECT_ID}/serviceAccounts/daygym-cloud-build@${PROJECT_ID}.iam.gserviceaccount.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _REGION: southamerica-east1
+  _REPOSITORY: daygym-containers
+  _IMAGE_TAG: manual
