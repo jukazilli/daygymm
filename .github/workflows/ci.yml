@@ -62,5 +62,12 @@ jobs:
       - name: Install from the lockfile
         run: pnpm install --frozen-lockfile
 
+      - name: Start the local Supabase stack
+        run: pnpm supabase:start
+
       - name: Reset the local database from migrations and seed
         run: pnpm db:reset
+
+      - name: Stop the local Supabase stack
+        if: always()
+        run: pnpm supabase:stop
