@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "DayGym",
+    "slug": "daygym",
+    "scheme": "daygym",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,105 @@
+:root {
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: Onest, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.environment,
+.eyebrow {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.content {
+  width: min(100% - 32px, 720px);
+  margin: 0 auto;
+  padding: 88px 0;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-2);
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  max-width: 14ch;
+  margin-bottom: var(--space-4);
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  letter-spacing: -0.04em;
+}
+
+.lead {
+  max-width: 54ch;
+  margin-bottom: var(--space-8);
+  color: var(--color-text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.panel {
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.panel h2 {
+  margin-bottom: var(--space-2);
+  font-size: 1.125rem;
+}
+
+.panel p {
+  margin-bottom: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 var(--space-4);
+  }
+
+  .content {
+    padding: 64px 0;
+  }
+}

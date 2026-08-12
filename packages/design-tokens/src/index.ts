@@ -1,0 +1,54 @@
+export const dayGymTokens = {
+  color: {
+    light: {
+      action: "#C2410C",
+      actionPressed: "#9A3412",
+      actionSoft: "#FFF7ED",
+      border: "#D6D3D1",
+      canvas: "#FAFAF9",
+      card: "#FFFFFF",
+      danger: "#991B1B",
+      info: "#0369A1",
+      textPrimary: "#1C1917",
+      textSecondary: "#6B625D",
+      success: "#166534",
+      warning: "#A16207",
+    },
+    dark: {
+      action: "#FB923C",
+      canvas: "#12110F",
+      card: "#1C1917",
+      raised: "#292524",
+      textPrimary: "#FAFAF9",
+      textSecondary: "#D6D3D1",
+    },
+  },
+  space: {
+    0: 0,
+    1: 4,
+    2: 8,
+    3: 12,
+    4: 16,
+    5: 20,
+    6: 24,
+    8: 32,
+    10: 40,
+    12: 48,
+    16: 64,
+  },
+  radius: {
+    card: 16,
+    control: 12,
+    pill: 999,
+    sheet: 24,
+  },
+  typography: {
+    family: "Onest",
+    fallback: "system-ui",
+    heading: 20,
+    body: 16,
+    label: 14,
+  },
+} as const;
+
+export type DayGymTokens = typeof dayGymTokens;
