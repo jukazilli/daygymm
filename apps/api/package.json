@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "lint": "eslint src",
     "start": "node dist/server.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude dist/**",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
