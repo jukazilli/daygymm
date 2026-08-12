@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+apps/web/.next/
+apps/mobile/.expo/
+apps/mobile/dist/
+.turbo/
+coverage/
+supabase/.branches/
+supabase/.temp/
+docs/DayGym_*.docx
+docs/DayGynn_*.docx
+docs/DayGym_*.xlsx
+docs/DayGym_*.md
+docs/DayGynn_*.md
+docs/assets/

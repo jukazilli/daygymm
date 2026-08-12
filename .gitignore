@@ -1,0 +1,29 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Build and local development artifacts
+apps/web/.next/
+apps/web/out/
+apps/mobile/.expo/
+apps/mobile/dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Local environment values
+.env
+.env.*
+!.env.example
+
+# Supabase CLI runtime state
+supabase/.branches/
+supabase/.temp/
+
+# Canonical planning material is private and remains local to authorized workstations.
+/docs/DayGym_*.docx
+/docs/DayGynn_*.docx
+/docs/DayGym_*.xlsx
+/docs/DayGym_*.md
+/docs/DayGynn_*.md
+/docs/assets/
