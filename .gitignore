@@ -8,6 +8,7 @@ apps/web/out/
 apps/mobile/.expo/
 apps/mobile/dist/
 .turbo/
+.playwright-cli/
 coverage/
 *.tsbuildinfo
 

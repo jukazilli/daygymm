@@ -4,7 +4,7 @@ Aplicação de acompanhamento de treinos, evolução, nutrição e colaboração
 
 ## Estado do projeto
 
-O produto está em **M0 — Fundação e Setup**. Este repositório contém apenas a fundação pública e segura: monorepo, shells, toolchain, Supabase local e CI.
+O produto está em **M0 — Fundação e Setup**. Este repositório contém apenas a fundação pública e segura: monorepo, shells, toolchain, Supabase de staging e CI.
 
 Os documentos canônicos de produto, UX, engenharia e backlog são material restrito. Eles permanecem fora deste repositório público e devem ser consultados por pessoas autorizadas antes de iniciar qualquer item de produto.
 
@@ -17,7 +17,7 @@ Os documentos canônicos de produto, UX, engenharia e backlog são material rest
 - `packages/domain`: limites puros do domínio, sem framework ou infraestrutura.
 - `packages/contracts`: contratos públicos iniciais.
 - `packages/design-tokens`: tokens compartilhados de tema claro e contrato de tema escuro.
-- `supabase`: configuração local, migrations e seed seguro.
+- `supabase`: migrations versionadas para o ambiente de staging e seed seguro.
 - `tooling`: verificações de fronteira e padrões de segredo.
 
 ## Comandos
@@ -31,4 +31,4 @@ pnpm test
 pnpm build
 ```
 
-Para Supabase local, siga o [runbook de setup](docs/runbooks/local-setup.md). O Docker Desktop precisa estar em execução; o comando não cria nem altera projetos remotos.
+O desenvolvimento é validado online: commits passam pelo CI e migrations aprovadas são aplicadas somente pela branch `staging`. Consulte o [runbook de staging](docs/runbooks/staging-setup.md). Docker não é necessário.
