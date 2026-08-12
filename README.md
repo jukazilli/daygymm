@@ -4,20 +4,31 @@ Aplicação de acompanhamento de treinos, evolução, nutrição e colaboração
 
 ## Estado do projeto
 
-O produto está na etapa **M0 — Fundação e Setup**. A baseline de produto, experiência, engenharia, arquitetura e execução está versionada em [`docs/`](docs/).
+O produto está em **M0 — Fundação e Setup**. Este repositório contém apenas a fundação pública e segura: monorepo, shells, toolchain, Supabase local e CI.
 
-A implementação deve seguir o Documento 08 e começar pelos habilitadores FND-001 e FND-002, antes de funcionalidades visuais isoladas.
+Os documentos canônicos de produto, UX, engenharia e backlog são material restrito. Eles permanecem fora deste repositório público e devem ser consultados por pessoas autorizadas antes de iniciar qualquer item de produto.
 
-## Documentação
+> **Nome canônico:** DayGym. “DayGynn” aparece apenas em material histórico autorizado.
 
-1. Pesquisa e viabilidade
-2. Briefing de produto e escopo do beta
-3. Visão de Product Owner
-4. Direção de UI e Design System
-5. Especificação de UX
-6. Técnicas de desenvolvimento
-7. Arquitetura e engenharia
-8. Backlog canônico, rastreabilidade e plano de entrega
-9. Matriz operacional de backlog e rastreabilidade
+## Estrutura
 
-> **Nome canônico:** DayGym. O nome “DayGynn” aparece somente no artefato histórico 01.
+- `apps/mobile`: shell Expo/React Native.
+- `apps/web`: shell Next.js.
+- `packages/domain`: limites puros do domínio, sem framework ou infraestrutura.
+- `packages/contracts`: contratos públicos iniciais.
+- `packages/design-tokens`: tokens compartilhados de tema claro e contrato de tema escuro.
+- `supabase`: configuração local, migrations e seed seguro.
+- `tooling`: verificações de fronteira e padrões de segredo.
+
+## Comandos
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Para Supabase local, siga o [runbook de setup](docs/runbooks/local-setup.md). O Docker Desktop precisa estar em execução; o comando não cria nem altera projetos remotos.
