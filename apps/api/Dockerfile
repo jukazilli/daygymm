@@ -5,6 +5,7 @@ RUN npm install --global pnpm@9.11.0
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/config/tsconfig.base.json packages/config/tsconfig.base.json
 RUN pnpm install --frozen-lockfile
 
 COPY apps/api apps/api
