@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- M0 seeds no real accounts, health data, credentials or production-like records.
+-- Future migrations must add only minimal synthetic fixtures required by their own tests.
