@@ -43,7 +43,9 @@ jobs:
     name: Deploy staging database
     runs-on: ubuntu-24.04
     needs: quality
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    if: >-
+      github.ref == 'refs/heads/staging' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     env:
       SUPABASE_TELEMETRY_DISABLED: "1"
       SUPABASE_DB_URL_STAGING: ${{ secrets.SUPABASE_DB_URL_STAGING }}
@@ -66,3 +68,82 @@ jobs:
 
       - name: Apply and verify versioned migrations in staging
         run: pnpm db:deploy:staging
+
+  deploy-staging-application:
+    name: Deploy staging application
+    runs-on: ubuntu-24.04
+    needs: [quality, deploy-staging-database]
+    if: >-
+      github.ref == 'refs/heads/staging' &&
+      vars.DAYGYM_STAGING_DEPLOY_ENABLED == 'true'
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: pex-gsc
+      PROJECT_NUMBER: "101192507609"
+      REGION: southamerica-east1
+      REPOSITORY: daygym-containers
+      API_SERVICE: daygym-api-staging
+      WORKER_SERVICE: daygym-worker-staging
+      WORKLOAD_IDENTITY_PROVIDER: projects/101192507609/locations/global/workloadIdentityPools/daygym-github-actions/providers/daygym-github
+      DEPLOY_SERVICE_ACCOUNT: daygym-github-deploy@pex-gsc.iam.gserviceaccount.com
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Authenticate to Google Cloud without a key
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Build immutable image
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gcloud builds submit . \
+            --project="${PROJECT_ID}" \
+            --config=cloudbuild.yaml \
+            --gcs-source-staging-dir="gs://daygym-build-source-${PROJECT_NUMBER}/source" \
+            --substitutions="_IMAGE_TAG=${DEPLOY_SHA}" \
+            --quiet
+
+      - name: Deploy the same image to API and worker
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/api:${DEPLOY_SHA}"
+          gcloud run services update "${API_SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${image}" \
+            --quiet
+          gcloud run services update "${WORKER_SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${image}" \
+            --quiet
+
+      - name: Verify public API and private worker
+        run: |
+          set -euo pipefail
+          api_url="$(gcloud run services describe "${API_SERVICE}" --project="${PROJECT_ID}" --region="${REGION}" --format='value(status.url)')"
+          worker_url="$(gcloud run services describe "${WORKER_SERVICE}" --project="${PROJECT_ID}" --region="${REGION}" --format='value(status.url)')"
+          live="$(curl --fail --silent --show-error "${api_url}/health/live")"
+          ready="$(curl --fail --silent --show-error "${api_url}/health/ready")"
+          jq -e '.status == "live" and .process == "api" and .environment == "staging"' <<< "${live}"
+          jq -e '.status == "ready" and .process == "api" and .environment == "staging"' <<< "${ready}"
+          worker_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "${worker_url}/health/live")"
+          if [[ "${worker_status}" == "200" ]]; then
+            echo "Private worker unexpectedly accepted an anonymous external request." >&2
+            exit 1
+          fi

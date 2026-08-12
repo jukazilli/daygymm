@@ -5,6 +5,7 @@ node_modules/
 # Build and local development artifacts
 apps/web/.next/
 apps/web/out/
+apps/api/dist/
 apps/mobile/.expo/
 apps/mobile/dist/
 .turbo/
@@ -20,6 +21,12 @@ coverage/
 # Supabase CLI runtime state
 supabase/.branches/
 supabase/.temp/
+
+# Terraform state and operator-only values
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/terraform.tfvars
 
 # Canonical planning material is private and remains local to authorized workstations.
 /docs/DayGym_*.docx
