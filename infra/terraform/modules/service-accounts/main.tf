@@ -12,6 +12,13 @@ resource "google_service_account" "worker" {
   description  = "Runtime identity for the private DayGym staging worker"
 }
 
+resource "google_service_account" "worker_scheduler" {
+  project      = var.project_id
+  account_id   = "daygym-worker-scheduler"
+  display_name = "DayGym worker scheduler"
+  description  = "OIDC caller identity for the private DayGym worker"
+}
+
 resource "google_service_account" "github_deploy" {
   project      = var.project_id
   account_id   = "daygym-github-deploy"
@@ -70,6 +77,12 @@ resource "google_service_account_iam_member" "github_can_use_api_runtime" {
 
 resource "google_service_account_iam_member" "github_can_use_worker_runtime" {
   service_account_id = google_service_account.worker.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
+resource "google_service_account_iam_member" "github_can_use_worker_scheduler" {
+  service_account_id = google_service_account.worker_scheduler.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.github_deploy.email}"
 }

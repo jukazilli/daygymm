@@ -2,14 +2,15 @@
 
 ## Topologia
 
-| Camada               | Serviço                 | Isolamento                                        |
-| -------------------- | ----------------------- | ------------------------------------------------- |
-| Web                  | Cloudflare Pages        | Projeto `daygym-web-staging`, conectado ao GitHub |
-| API                  | Cloud Run               | Serviço público `daygym-api-staging`              |
-| Worker               | Cloud Run               | Serviço interno `daygym-worker-staging`           |
-| Imagens              | Artifact Registry       | Repositório `daygym-containers`                   |
-| Banco e autenticação | Supabase                | Projeto DayGym de staging                         |
-| Infraestrutura       | Terraform + GitHub OIDC | State e identidades próprios do DayGym            |
+| Camada                | Serviço                 | Isolamento                                          |
+| --------------------- | ----------------------- | --------------------------------------------------- |
+| Web                   | Cloudflare Pages        | Projeto `daygym-web-staging`, conectado ao GitHub   |
+| API                   | Cloud Run               | Serviço público `daygym-api-staging`                |
+| Worker                | Cloud Run               | Serviço interno `daygym-worker-staging`             |
+| Acionamento do worker | Cloud Scheduler         | OIDC + `roles/run.invoker`, uma execução por minuto |
+| Imagens               | Artifact Registry       | Repositório `daygym-containers`                     |
+| Banco e autenticação  | Supabase                | Projeto DayGym de staging                           |
+| Infraestrutura        | Terraform + GitHub OIDC | State e identidades próprios do DayGym              |
 
 O frontend de staging está disponível em
 <https://daygym-web-staging.pages.dev>. Cloudflare Pages foi adotado para o
@@ -40,11 +41,13 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
    imutável no Cloud Build e publica a mesma imagem na API e no worker.
 7. O pipeline confirma `/health/live` e `/health/ready` da API e confirma que
    o worker não aceita uma chamada anônima externa.
-8. Somente depois de todos os gates hospedados, abra um PR de `staging` para
+8. O Cloud Scheduler chama `POST /internal/jobs/domain-events` com OIDC; cada
+   requisição executa um lote limitado e não recebe payload de domínio.
+9. Somente depois de todos os gates hospedados, abra um PR de `staging` para
    `main` e promova com merge commit. Rebase e squash não preservam a
    ancestralidade do SHA validado.
-9. Se `staging` não puder avançar por fast-forward, interrompa a promoção e
-   reconcilie o histórico por PR; nunca reescreva a branch de ambiente.
+10. Se `staging` não puder avançar por fast-forward, interrompa a promoção e
+    reconcilie o histórico por PR; nunca reescreva a branch de ambiente.
 
 O Cloudflare pode registrar um check adicional ao abrir o PR com um SHA já
 publicado. O gate da web é o deployment de produção do projeto disparado pela
@@ -86,6 +89,9 @@ seed de dados reais, Docker ou acesso a projetos fora do staging.
   aplica-a pelo canal administrativo e envia a URL diretamente ao Secret Manager.
 - O Cloud Run monta esse secret em `/var/run/secrets/daygym/database-url`; somente
   `daygym-worker-runtime` recebe `roles/secretmanager.secretAccessor` nesse secret.
+- `daygym-worker-scheduler` possui somente invocação no worker. O token OIDC usa
+  como audiência a URL base do serviço; o endpoint continua inacessível a
+  chamadas anônimas e ao tráfego externo comum.
 - Chaves públicas de cliente só serão configuradas quando a integração do app
   com Supabase for implementada.
 
@@ -94,7 +100,9 @@ seed de dados reais, Docker ou acesso a projetos fora do staging.
 O Terraform cria um alerta mensal de R$ 50 para recursos do DayGym rotulados no
 projeto host, com avisos em 50%, 80% e 100%. É um alerta, não um bloqueio
 automático de gasto. O Cloud Run começa com zero instâncias mínimas e máximo de
-uma instância por serviço.
+uma instância por serviço. O staging usa um job do Cloud Scheduler; a cobrança é
+por job, não por execução, e permanece sujeita ao free tier compartilhado da
+conta de faturamento.
 
 ## Aplicação inicial da infraestrutura
 

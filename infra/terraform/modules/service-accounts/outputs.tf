@@ -8,6 +8,11 @@ output "worker_email" {
   description = "Worker runtime service-account email."
 }
 
+output "worker_scheduler_email" {
+  value       = google_service_account.worker_scheduler.email
+  description = "OIDC caller service-account email for the worker scheduler."
+}
+
 output "github_deploy_email" {
   value       = google_service_account.github_deploy.email
   description = "GitHub deployment service-account email."

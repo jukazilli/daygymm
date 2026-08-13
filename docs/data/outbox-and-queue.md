@@ -25,6 +25,12 @@ O segundo subcorte adiciona o adaptador PostgreSQL em
 `daygym_worker_runtime`. A credencial é montada como arquivo pelo Secret Manager;
 a URL administrativa de migrations nunca é reutilizada no container.
 
+O terceiro subcorte implementa `TrainingSessionCompleted` sem antecipar
+progressão ou rewards. O handler valida o envelope contra a sessão canônica,
+grava um recibo idempotente sem payload e marca a finalização como consumida na
+mesma transação. Eventos de sessões diferentes não compartilham estado mutável e
+podem chegar fora de ordem.
+
 ## Contrato executável
 
 - `platform.job_outbox` aceita somente os seis eventos v1 declarados em
@@ -63,17 +69,17 @@ definitivos serão fechados no `FND-029` antes de dados reais.
 1. Fechado: `private.complete_training_session()` grava estado e chama o enqueue
    na mesma transação; replay reaproveita o resultado e falha do enqueue reverte
    o estado.
-2. Identidade, segredo e adaptador mínimos já existem; falta ativar e observar o
-   ciclo no Cloud Run consumindo `domain_events` com um handler funcional.
-3. O consumidor prova repetição, arquivo após sucesso e visibility timeout
-   bounded; ainda precisa provar reordenação permitida com o handler real.
+2. O handler real, a identidade, o segredo e o adaptador mínimos existem. O
+   ciclo é acionado por Cloud Scheduler com OIDC, ingress interno e um lote
+   bounded; a evidência hospedada precisa confirmar consumo e arquivo.
+3. O consumidor prova repetição, arquivo após sucesso, visibility timeout
+   bounded e reordenação entre sessões independentes.
 4. Idade, tentativas e dead-letter lógico alimentam `FND-024` sem payload
    sensível.
 
-O item 2 permanece parcial até o ciclo ser ativado e observado no Cloud Run.
-Polling agendado não é habilitado antes de handlers funcionais: ler uma fila de
-trabalho sem conseguir executar todos os efeitos poderia aumentar tentativas ou
-arquivar incorretamente mensagens futuras.
+Eventos ainda sem handler falham fechado e permanecem na fila. Retry/DLQ lógico
+e queue age continuam no próximo corte; o agendador não repete a requisição HTTP,
+pois a própria fila torna a mensagem visível para o ciclo seguinte.
 
 ## Referências oficiais
 

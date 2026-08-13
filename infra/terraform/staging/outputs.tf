@@ -27,3 +27,11 @@ output "secret_containers" {
   value       = module.secrets.secret_ids
   description = "Secret containers created without values."
 }
+
+output "worker_scheduler_job" {
+  value = try(
+    google_cloud_scheduler_job.domain_events[0].name,
+    null,
+  )
+  description = "Authenticated scheduler that invokes the bounded worker cycle."
+}
