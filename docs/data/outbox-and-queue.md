@@ -13,6 +13,11 @@ marca `FND-022` como concluído. Ainda não existe um comando funcional de trein
 que possa gravar estado canônico e evento na mesma transação, e o worker do
 Cloud Run ainda não possui o acesso mínimo ao banco para consumir a fila.
 
+O contrato de aplicação em `apps/api/src/domain-event-consumer.ts` valida o
+envelope compartilhado, exige um handler `handleOnce` idempotente e arquiva a
+mensagem somente depois de sucesso. Ele ainda não é o adaptador do PGMQ nem
+autoriza acesso privilegiado do runtime ao banco.
+
 ## Contrato executável
 
 - `platform.job_outbox` aceita somente os seis eventos v1 declarados em
@@ -27,6 +32,8 @@ Cloud Run ainda não possui o acesso mínimo ao banco para consumir a fila.
   ou `pgmq` nem aos payloads da fila;
 - mensagens futuras só podem ser arquivadas pelo consumidor depois do efeito
   concluído com idempotência própria.
+- falhas de validação, processamento ou arquivo usam apenas códigos estáveis;
+  detalhes de payload e segredos dos adaptadores não integram o erro retornado.
 
 ## Semântica operacional
 
@@ -43,8 +50,8 @@ definitivos serão fechados no `FND-029` antes de dados reais.
 
 1. Um comando funcional grava estado e chama o enqueue na mesma transação.
 2. O worker usa identidade/segredo mínimo e consome `domain_events`.
-3. O consumidor prova repetição, timeout, reordenação permitida e arquivo após
-   sucesso.
+3. O consumidor já prova repetição e arquivo após sucesso em unidade; ainda
+   precisa provar timeout e reordenação permitida com o adaptador real.
 4. Idade, tentativas e dead-letter lógico alimentam `FND-024` sem payload
    sensível.
 
