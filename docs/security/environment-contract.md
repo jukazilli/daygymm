@@ -87,12 +87,14 @@ nenhum valor foi persistido no repositório ou nesta documentação.
 
 O `Site URL` e as duas URLs exatas de confirmação e recuperação apontam para o
 Cloudflare Pages. Um e-mail de recuperação foi entregue e seu destino foi
-inspecionado sem consumir o token, confirmando `/redefinir-senha/`. A autenticação
-por senha também retornou HTTP 200, mas a leitura de elegibilidade falhou com
-`PGRST106` porque o schema `api` ainda não está exposto no Data API hospedado.
-Exposição mínima do schema, persistência da sessão, logout e consumo completo do
-link ainda precisam das evidências previstas para fechar FND-018. O ambiente
-mobile EAS continua separado e não recebeu essas variáveis.
+inspecionado sem consumir o token, confirmando `/redefinir-senha/`. Em 13 de
+agosto de 2026, o Data API hospedado foi alinhado ao contrato local: somente o
+schema `api` está exposto, `api, extensions` compõem o extra search path, o limite
+é de 100 linhas e `public` não recebe rota. A prova anônima recebeu `42501` em
+`api` e `PGRST106` em `public`, confirmando schema reconhecido com grant negado e
+superfície pública removida, respectivamente. Persistência da sessão, logout e
+consumo completo do link ainda precisam das evidências previstas para fechar
+FND-013. O ambiente mobile EAS continua separado e não recebeu essas variáveis.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
