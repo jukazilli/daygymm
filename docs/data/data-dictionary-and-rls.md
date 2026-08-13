@@ -116,6 +116,7 @@ cliente.
 | `private.legal_document_versions` | administração          |     Sim |    Sim |    Sim |    Sim | migration/operação privilegiada       | fora do cliente      |
 | `platform.job_outbox`             | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema interno; grants revogados      | `RLS-N07`            |
 | `platform.job_outbox`             | funções internas       |     Sim |    Sim |    Sim |    Não | definer boundary e fila privada       | testes do outbox     |
+| `platform.job_outbox`             | worker runtime         |     Não |    Não |    Não |    Não | apenas wrappers privados bounded      | `RLS-N08`            |
 
 As policies temporárias de inserção criadas na migration inicial foram removidas
 pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
@@ -128,6 +129,7 @@ pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
 - `RLS-N05`: prova isolamento entre perfis autenticados;
 - `RLS-N06`: prova isolamento entre históricos autenticados.
 - `RLS-N07`: bloqueia acesso de clientes ao outbox e aos payloads internos.
+- `RLS-N08`: bloqueia acesso direto do worker ao outbox e ao schema `pgmq`.
 
 ## Pendências deliberadas para `FND-029`
 

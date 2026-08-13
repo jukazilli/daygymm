@@ -88,6 +88,15 @@ module "secrets" {
   depends_on = [module.project_services]
 }
 
+resource "google_secret_manager_secret_iam_member" "worker_database_accessor" {
+  project   = var.project_id
+  secret_id = "daygym-database-url"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.service_accounts.worker_email}"
+
+  depends_on = [module.secrets]
+}
+
 module "budget" {
   source = "../modules/budget"
 

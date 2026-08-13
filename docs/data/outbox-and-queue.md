@@ -10,13 +10,20 @@ depois dashboards, SLOs e alertas (`FND-024`).
 
 Este corte cria o mecanismo privado e prova deduplicação e despacho, mas não
 marca `FND-022` como concluído. Ainda não existe um comando funcional de treino
-que possa gravar estado canônico e evento na mesma transação, e o worker do
-Cloud Run ainda não possui o acesso mínimo ao banco para consumir a fila.
+que possa gravar estado canônico e evento na mesma transação. O worker do Cloud
+Run já possui credencial e acesso mínimo ao banco, mas o ciclo ainda não é
+ativado sem handlers funcionais para os eventos aprovados.
 
 O contrato de aplicação em `apps/api/src/domain-event-consumer.ts` valida o
 envelope compartilhado, exige um handler `handleOnce` idempotente e arquiva a
 mensagem somente depois de sucesso. Ele ainda não é o adaptador do PGMQ nem
 autoriza acesso privilegiado do runtime ao banco.
+
+O segundo subcorte adiciona o adaptador PostgreSQL em
+`apps/api/src/worker-queue.ts`, o ciclo bounded em
+`apps/api/src/domain-event-worker.ts` e a identidade exclusiva
+`daygym_worker_runtime`. A credencial é montada como arquivo pelo Secret Manager;
+a URL administrativa de migrations nunca é reutilizada no container.
 
 ## Contrato executável
 
@@ -34,6 +41,11 @@ autoriza acesso privilegiado do runtime ao banco.
   concluído com idempotência própria.
 - falhas de validação, processamento ou arquivo usam apenas códigos estáveis;
   detalhes de payload e segredos dos adaptadores não integram o erro retornado.
+- o worker não possui acesso direto ao schema `pgmq`, ao outbox ou ao enqueue;
+  executa somente wrappers privados bounded de dispatch, read e archive;
+- a migration cria o login sem senha; a rotação segura ocorre pelo comando
+  `pnpm db:provision:worker:staging`, que grava uma nova versão diretamente no
+  Secret Manager sem imprimir o valor.
 
 ## Semântica operacional
 
@@ -49,11 +61,17 @@ definitivos serão fechados no `FND-029` antes de dados reais.
 ## Critérios para concluir `FND-022`
 
 1. Um comando funcional grava estado e chama o enqueue na mesma transação.
-2. O worker usa identidade/segredo mínimo e consome `domain_events`.
-3. O consumidor já prova repetição e arquivo após sucesso em unidade; ainda
-   precisa provar timeout e reordenação permitida com o adaptador real.
+2. Identidade, segredo e adaptador mínimos já existem; falta ativar e observar o
+   ciclo no Cloud Run consumindo `domain_events` com um handler funcional.
+3. O consumidor prova repetição, arquivo após sucesso e visibility timeout
+   bounded; ainda precisa provar reordenação permitida com o handler real.
 4. Idade, tentativas e dead-letter lógico alimentam `FND-024` sem payload
    sensível.
+
+O item 2 permanece parcial até o ciclo ser ativado e observado no Cloud Run.
+Polling agendado não é habilitado antes de handlers funcionais: ler uma fila de
+trabalho sem conseguir executar todos os efeitos poderia aumentar tentativas ou
+arquivar incorretamente mensagens futuras.
 
 ## Referências oficiais
 
