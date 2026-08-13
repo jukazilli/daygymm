@@ -12,6 +12,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@daygym/contracts": "workspace:*",
     "fastify": "5.11.3"
   }
 }

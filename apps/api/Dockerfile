@@ -5,11 +5,13 @@ RUN npm install --global pnpm@9.11.0
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/config/tsconfig.base.json packages/config/tsconfig.base.json
 RUN pnpm install --frozen-lockfile
 
 COPY apps/api apps/api
-RUN pnpm --filter @daygym/api build
+COPY packages/contracts packages/contracts
+RUN pnpm --filter @daygym/contracts build && pnpm --filter @daygym/api build
 
 FROM node:22.12.0-alpine AS runtime
 
@@ -19,9 +21,11 @@ RUN npm install --global pnpm@9.11.0
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
 RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=build /workspace/apps/api/dist apps/api/dist
+COPY --from=build /workspace/packages/contracts/dist packages/contracts/dist
 
 USER node
 EXPOSE 8080
