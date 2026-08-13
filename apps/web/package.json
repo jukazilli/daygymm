@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@daygym/config": "workspace:*",
+    "@daygym/contracts": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
     "@fontsource/onest": "5.3.0",
     "@supabase/supabase-js": "2.112.3",

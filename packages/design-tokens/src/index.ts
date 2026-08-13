@@ -44,6 +44,8 @@ export const dayGymTokens = {
   },
   typography: {
     family: "Onest",
+    familyBold: "Onest-Bold",
+    familySemiBold: "Onest-SemiBold",
     fallback: "system-ui",
     heading: 20,
     body: 16,

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import * as Linking from "expo-linking";
 
 import {
   stagingLegalVersions,
@@ -6,19 +6,23 @@ import {
   type AuthGateway,
 } from "@daygym/contracts";
 
-import { getWebPublicConfig } from "./supabase-public-config";
+import { createMobileAuthRuntime } from "./mobile-auth-client";
 
-export { stagingLegalVersions } from "@daygym/contracts";
-export type {
-  AuthFailure,
-  AuthGateway,
-  AuthResult,
-  SignUpInput,
-} from "@daygym/contracts";
+type MobileAuthRuntime = ReturnType<typeof createMobileAuthRuntime>;
+type MobileAuthClient = MobileAuthRuntime["client"];
+
+export interface DisposableMobileAuthGateway extends AuthGateway {
+  dispose(): Promise<void>;
+}
+
+interface MobileAuthGatewayOptions {
+  readonly client?: MobileAuthClient;
+  readonly createRedirect?: (path: string) => string;
+}
 
 class AuthConfigurationError extends Error {
   constructor() {
-    super("Public authentication configuration is unavailable.");
+    super("Public mobile authentication configuration is unavailable.");
     this.name = "AuthConfigurationError";
   }
 }
@@ -35,7 +39,6 @@ function failureFromError(error: unknown, fallback: AuthFailure): AuthFailure {
   if (error instanceof AuthConfigurationError) {
     return "configuration";
   }
-
   if (getErrorProperty(error, "status") === 429) {
     return "rate-limited";
   }
@@ -52,72 +55,88 @@ function failureFromError(error: unknown, fallback: AuthFailure): AuthFailure {
   return fallback;
 }
 
-function exactCallback(siteUrl: string, path: string): string {
-  const callback = new URL(path, `${siteUrl}/`);
-  if (callback.origin !== siteUrl) {
+function exactMobileCallback(
+  path: "entrar" | "redefinir-senha",
+  createRedirect: (path: string) => string,
+): string {
+  let callback: URL;
+  try {
+    callback = new URL(createRedirect(path));
+  } catch {
+    throw new AuthConfigurationError();
+  }
+
+  const scheme = callback.protocol.replace(/:$/, "");
+  const logicalPath =
+    callback.pathname === "" || callback.pathname === "/"
+      ? callback.hostname
+      : callback.pathname.replace(/^\//, "");
+  const isDayGymScheme =
+    scheme === "daygym" ||
+    scheme === "daygym-development" ||
+    scheme === "daygym-preview";
+
+  if (
+    !isDayGymScheme ||
+    logicalPath !== path ||
+    callback.username ||
+    callback.password ||
+    callback.search ||
+    callback.hash
+  ) {
     throw new AuthConfigurationError();
   }
 
   return callback.toString();
 }
 
-export function createWebAuthGateway(): AuthGateway {
-  function buildClient(url: string, publishableKey: string) {
-    return createClient(url, publishableKey, {
-      auth: {
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        flowType: "pkce",
-        persistSession: true,
-      },
-      db: { schema: "api" },
-    });
+async function isEligible(client: MobileAuthClient): Promise<boolean> {
+  const [profile, consents] = await Promise.all([
+    client.from("profiles").select("user_id").limit(1).maybeSingle(),
+    client.from("consents").select("document, document_version"),
+  ]);
+
+  if (profile.error || consents.error || !profile.data || !consents.data) {
+    return false;
   }
 
-  type WebSupabaseClient = ReturnType<typeof buildClient>;
+  return Object.entries({
+    privacy_notice: stagingLegalVersions.privacyNotice,
+    terms_of_service: stagingLegalVersions.termsOfService,
+  }).every(([document, version]) =>
+    consents.data.some(
+      (consent) =>
+        consent.document === document && consent.document_version === version,
+    ),
+  );
+}
 
-  let client: WebSupabaseClient | undefined;
-  let siteUrl: string | undefined;
+export function createMobileAuthGateway(
+  options: MobileAuthGatewayOptions = {},
+): DisposableMobileAuthGateway {
+  const createRedirect = options.createRedirect ?? Linking.createURL;
+  let client = options.client;
+  let runtime: MobileAuthRuntime | undefined;
 
-  function configuredClient(): WebSupabaseClient {
-    if (client) {
-      return client;
-    }
-
+  function configuredClient(): MobileAuthClient {
     try {
-      const config = getWebPublicConfig();
-      siteUrl = config.siteUrl;
-      client = buildClient(config.url, config.publishableKey);
+      if (!client) {
+        runtime = createMobileAuthRuntime();
+        client = runtime.client;
+      }
       return client;
     } catch {
       throw new AuthConfigurationError();
     }
   }
 
-  async function isEligible(
-    currentClient: WebSupabaseClient,
-  ): Promise<boolean> {
-    const [profile, consents] = await Promise.all([
-      currentClient.from("profiles").select("user_id").limit(1).maybeSingle(),
-      currentClient.from("consents").select("document, document_version"),
-    ]);
-
-    if (profile.error || consents.error || !profile.data || !consents.data) {
-      return false;
-    }
-
-    return Object.entries({
-      privacy_notice: stagingLegalVersions.privacyNotice,
-      terms_of_service: stagingLegalVersions.termsOfService,
-    }).every(([document, version]) =>
-      consents.data.some(
-        (consent) =>
-          consent.document === document && consent.document_version === version,
-      ),
-    );
-  }
-
   return {
+    async dispose() {
+      await runtime?.dispose();
+      runtime = undefined;
+      client = undefined;
+    },
+
     async signIn(email, password) {
       try {
         const currentClient = configuredClient();
@@ -125,11 +144,9 @@ export function createWebAuthGateway(): AuthGateway {
           email,
           password,
         });
-
         if (error || !data.session) {
           return { ok: false, reason: failureFromError(error, "credentials") };
         }
-
         if (!(await isEligible(currentClient))) {
           await currentClient.auth.signOut({ scope: "local" });
           return { ok: false, reason: "account-incomplete" };
@@ -143,12 +160,7 @@ export function createWebAuthGateway(): AuthGateway {
 
     async signUp({ email, password, isAdult }) {
       try {
-        const currentClient = configuredClient();
-        if (!siteUrl) {
-          throw new AuthConfigurationError();
-        }
-
-        const { error } = await currentClient.auth.signUp({
+        const { error } = await configuredClient().auth.signUp({
           email,
           password,
           options: {
@@ -158,7 +170,7 @@ export function createWebAuthGateway(): AuthGateway {
               daygym_privacy_version: stagingLegalVersions.privacyNotice,
               daygym_terms_version: stagingLegalVersions.termsOfService,
             },
-            emailRedirectTo: exactCallback(siteUrl, "/entrar/"),
+            emailRedirectTo: exactMobileCallback("entrar", createRedirect),
           },
         });
 
@@ -178,18 +190,12 @@ export function createWebAuthGateway(): AuthGateway {
 
     async requestPasswordReset(email) {
       try {
-        const currentClient = configuredClient();
-        if (!siteUrl) {
-          throw new AuthConfigurationError();
-        }
-
-        const { error } = await currentClient.auth.resetPasswordForEmail(
+        const { error } = await configuredClient().auth.resetPasswordForEmail(
           email,
           {
-            redirectTo: exactCallback(siteUrl, "/redefinir-senha/"),
+            redirectTo: exactMobileCallback("redefinir-senha", createRedirect),
           },
         );
-
         if (failureFromError(error, "unexpected") === "rate-limited") {
           return { ok: false, reason: "rate-limited" };
         }
