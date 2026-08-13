@@ -26,10 +26,10 @@ interface PlanSourceOption {
 
 const planSourceOptions: readonly PlanSourceOption[] = [
   {
-    label: "Usar sugestão DayGym",
-    meta: "Poucos minutos · sem arquivo",
-    support: "Comece com um plano baseado nas suas respostas.",
-    value: "daygym_suggestion",
+    label: "Preciso de um profissional",
+    meta: "Requer convite e verificação",
+    support: "Conecte-se a um profissional que você já conhece.",
+    value: "professional",
   },
   {
     label: "Importar planilha oficial",
@@ -42,12 +42,6 @@ const planSourceOptions: readonly PlanSourceOption[] = [
     meta: "Você escolhe cada exercício",
     support: "Crie a primeira sessão do seu jeito.",
     value: "manual",
-  },
-  {
-    label: "Receber de profissional",
-    meta: "Precisa de um convite",
-    support: "Acompanhe um plano enviado por um profissional.",
-    value: "professional",
   },
 ];
 

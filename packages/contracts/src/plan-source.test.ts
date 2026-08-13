@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { planSourceSchema, planSourceStateSchema } from "./plan-source.js";
 
 describe("plan source contracts", () => {
-  it("accepts exactly the four approved paths", () => {
+  it("accepts exactly the three approved paths", () => {
     expect(
-      ["daygym_suggestion", "official_xlsx", "manual", "professional"].map(
-        (source) => planSourceSchema.parse(source),
+      ["official_xlsx", "manual", "professional"].map((source) =>
+        planSourceSchema.parse(source),
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
+    expect(() => planSourceSchema.parse("daygym_suggestion")).toThrow();
     expect(() => planSourceSchema.parse("automatic_plan")).toThrow();
   });
 
