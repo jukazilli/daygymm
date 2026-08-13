@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "DayGym",
     description: "Plano, registro e evolução do seu treino.",
     id: "/",
-    start_url: "/comecar/",
+    start_url: "/hoje/",
     scope: "/",
     display: "standalone",
     background_color: "#FFFBF8",

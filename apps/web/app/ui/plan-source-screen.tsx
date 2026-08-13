@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type {
@@ -115,14 +116,10 @@ export function PlanSourceScreen({
   return (
     <main className="onboarding-shell">
       <header className="product-header">
-        <a
-          className="brand"
-          href="/escolher-plano/"
-          aria-label="DayGym — início"
-        >
+        <Link className="brand" href="/hoje/" aria-label="DayGym — Hoje">
           DayGym
-        </a>
-        <a href="/conta/">Minha conta</a>
+        </Link>
+        <Link href="/hoje/">Hoje</Link>
       </header>
       <section className="onboarding-card plan-source-panel">
         <p className="eyebrow">Seu plano</p>
@@ -178,6 +175,12 @@ export function PlanSourceScreen({
           >
             {feedback}
           </p>
+        ) : null}
+
+        {state?.source ? (
+          <Link className="button-primary plan-source-continue" href="/hoje/">
+            Continuar para Hoje
+          </Link>
         ) : null}
       </section>
     </main>
