@@ -483,35 +483,91 @@ input:focus-visible {
   width: 100%;
 }
 
-.onboarding-complete {
-  text-align: center;
-}
-
-.onboarding-complete h1,
-.onboarding-complete .support {
-  margin-right: auto;
-  margin-left: auto;
-}
-
-.completion-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: var(--space-5);
-  border-radius: 50%;
-  background: var(--color-action-soft);
-  color: var(--color-action);
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
 .onboarding-loading {
   display: grid;
   min-height: calc(100vh - (2 * var(--space-5)));
   place-items: center;
   color: var(--color-text-secondary);
   font-weight: 600;
+}
+
+.plan-source-panel {
+  width: min(100%, 46rem);
+}
+
+.plan-source-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+
+.plan-source-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 112px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.plan-source-option:hover:not(:disabled),
+.plan-source-option:focus-visible,
+.plan-source-option[data-selected] {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.plan-source-option:focus-visible {
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 2px;
+}
+
+.plan-source-option:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.plan-source-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.plan-source-copy strong {
+  font-size: 1.0625rem;
+}
+
+.plan-source-copy > span,
+.plan-source-copy small {
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.plan-source-copy small {
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.plan-source-state {
+  min-width: 5.5rem;
+  color: var(--color-action-pressed);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.plan-source-loading {
+  min-height: 18rem;
 }
 
 @media (max-width: 760px) {
@@ -554,6 +610,15 @@ input:focus-visible {
 
   .onboarding-actions {
     display: grid;
+  }
+
+  .plan-source-option {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-source-state {
+    min-width: 0;
+    text-align: left;
   }
 }
 

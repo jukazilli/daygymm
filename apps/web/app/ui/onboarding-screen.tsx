@@ -234,8 +234,13 @@ export function OnboardingScreen({
           return;
         }
 
+        if (result.value.completedAt) {
+          navigate("/escolher-plano/");
+          return;
+        }
+
         setContext(result.value);
-        setActiveStep(result.value.completedAt ? 7 : result.value.currentStep);
+        setActiveStep(result.value.currentStep);
       });
   }, [navigate]);
 
@@ -297,8 +302,7 @@ export function OnboardingScreen({
       return;
     }
 
-    setContext(result.value);
-    setActiveStep(7);
+    navigate("/escolher-plano/");
   }
 
   function editStep(step: number) {
@@ -313,30 +317,6 @@ export function OnboardingScreen({
         <div className="onboarding-loading" aria-live="polite">
           {feedback ?? "Carregando seu treino…"}
         </div>
-      </main>
-    );
-  }
-
-  if (activeStep === 7) {
-    return (
-      <main className="onboarding-shell">
-        <header className="product-header">
-          <a className="brand" href="/comecar/" aria-label="DayGym — início">
-            DayGym
-          </a>
-          <a href="/conta/">Minha conta</a>
-        </header>
-        <section className="onboarding-card onboarding-complete">
-          <span className="completion-mark" aria-hidden="true">
-            ✓
-          </span>
-          <p className="eyebrow">Contexto salvo</p>
-          <h1>Base do treino pronta.</h1>
-          <p className="support">Suas respostas estão salvas.</p>
-          <a className="button-secondary" href="/conta/">
-            Minha conta
-          </a>
-        </section>
       </main>
     );
   }
