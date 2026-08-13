@@ -74,6 +74,7 @@ select ok(
   has_schema_privilege('authenticated', 'api', 'usage'),
   'authenticated can use the api schema'
 );
+-- RLS-N01: anonymous clients cannot enter the exposed API schema.
 select ok(
   not has_schema_privilege('anon', 'api', 'usage'),
   'anonymous users cannot use the api schema'
@@ -82,6 +83,7 @@ select ok(
   has_table_privilege('authenticated', 'api.profiles', 'select'),
   'authenticated can select profiles through RLS'
 );
+-- RLS-N02: authenticated clients cannot mutate eligibility directly.
 select ok(
   not has_table_privilege('authenticated', 'api.profiles', 'insert'),
   'clients cannot create eligibility directly'
@@ -108,6 +110,7 @@ select ok(
   has_table_privilege('authenticated', 'api.consents', 'select'),
   'authenticated can select their acceptance history through RLS'
 );
+-- RLS-N03: authenticated clients cannot mutate acceptance evidence directly.
 select ok(
   not has_table_privilege('authenticated', 'api.consents', 'insert'),
   'clients cannot create acceptance evidence directly'
@@ -141,6 +144,7 @@ select ok(
   not has_table_privilege('authenticated', 'api.consents', 'delete'),
   'acceptance history cannot be deleted directly'
 );
+-- RLS-N04: authenticated clients cannot read the private version registry.
 select ok(
   not has_table_privilege(
     'authenticated',
@@ -331,6 +335,7 @@ select is(
   1::bigint,
   'a user sees exactly their own profile'
 );
+-- RLS-N05: profiles_select_own hides another user's profile.
 select is(
   (
     select count(*)
@@ -345,6 +350,7 @@ select is(
   2::bigint,
   'a user sees exactly their two required acceptances'
 );
+-- RLS-N06: consents_select_own hides another user's acceptance history.
 select is(
   (
     select count(*)
