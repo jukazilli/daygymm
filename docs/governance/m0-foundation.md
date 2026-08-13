@@ -100,3 +100,8 @@ GitHub Issues é público neste repositório e, portanto, não pode receber o
 backlog canônico restrito. O M0 permanece aberto até que uma fonte operacional
 privada seja definida e os demais gates de autenticação, observabilidade,
 restauração, privacidade e operação sejam comprovados.
+
+O estado sanitizado de owners, acessos, recuperação e custos fica no
+[inventário operacional de acessos e custos](./access-and-cost-inventory.md).
+FND-001 permanece aberto enquanto MFA, recuperação e substitutos não forem
+comprovados fora do repositório para todas as superfícies críticas.
