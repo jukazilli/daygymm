@@ -45,6 +45,23 @@ deve escolher uma destas saídas:
 2. registrar nova decisão temporária, com escopo, risco, prazo e controles
    compensatórios próprios.
 
+## Promoção entre staging e main
+
+O SHA candidato passa primeiro pelos checks do PR e depois avança `staging`
+somente por fast-forward. O deploy hospedado valida banco, API, worker e web. O
+mesmo histórico é então promovido a `main` com merge commit.
+
+Rebase e squash não são usados nessa promoção porque trocam os SHAs já provados
+em staging. A proteção de histórico linear fica desligada; force push e
+exclusão das branches permanecem bloqueados.
+
+### Exceção de reconciliação M0-GAP-001
+
+O owner autorizou uma segunda exceção de fundador solo, limitada ao PR que
+reconcilia os históricos criados pelo rebase do PR #1 e comprova o fluxo acima.
+Os mesmos controles compensatórios permanecem obrigatórios. A exceção termina
+com o merge desse PR, quando a proteção volta a exigir uma aprovação humana.
+
 ## Pendência operacional
 
 GitHub Issues é público neste repositório e, portanto, não pode receber o
