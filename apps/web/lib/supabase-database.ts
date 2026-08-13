@@ -14,6 +14,8 @@ export interface OnboardingContextRow extends Record<string, unknown> {
   experience: string | null;
   goal: string | null;
   limitation_status: string | null;
+  plan_source: string | null;
+  plan_source_selected_at: string | null;
   session_minutes: number | null;
   updated_at: string;
   user_id: string;
@@ -36,6 +38,12 @@ export interface WebDatabase {
     };
     Views: Record<string, never>;
     Functions: {
+      select_plan_source: {
+        Args: {
+          p_plan_source: string;
+        };
+        Returns: OnboardingContextRow;
+      };
       save_onboarding_context: {
         Args: {
           p_confirmed: boolean;
