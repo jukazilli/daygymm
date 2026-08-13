@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm --filter @daygym/contracts build && next build",
     "dev": "next dev",
+    "generate:training-template": "node scripts/generate-official-training-template.mjs",
     "lint": "eslint app lib next.config.ts",
     "start": "next start",
     "test": "vitest run",
@@ -17,9 +18,11 @@
     "@daygym/design-tokens": "workspace:*",
     "@fontsource/nunito": "5.3.0",
     "@supabase/supabase-js": "2.112.3",
+    "fflate": "0.8.3",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "read-excel-file": "9.3.10"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

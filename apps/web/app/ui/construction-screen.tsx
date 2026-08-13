@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { AuthGateway } from "../../lib/auth-gateway";
 import { createWebAuthGateway } from "../../lib/auth-gateway";
-import { AppShell, type AppDestination } from "./app-shell";
+import { AppLoadingSkeleton, AppShell, type AppDestination } from "./app-shell";
 
 interface ConstructionScreenProps {
   readonly active: AppDestination;
@@ -62,9 +62,7 @@ export function ConstructionScreen({
   return (
     <AppShell active={active}>
       {sessionState === "checking" ? (
-        <div className="app-loading" role="status">
-          Verificando acesso…
-        </div>
+        <AppLoadingSkeleton label="Verificando acesso" />
       ) : null}
       {sessionState === "ready" ? (
         <section className="app-state-card construction-card">

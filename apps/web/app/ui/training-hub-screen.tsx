@@ -4,17 +4,21 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type {
+  ImportedTrainingPlan,
   PlanSource,
   PlanSourceGateway,
   PlanSourceState,
+  TrainingPlanGateway,
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { AppShell } from "./app-shell";
+import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
+import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TrainingHubScreenProps {
   readonly gateway?: PlanSourceGateway;
   readonly navigate?: (path: string) => void;
+  readonly trainingPlanGateway?: TrainingPlanGateway;
 }
 
 const sourceContent: Record<PlanSource, { label: string; next: string }> = {
@@ -37,7 +41,13 @@ function defaultNavigate(path: string) {
   window.location.assign(path);
 }
 
-function TrainingState({ state }: Readonly<{ state: PlanSourceState }>) {
+function TrainingState({
+  activePlan,
+  state,
+}: Readonly<{
+  activePlan: ImportedTrainingPlan | null;
+  state: PlanSourceState;
+}>) {
   if (!state.onboardingCompleted) {
     return (
       <section className="app-state-card training-card">
@@ -62,13 +72,41 @@ function TrainingState({ state }: Readonly<{ state: PlanSourceState }>) {
     );
   }
 
+  if (activePlan) {
+    return (
+      <section className="app-state-card training-card">
+        <p className="eyebrow">Plano ativo · versão {activePlan.version}</p>
+        <h1>{activePlan.name}</h1>
+        <p>
+          {activePlan.sessionCount} sessões · {activePlan.itemCount} exercícios
+        </p>
+        <span className="construction-pill">Execução em construção</span>
+      </section>
+    );
+  }
+
+  if (state.source === "official_xlsx") {
+    return (
+      <section className="app-state-card training-card">
+        <p className="eyebrow">Planilha oficial</p>
+        <h1>Importe seu primeiro plano.</h1>
+        <Link className="button-primary" href="/treinos/importar/">
+          Importar planilha
+        </Link>
+        <Link className="button-text" href="/escolher-plano/?alterar=1">
+          Alterar caminho
+        </Link>
+      </section>
+    );
+  }
+
   const content = sourceContent[state.source];
   return (
     <section className="app-state-card training-card">
       <p className="eyebrow">{content.label}</p>
       <h1>{content.next}</h1>
       <span className="construction-pill">Em construção</span>
-      <Link className="button-secondary" href="/escolher-plano/">
+      <Link className="button-secondary" href="/escolher-plano/?alterar=1">
         Alterar caminho
       </Link>
     </section>
@@ -78,9 +116,14 @@ function TrainingState({ state }: Readonly<{ state: PlanSourceState }>) {
 export function TrainingHubScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  trainingPlanGateway: providedTrainingPlanGateway,
 }: TrainingHubScreenProps) {
   const gatewayRef = useRef<PlanSourceGateway | undefined>(providedGateway);
+  const trainingPlanGatewayRef = useRef<TrainingPlanGateway | undefined>(
+    providedTrainingPlanGateway,
+  );
   const [state, setState] = useState<PlanSourceState>();
+  const [activePlan, setActivePlan] = useState<ImportedTrainingPlan | null>();
   const [failed, setFailed] = useState(false);
 
   function gateway() {
@@ -88,24 +131,34 @@ export function TrainingHubScreen({
     return gatewayRef.current;
   }
 
+  function trainingPlanGateway() {
+    trainingPlanGatewayRef.current ??= createWebTrainingPlanGateway();
+    return trainingPlanGatewayRef.current;
+  }
+
   useEffect(() => {
     let active = true;
-    void gateway()
-      .load()
-      .then((result) => {
-        if (!active) {
+    void Promise.all([
+      gateway().load(),
+      trainingPlanGateway().loadActive(),
+    ]).then(([sourceResult, planResult]) => {
+      if (!active) {
+        return;
+      }
+      if (!sourceResult.ok || !planResult.ok) {
+        if (
+          (!sourceResult.ok && sourceResult.reason === "session") ||
+          (!planResult.ok && planResult.reason === "session")
+        ) {
+          navigate("/entrar/");
           return;
         }
-        if (!result.ok) {
-          if (result.reason === "session") {
-            navigate("/entrar/");
-            return;
-          }
-          setFailed(true);
-          return;
-        }
-        setState(result.value);
-      });
+        setFailed(true);
+        return;
+      }
+      setState(sourceResult.value);
+      setActivePlan(planResult.value);
+    });
     return () => {
       active = false;
     };
@@ -113,12 +166,12 @@ export function TrainingHubScreen({
 
   return (
     <AppShell active="workouts">
-      {!state && !failed ? (
-        <div className="app-loading" role="status">
-          Carregando Treinos…
-        </div>
+      {(!state || activePlan === undefined) && !failed ? (
+        <AppLoadingSkeleton label="Carregando Treinos" />
       ) : null}
-      {state ? <TrainingState state={state} /> : null}
+      {state && activePlan !== undefined ? (
+        <TrainingState activePlan={activePlan} state={state} />
+      ) : null}
       {failed ? (
         <section className="app-state-card" role="alert">
           <p className="eyebrow">Treinos</p>

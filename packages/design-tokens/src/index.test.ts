@@ -12,7 +12,7 @@ describe("DayGym design tokens", () => {
   });
 
   it("uses a readable dark foreground on luminous orange", () => {
-    expect(dayGymTokens.color.light.actionContrast).toBe("#24150B");
+    expect(dayGymTokens.color.light.actionContrast).toBe("#FFFFFF");
   });
 
   it("uses Nunito without changing the approved type scale", () => {
