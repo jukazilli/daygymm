@@ -8,6 +8,14 @@ export interface PublicSupabaseConfig {
   readonly publishableKey: string;
 }
 
+export interface PublicWebEnvironment extends PublicSupabaseEnvironment {
+  readonly siteUrl: string | undefined;
+}
+
+export interface PublicWebConfig extends PublicSupabaseConfig {
+  readonly siteUrl: string;
+}
+
 const publishableKeyPattern = /^sb_publishable_[A-Za-z0-9._-]{16,}$/;
 
 function validateUrl(value: string): string {
@@ -32,6 +40,22 @@ function validateUrl(value: string): string {
   }
 
   return parsed.origin;
+}
+
+export function parsePublicWebConfig(
+  environment: PublicWebEnvironment,
+): PublicWebConfig {
+  const supabase = parsePublicSupabaseConfig(environment);
+  const rawSiteUrl = environment.siteUrl;
+
+  if (!rawSiteUrl) {
+    throw new Error("Public web configuration is missing: site URL.");
+  }
+
+  return Object.freeze({
+    ...supabase,
+    siteUrl: validateUrl(rawSiteUrl),
+  });
 }
 
 export function parsePublicSupabaseConfig(

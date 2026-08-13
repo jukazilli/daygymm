@@ -2,18 +2,28 @@
   "name": "@daygym/web",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint app lib next.config.ts",
     "start": "next start",
+    "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@daygym/config": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
+    "@fontsource/onest": "5.3.0",
+    "@supabase/supabase-js": "2.112.3",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.4",
+    "jsdom": "28.1.0",
+    "vitest": "4.1.10"
   }
 }

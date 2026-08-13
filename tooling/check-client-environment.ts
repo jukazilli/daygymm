@@ -14,6 +14,7 @@ const allowedByApplication = new Map<string, ReadonlySet<string>>([
   [
     "apps/web",
     new Set([
+      "NEXT_PUBLIC_DAYGYM_SITE_URL",
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_SUPABASE_URL",
       "NODE_ENV",
@@ -29,6 +30,7 @@ const allowedByApplication = new Map<string, ReadonlySet<string>>([
   ],
 ]);
 const requiredVariables = new Set([
+  "NEXT_PUBLIC_DAYGYM_SITE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
   "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
