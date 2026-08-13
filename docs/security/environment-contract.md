@@ -48,3 +48,8 @@ operacional atual não possui permissão para consultar as API keys do projeto n
 Supabase. FND-018 permanece `In Progress` até uma conta autorizada fornecer a
 chave `sb_publishable_` diretamente aos stores dos provedores, sem copiá-la para
 código, documentação, issue ou log.
+
+Os riscos e testes obrigatórios desse fluxo estão em
+[`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
+para declarar autenticação pronta: callbacks, sessão, não enumeração e
+isolamento também precisam das evidências previstas ali.
