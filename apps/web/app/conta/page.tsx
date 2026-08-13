@@ -1,5 +1,5 @@
-import { AuthScreen } from "../ui/auth-screen";
+import { ProfileScreen } from "../ui/profile-screen";
 
 export default function AccountPage() {
-  return <AuthScreen mode="account" />;
+  return <ProfileScreen />;
 }
