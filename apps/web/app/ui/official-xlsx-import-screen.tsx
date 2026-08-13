@@ -63,6 +63,8 @@ export function OfficialXlsxImportScreen({
     parsed?.proposal !== null &&
     parsed?.proposal !== undefined &&
     parsed.planName.trim().length > 0;
+  const blockingIssueCount =
+    parsed?.issues.filter((issue) => issue.severity === "blocking").length ?? 0;
 
   function sourceGateway() {
     sourceGatewayRef.current ??= createWebPlanSourceGateway();
@@ -245,20 +247,38 @@ export function OfficialXlsxImportScreen({
               </div>
 
               {parsed.issues.length > 0 ? (
-                <div className="import-issues">
-                  {parsed.issues.map((issue, index) => (
-                    <p
-                      data-severity={issue.severity}
-                      key={`${issue.row ?? "file"}-${index}`}
-                    >
-                      {issue.row ? `Linha ${issue.row}: ` : ""}
-                      {issue.message}
-                    </p>
-                  ))}
-                </div>
+                <details className="import-issues">
+                  <summary>
+                    <span>
+                      {blockingIssueCount > 0
+                        ? "Houve erros durante a importação"
+                        : "Há avisos para revisar"}
+                    </span>
+                    <small>
+                      {parsed.issues.length}{" "}
+                      {parsed.issues.length === 1 ? "item" : "itens"}
+                    </small>
+                  </summary>
+                  <div className="import-issue-list">
+                    {parsed.issues.map((issue, index) => (
+                      <p
+                        data-severity={issue.severity}
+                        key={`${issue.row ?? "file"}-${index}`}
+                      >
+                        {issue.row ? `Linha ${issue.row}: ` : ""}
+                        {issue.message}
+                      </p>
+                    ))}
+                  </div>
+                </details>
               ) : null}
 
-              <div className="import-session-list">
+              <div
+                aria-label="Treinos encontrados"
+                className="import-session-list"
+                role="region"
+                tabIndex={0}
+              >
                 {parsed.sessions.map((session) => (
                   <article
                     className="import-session-card"
