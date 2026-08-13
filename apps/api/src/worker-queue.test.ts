@@ -17,6 +17,7 @@ function buildDatabase(): WorkerQueueDatabase & {
     archive: vi.fn(async () => [{ archived: true }]),
     close: vi.fn(async () => undefined),
     dispatch: vi.fn(async () => [{ dispatched: 1 }]),
+    handle: vi.fn(async () => [{ outcome: "processed" }]),
     read: vi.fn(async () => [
       {
         message_id: "9223372036854775806",

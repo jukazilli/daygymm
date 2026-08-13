@@ -13,9 +13,16 @@ import {
   type ProblemDetails,
 } from "@daygym/contracts";
 
+import type { DomainEventWorkerCycleResult } from "./domain-event-worker.js";
+import { runConfiguredDomainEventWorkerCycle } from "./worker-runtime.js";
+
 export type RuntimeConfiguration = {
   environment: string;
   processKind: "api" | "worker";
+};
+
+export type RuntimeDependencies = {
+  runWorkerCycle?: () => Promise<DomainEventWorkerCycleResult>;
 };
 
 function readProcessKind(
@@ -33,7 +40,10 @@ export function readRuntimeConfiguration(
   };
 }
 
-export function buildServer(configuration = readRuntimeConfiguration()) {
+export function buildServer(
+  configuration = readRuntimeConfiguration(),
+  dependencies: RuntimeDependencies = {},
+) {
   const server = Fastify({
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
@@ -79,6 +89,48 @@ export function buildServer(configuration = readRuntimeConfiguration()) {
   );
 
   server.get("/v1/openapi.json", async () => dayGymOpenApiV1);
+
+  if (configuration.processKind === "worker") {
+    server.post(
+      "/internal/jobs/domain-events",
+      {
+        schema: {
+          body: {
+            type: "object",
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request) => {
+        const runWorkerCycle =
+          dependencies.runWorkerCycle ?? runConfiguredDomainEventWorkerCycle;
+        const result = await runWorkerCycle();
+
+        request.log.info(
+          {
+            already_processed: result.alreadyProcessed,
+            correlation_id: request.id,
+            dispatched: result.dispatched,
+            failed: result.failed,
+            processed: result.processed,
+            received: result.received,
+          },
+          "domain event cycle completed",
+        );
+
+        if (result.failed > 0) {
+          throw Object.assign(new Error("worker.cycle_incomplete"), {
+            code: "worker.cycle_incomplete",
+          });
+        }
+
+        return {
+          status: "completed",
+          ...result,
+        };
+      },
+    );
+  }
 
   server.setNotFoundHandler(async (request, reply) => {
     const problem = buildProblemDetails("not-found", request.id);

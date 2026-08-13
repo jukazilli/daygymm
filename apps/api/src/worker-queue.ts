@@ -3,6 +3,8 @@ import { isAbsolute } from "node:path";
 
 import postgres from "postgres";
 
+import type { DomainEventV1 } from "@daygym/contracts";
+
 import type {
   DomainEventQueue,
   DomainEventQueueMessage,
@@ -29,6 +31,7 @@ export type WorkerQueueDatabase = {
   archive(messageId: string): Promise<unknown>;
   close(): Promise<void>;
   dispatch(batchSize: number): Promise<unknown>;
+  handle(event: DomainEventV1): Promise<unknown>;
   read(visibilityTimeoutSeconds: number, batchSize: number): Promise<unknown>;
 };
 
@@ -134,6 +137,13 @@ export function createPostgresWorkerQueueDatabase(
     async dispatch(batchSize) {
       return sql`
         select private.worker_dispatch_domain_events(${batchSize}) as dispatched
+      `;
+    },
+    async handle(event) {
+      return sql`
+        select private.worker_handle_domain_event(
+          ${sql.json(event)}::jsonb
+        ) as outcome
       `;
     },
     async read(visibilityTimeoutSeconds, batchSize) {

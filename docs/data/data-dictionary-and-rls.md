@@ -107,15 +107,33 @@ identidade estável do evento correspondente. O corte não modela sets, timers,
 notas ou o ciclo da sessão ativa; esses dados pertencem ao M1 e serão adicionados
 sem reescrever uma finalização já confirmada.
 
-| Campo                 | Tipo/restrição                              | Finalidade                                     | Classificação              | Retenção atual                                                               | Índice                                 |
-| --------------------- | ------------------------------------------- | ---------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
-| `session_id`          | UUID, PK                                    | Identificar a sessão canônica                  | Identificador técnico      | Ciclo de vida da conta; política final no `FND-029`                          | PK                                     |
-| `user_id`             | UUID, FK `api.profiles.user_id`, cascade    | Vincular a sessão ao titular                   | Identificador pessoal      | Removido em cascade com o perfil enquanto não houver decisão legal diferente | `training_sessions_user_completed_idx` |
-| `operation_id`        | text, 16–128, formato técnico, unique/owner | Deduplicar replay do comando offline           | Identificador técnico      | Mesmo ciclo da sessão                                                        | Unique composto                        |
-| `completed_at`        | timestamptz, obrigatório                    | Registrar o instante declarado da finalização  | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | `training_sessions_user_completed_idx` |
-| `version`             | integer positivo                            | Controlar a versão canônica da sessão          | Metadado técnico           | Mesmo ciclo da sessão                                                        | Não                                    |
-| `completion_event_id` | UUID, unique                                | Fixar o evento emitido na primeira finalização | Identificador técnico      | Mesmo ciclo da sessão/evento                                                 | Unique                                 |
-| `created_at`          | timestamptz, obrigatório                    | Registrar a persistência no servidor           | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
+| Campo                    | Tipo/restrição                              | Finalidade                                     | Classificação              | Retenção atual                                                               | Índice                                 |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
+| `session_id`             | UUID, PK                                    | Identificar a sessão canônica                  | Identificador técnico      | Ciclo de vida da conta; política final no `FND-029`                          | PK                                     |
+| `user_id`                | UUID, FK `api.profiles.user_id`, cascade    | Vincular a sessão ao titular                   | Identificador pessoal      | Removido em cascade com o perfil enquanto não houver decisão legal diferente | `training_sessions_user_completed_idx` |
+| `operation_id`           | text, 16–128, formato técnico, unique/owner | Deduplicar replay do comando offline           | Identificador técnico      | Mesmo ciclo da sessão                                                        | Unique composto                        |
+| `completed_at`           | timestamptz, obrigatório                    | Registrar o instante declarado da finalização  | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | `training_sessions_user_completed_idx` |
+| `version`                | integer positivo                            | Controlar a versão canônica da sessão          | Metadado técnico           | Mesmo ciclo da sessão                                                        | Não                                    |
+| `completion_event_id`    | UUID, unique                                | Fixar o evento emitido na primeira finalização | Identificador técnico      | Mesmo ciclo da sessão/evento                                                 | Unique                                 |
+| `completion_consumed_at` | timestamptz, opcional                       | Confirmar aplicação idempotente do handler     | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
+| `created_at`             | timestamptz, obrigatório                    | Registrar a persistência no servidor           | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
+
+### `platform.domain_event_receipts`
+
+Owner: handlers internos executados pelo worker.
+
+Finalidade: manter a chave idempotente durável de cada efeito concluído. A
+relação não armazena payload, usuário, sessão, correlação ou conteúdo de treino;
+serve apenas para impedir reaplicação após replay da fila.
+
+| Campo           | Tipo/restrição                   | Finalidade                               | Classificação         | Retenção atual                                                           | Índice      |
+| --------------- | -------------------------------- | ---------------------------------------- | --------------------- | ------------------------------------------------------------------------ | ----------- |
+| `consumer_name` | text técnico, PK composta        | Versionar o consumidor idempotente       | Metadado operacional  | Sem expurgo automático no staging sintético; política final no `FND-029` | PK composta |
+| `event_id`      | UUID, PK composta                | Deduplicar o efeito para o consumidor    | Identificador técnico | Mesmo ciclo do recibo                                                    | PK composta |
+| `event_name`    | `TrainingSessionCompleted`       | Fixar o contrato tratado neste corte     | Metadado operacional  | Mesmo ciclo do recibo                                                    | Não         |
+| `event_version` | smallint, somente `1`            | Fixar a versão do contrato               | Metadado operacional  | Mesmo ciclo do recibo                                                    | Não         |
+| `occurred_at`   | timestamptz, obrigatório         | Preservar a ordem lógica recebida        | Metadado operacional  | Mesmo ciclo do recibo                                                    | Não         |
+| `processed_at`  | timestamptz, default do servidor | Registrar quando o efeito foi confirmado | Metadado operacional  | Mesmo ciclo do recibo                                                    | Não         |
 
 ## Matriz de acesso e RLS
 
@@ -140,10 +158,14 @@ cliente.
 | `api.training_sessions`           | `anon`                 |     Não |    Não |    Não |    Não | sem `USAGE` em `api`                           | `RLS-N01`            |
 | `api.training_sessions`           | `authenticated`        | Próprio |    Não |    Não |    Não | `training_sessions_select_own`; grants mínimos | `RLS-N09`            |
 | `api.training_sessions`           | função interna         |     Sim |    Sim |    Não |    Não | comando transacional server-owned              | testes do comando    |
+| `platform.domain_event_receipts`  | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema interno; grants revogados               | `RLS-N10`            |
+| `platform.domain_event_receipts`  | worker runtime         |     Não |    Não |    Não |    Não | somente router privado bounded                 | `RLS-N10`            |
+| `platform.domain_event_receipts`  | handler interno        |     Sim |    Sim |    Não |    Não | definer boundary sem payload                   | testes do handler    |
 
 As policies temporárias de inserção criadas na migration inicial foram removidas
-pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
-`consents_select_own`. Os controles negativos estáveis são:
+pela migration seguinte. As policies ativas são `profiles_select_own`,
+`consents_select_own` e `training_sessions_select_own`. Os controles negativos
+estáveis são:
 
 - `RLS-N01`: bloqueia acesso anônimo ao schema exposto;
 - `RLS-N02`: bloqueia mutação direta de elegibilidade;
@@ -155,6 +177,8 @@ pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
 - `RLS-N08`: bloqueia acesso direto do worker ao outbox e ao schema `pgmq`.
 - `RLS-N09`: permite leitura apenas das próprias sessões e bloqueia mutação
   direta por clientes autenticados.
+- `RLS-N10`: bloqueia leitura direta dos recibos e execução do handler concreto
+  pelo worker; o runtime recebe somente o router bounded.
 
 ## Pendências deliberadas para `FND-029`
 

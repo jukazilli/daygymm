@@ -44,6 +44,72 @@ describe("DayGym online health boundary", () => {
     });
   });
 
+  it("runs one bounded domain-event cycle only on the worker surface", async () => {
+    const runWorkerCycle = async () => ({
+      alreadyProcessed: 1,
+      dispatched: 2,
+      failed: 0,
+      processed: 1,
+      received: 2,
+    });
+    const worker = buildServer(
+      { environment: "staging", processKind: "worker" },
+      { runWorkerCycle },
+    );
+    const api = buildServer({ environment: "staging", processKind: "api" });
+    servers.push(worker, api);
+
+    const workerResponse = await worker.inject({
+      method: "POST",
+      url: "/internal/jobs/domain-events",
+      payload: {},
+    });
+    const apiResponse = await api.inject({
+      method: "POST",
+      url: "/internal/jobs/domain-events",
+      payload: {},
+    });
+
+    expect(workerResponse.statusCode).toBe(200);
+    expect(workerResponse.json()).toEqual({
+      status: "completed",
+      alreadyProcessed: 1,
+      dispatched: 2,
+      failed: 0,
+      processed: 1,
+      received: 2,
+    });
+    expect(apiResponse.statusCode).toBe(404);
+  });
+
+  it("reports an incomplete worker cycle without exposing event content", async () => {
+    const worker = buildServer(
+      { environment: "staging", processKind: "worker" },
+      {
+        runWorkerCycle: async () => ({
+          alreadyProcessed: 0,
+          dispatched: 0,
+          failed: 1,
+          processed: 0,
+          received: 1,
+        }),
+      },
+    );
+    servers.push(worker);
+
+    const response = await worker.inject({
+      method: "POST",
+      url: "/internal/jobs/domain-events",
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(problemDetailsSchema.parse(response.json()).code).toBe(
+      "server.unavailable",
+    );
+    expect(response.body).not.toContain("payload");
+  });
+
   it("serves the versioned API contract with a correlation ID", async () => {
     const server = buildServer();
     servers.push(server);
