@@ -6,7 +6,6 @@
     "moduleResolution": "bundler",
     "paths": {
       "@daygym/config": ["../../packages/config/src/index.ts"],
-      "@daygym/contracts": ["../../packages/contracts/src/index.ts"],
       "@daygym/design-tokens": ["../../packages/design-tokens/src/index.ts"]
     }
   },

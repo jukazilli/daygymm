@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "pnpm --filter @daygym/contracts build && next build",
     "dev": "next dev",
     "lint": "eslint app lib next.config.ts",
     "start": "next start",
