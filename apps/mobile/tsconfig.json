@@ -12,7 +12,10 @@
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
+    "config/**/*.ts",
+    "config/**/*.json",
     "lib/**/*.ts",
+    "app.config.ts",
     "expo-env.d.ts",
     ".expo/types/**/*.ts"
   ]

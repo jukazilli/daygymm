@@ -1,0 +1,17 @@
+{
+  "development": {
+    "name": "DayGym Dev",
+    "identifier": "com.daygym.mobile.development",
+    "scheme": "daygym-development"
+  },
+  "preview": {
+    "name": "DayGym Preview",
+    "identifier": "com.daygym.mobile.preview",
+    "scheme": "daygym-preview"
+  },
+  "production": {
+    "name": "DayGym",
+    "identifier": "com.daygym.mobile",
+    "scheme": "daygym"
+  }
+}

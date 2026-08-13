@@ -5,8 +5,9 @@
   "main": "expo-router/entry",
   "scripts": {
     "build": "expo export --platform all --output-dir dist",
-    "dev": "expo start",
-    "lint": "eslint app lib",
+    "dev": "expo start --dev-client",
+    "lint": "eslint app lib config app.config.ts",
+    "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "@expo/metro-runtime": "55.0.12",
     "expo": "55.0.28",
     "expo-constants": "55.0.17",
+    "expo-dev-client": "55.0.37",
     "expo-linking": "55.0.16",
     "expo-router": "55.0.17",
     "expo-status-bar": "55.0.6",

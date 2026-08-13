@@ -1,0 +1,94 @@
+import { readFileSync } from "node:fs";
+import { URL } from "node:url";
+
+import { describe, expect, it } from "vitest";
+
+import { getAppVariant, resolveAppVariant } from "../app.config";
+import appVariants from "./app-variants.json";
+
+interface EasBuildProfile {
+  autoIncrement?: boolean;
+  channel: string;
+  developmentClient?: boolean;
+  distribution: "internal" | "store";
+  environment: string;
+  env: {
+    APP_VARIANT: string;
+  };
+  node: string;
+}
+
+interface EasConfig {
+  cli: {
+    appVersionSource: string;
+    version: string;
+  };
+  build: Record<string, EasBuildProfile>;
+}
+
+describe("mobile app variants", () => {
+  it("defaults safely to development", () => {
+    expect(resolveAppVariant()).toBe("development");
+    expect(resolveAppVariant("")).toBe("development");
+  });
+
+  it("keeps install identifiers and deep-link schemes isolated", () => {
+    const definitions = Object.values(appVariants);
+
+    expect(new Set(definitions.map(({ identifier }) => identifier)).size).toBe(
+      definitions.length,
+    );
+    expect(new Set(definitions.map(({ scheme }) => scheme)).size).toBe(
+      definitions.length,
+    );
+  });
+
+  it.each([
+    ["development", "daygym-development://auth/callback"],
+    ["preview", "daygym-preview://auth/callback"],
+    ["production", "daygym://auth/callback"],
+  ] as const)("defines the %s auth callback", (variant, callback) => {
+    expect(getAppVariant(variant).authCallback).toBe(callback);
+  });
+
+  it("rejects an unknown variant", () => {
+    expect(() => resolveAppVariant("staging")).toThrow(
+      'Invalid APP_VARIANT "staging"',
+    );
+  });
+});
+
+describe("EAS profiles", () => {
+  const easConfig = JSON.parse(
+    readFileSync(new URL("../eas.json", import.meta.url), "utf8"),
+  ) as EasConfig;
+
+  it("pins the toolchain and remote app-version source", () => {
+    expect(easConfig.cli).toEqual({
+      version: "21.8.0",
+      appVersionSource: "remote",
+    });
+  });
+
+  it.each(["development", "preview", "production"] as const)(
+    "isolates the %s profile and channel",
+    (variant) => {
+      const profile = easConfig.build[variant];
+
+      expect(profile).toBeDefined();
+      expect(profile?.environment).toBe(variant);
+      expect(profile?.channel).toBe(variant);
+      expect(profile?.env.APP_VARIANT).toBe(variant);
+      expect(profile?.node).toBe("22.12.0");
+    },
+  );
+
+  it("uses a development client only for local development", () => {
+    expect(easConfig.build.development?.developmentClient).toBe(true);
+    expect(easConfig.build.development?.distribution).toBe("internal");
+    expect(easConfig.build.preview?.developmentClient).toBeUndefined();
+    expect(easConfig.build.production?.developmentClient).toBeUndefined();
+    expect(easConfig.build.production?.distribution).toBe("store");
+    expect(easConfig.build.production?.autoIncrement).toBe(true);
+  });
+});
