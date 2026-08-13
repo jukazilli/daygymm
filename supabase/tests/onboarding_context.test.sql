@@ -64,12 +64,14 @@ select ok(
 select ok(
   has_column_privilege(
       'authenticated',
-      'api.onboarding_contexts.goal',
+      'api.onboarding_contexts',
+      'goal',
       'insert'
     )
     and has_column_privilege(
       'authenticated',
-      'api.onboarding_contexts.goal',
+      'api.onboarding_contexts',
+      'goal',
       'update'
     )
     and not has_table_privilege(
