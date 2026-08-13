@@ -20,10 +20,6 @@ resource "google_cloud_scheduler_job" "domain_events" {
   attempt_deadline = "30s"
   paused           = false
 
-  retry_config {
-    retry_count = 0
-  }
-
   http_target {
     http_method = "POST"
     uri         = "${module.worker_service[0].uri}/internal/jobs/domain-events"
