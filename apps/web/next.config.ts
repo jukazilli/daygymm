@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "export",
   reactStrictMode: true,
   trailingSlash: true,
-  transpilePackages: ["@daygym/design-tokens"],
+  transpilePackages: ["@daygym/contracts", "@daygym/design-tokens"],
 };
 
 export default nextConfig;

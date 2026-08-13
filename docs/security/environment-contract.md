@@ -10,11 +10,11 @@ logados ou copiados para issues.
 | Web        | `NEXT_PUBLIC_DAYGYM_SITE_URL`                | `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 | Mobile     | Scheme e callback derivados de `APP_VARIANT` | `EXPO_PUBLIC_SUPABASE_URL` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 
-| Variante mobile | Identificador de instalação     | Callback permitido                   |
-| --------------- | ------------------------------- | ------------------------------------ |
-| `development`   | `com.daygym.mobile.development` | `daygym-development://auth/callback` |
-| `preview`       | `com.daygym.mobile.preview`     | `daygym-preview://auth/callback`     |
-| `production`    | `com.daygym.mobile`             | `daygym://auth/callback`             |
+| Variante mobile | Identificador de instalação     | Confirmação de conta          | Redefinição de senha                   |
+| --------------- | ------------------------------- | ----------------------------- | -------------------------------------- |
+| `development`   | `com.daygym.mobile.development` | `daygym-development://entrar` | `daygym-development://redefinir-senha` |
+| `preview`       | `com.daygym.mobile.preview`     | `daygym-preview://entrar`     | `daygym-preview://redefinir-senha`     |
+| `production`    | `com.daygym.mobile`             | `daygym://entrar`             | `daygym://redefinir-senha`             |
 
 `NEXT_PUBLIC_DAYGYM_SITE_URL` aceita somente uma origem HTTPS exata, sem path,
 query, fragmento ou credencial. O cliente deriva dela apenas os callbacks
@@ -71,6 +71,14 @@ operacional atual não possui permissão para consultar as API keys do projeto n
 Supabase. FND-018 permanece `In Progress` até uma conta autorizada fornecer a
 chave `sb_publishable_` diretamente aos stores dos provedores, sem copiá-la para
 código, documentação, issue ou log.
+
+Em 13 de agosto de 2026, uma inspeção funcional do staging confirmou que o
+bundle publicado não contém nenhuma das três variáveis públicas web. O login
+falha antes de emitir request ao Supabase, com mensagem de configuração segura.
+Isso comprova o bloqueio sem expor valores: `NEXT_PUBLIC_DAYGYM_SITE_URL`,
+`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` precisam ser
+definidas no ambiente de build do Cloudflare e uma nova publicação deve ser
+inspecionada antes do teste hospedado de autenticação.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
