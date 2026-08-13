@@ -31,7 +31,13 @@ nunca entram em código cliente, bundle, analytics ou log.
 | Configuração pública web    | Variáveis de build do Cloudflare Pages                | Projeto e domínio próprios antes do beta real              |
 | Configuração pública mobile | Ambiente preview do EAS, isolado por perfil e channel | Ambiente production do EAS antes do beta real              |
 | Banco/migrations            | Secret `SUPABASE_DB_URL_STAGING` no GitHub Actions    | Secret e approval próprios antes de dados reais            |
+| Banco/worker                | `daygym-database-url` no Google Secret Manager        | Role e secret próprios, sem reutilizar migration/admin     |
 | Google Cloud                | OIDC federado, sem chave persistente no GitHub        | Service account e environment separados antes do beta real |
+
+O worker recebe somente o caminho `DAYGYM_DATABASE_URL_FILE`. O arquivo montado
+usa a role PostgreSQL `daygym_worker_runtime`, connection limit 2 e wrappers
+privados bounded. A URL nunca entra em variável pública, imagem, log ou output
+de Terraform.
 
 ## Rotação e vazamento
 

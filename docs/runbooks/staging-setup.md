@@ -80,6 +80,12 @@ seed de dados reais, Docker ou acesso a projetos fora do staging.
   local ignorado apenas para executar uma migration manual autorizada.
 - URLs de banco e secrets de serviço entram no Secret Manager por fluxo seguro;
   nunca entram em commits, variáveis públicas, outputs do Terraform ou logs.
+- `daygym-database-url` contém exclusivamente a conexão da role
+  `daygym_worker_runtime`. Depois da migration de identidade, um owner autenticado
+  rotaciona o valor com `pnpm db:provision:worker:staging`; o comando gera a senha,
+  aplica-a pelo canal administrativo e envia a URL diretamente ao Secret Manager.
+- O Cloud Run monta esse secret em `/var/run/secrets/daygym/database-url`; somente
+  `daygym-worker-runtime` recebe `roles/secretmanager.secretAccessor` nesse secret.
 - Chaves públicas de cliente só serão configuradas quando a integração do app
   com Supabase for implementada.
 

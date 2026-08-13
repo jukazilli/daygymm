@@ -58,6 +58,19 @@ variable "public_access" {
   description = "Whether to disable the Cloud Run invoker IAM check."
 }
 
+variable "database_url_secret_id" {
+  type        = string
+  description = "Optional Secret Manager ID mounted as the worker database URL."
+  default     = null
+  nullable    = true
+}
+
+variable "database_url_secret_version" {
+  type        = string
+  description = "Secret version mounted by Cloud Run; volume mounts may safely follow latest."
+  default     = "latest"
+}
+
 variable "labels" {
   type        = map(string)
   description = "Ownership labels attached to the Cloud Run service."
