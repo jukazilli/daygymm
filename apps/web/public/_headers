@@ -4,3 +4,8 @@
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Security-Policy: default-src 'self'; script-src 'self'
+  Content-Type: application/javascript; charset=utf-8

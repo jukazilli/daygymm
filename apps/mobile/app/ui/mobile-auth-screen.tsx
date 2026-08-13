@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.light.action,
   },
   checkmark: {
-    color: color.light.card,
+    color: color.light.actionContrast,
     fontFamily: typography.familyBold,
     fontSize: 16,
   },
@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
   primaryButtonPressed: { backgroundColor: color.light.actionPressed },
   buttonDisabled: { opacity: 0.62 },
   primaryButtonLabel: {
-    color: color.light.card,
+    color: color.light.actionContrast,
     fontFamily: typography.familyBold,
     fontSize: typography.body,
   },

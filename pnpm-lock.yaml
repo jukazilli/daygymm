@@ -70,9 +70,9 @@ importers:
       "@daygym/design-tokens":
         specifier: workspace:*
         version: link:../../packages/design-tokens
-      "@expo-google-fonts/onest":
-        specifier: 0.4.1
-        version: 0.4.1
+      "@expo-google-fonts/nunito":
+        specifier: 0.4.2
+        version: 0.4.2
       "@expo/metro-runtime":
         specifier: 55.0.12
         version: 55.0.12(@expo/dom-webview@55.0.6)(expo@55.0.28)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)
@@ -103,6 +103,9 @@ importers:
       expo-secure-store:
         specifier: 55.0.16
         version: 55.0.16(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))
+      expo-splash-screen:
+        specifier: 55.0.23
+        version: 55.0.23(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
       expo-sqlite:
         specifier: 55.0.18
         version: 55.0.18(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)
@@ -139,7 +142,7 @@ importers:
       "@daygym/design-tokens":
         specifier: workspace:*
         version: link:../../packages/design-tokens
-      "@fontsource/onest":
+      "@fontsource/nunito":
         specifier: 5.3.0
         version: 5.3.0
       "@supabase/supabase-js":
@@ -1382,10 +1385,10 @@ packages:
         integrity: sha512-jJzgVcbkJnl48X5iBFNaL5CQHwoBElJapl8unc2Ri8DnyuBR+gRiuAD4gu3ESZjjo3sknIoYIwloOsWzKbLknQ==,
       }
 
-  "@expo-google-fonts/onest@0.4.1":
+  "@expo-google-fonts/nunito@0.4.2":
     resolution:
       {
-        integrity: sha512-g+onvw0be9D/W/5WPYaEP+PT/MUma+Gb6O1n/T0FvRBMRx5fMHDMwjwzd3vY95G5zEAxPv1e53XIpxHiKd5DoA==,
+        integrity: sha512-1KCWphw/I2ugqfs9iRHUCkPTnomNgGPtF4AvqVquoEKxr0EL+mcLNLgeixsslbaSFevRR6/KJAE3sc8g0VaY0Q==,
       }
 
   "@expo/cli@55.0.34":
@@ -1698,10 +1701,10 @@ packages:
         integrity: sha512-INS+6gh91cLUjB+PVHfu1UqcB76Sqtpyp7bnL+FYojhjygvOPA9ctiD/JDKsyD9Xgu4hUhCSJBPig/w7duNajw==,
       }
 
-  "@fontsource/onest@5.3.0":
+  "@fontsource/nunito@5.3.0":
     resolution:
       {
-        integrity: sha512-+RavnZZ3Ql/CnxaOCqkRPCO2JR7Eh9WO6vwsb+bF0806Ta65No7ekm3+ye9+piadhqjQ7Dvu4cJo96RniquNFw==,
+        integrity: sha512-vw9TaTQJ/zpEpKrsODuPmOvaVjXgdda6B+xXA4YqjrdeJ62MLgVoDerdRXFQHyBnSCt2yQ2nHKCHPP/Pv7Xq4Q==,
       }
 
   "@humanfs/core@0.19.2":
@@ -4484,6 +4487,14 @@ packages:
         integrity: sha512-AxRdHqcv0H1g4s923vu+5n1Nrhne23bjXbP+Vl7+Lwfpe7MG9PuU1IS95IJK6a+7BVV1mRN6QlZvs8Yv7EEXNQ==,
       }
     engines: { node: ">=20.16.0" }
+
+  expo-splash-screen@55.0.23:
+    resolution:
+      {
+        integrity: sha512-gvxl1bWvcxWwr8Hd5hMjCkOYIgK+IY0tEFSLlhvVJIKr2vMUkz1RYMgC4732lhn4PZXvwjeFUsREvjzGMRsuqA==,
+      }
+    peerDependencies:
+      expo: "*"
 
   expo-sqlite@55.0.18:
     resolution:
@@ -8423,7 +8434,7 @@ snapshots:
 
   "@expo-google-fonts/material-symbols@0.4.43": {}
 
-  "@expo-google-fonts/onest@0.4.1": {}
+  "@expo-google-fonts/nunito@0.4.2": {}
 
   "@expo/cli@55.0.34(kq7l3ib274viqzcfdvjqxje3ea)":
     dependencies:
@@ -8811,7 +8822,7 @@ snapshots:
       "@fastify/forwarded": 3.0.2
       ipaddr.js: 2.5.0
 
-  "@fontsource/onest@5.3.0": {}
+  "@fontsource/nunito@5.3.0": {}
 
   "@humanfs/core@0.19.2":
     dependencies:
@@ -10615,6 +10626,14 @@ snapshots:
       expo: 55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
 
   expo-server@55.0.11: {}
+
+  expo-splash-screen@55.0.23(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3):
+    dependencies:
+      "@expo/prebuild-config": 55.0.20(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+      expo: 55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   expo-sqlite@55.0.18(expo@55.0.28(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.12)(expo-router@55.0.17)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-native@0.83.10(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.0))(react@19.2.0):
     dependencies:

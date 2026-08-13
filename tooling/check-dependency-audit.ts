@@ -32,6 +32,10 @@ const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const audit = spawnSync(command, ["audit", "--prod", "--json"], {
   cwd: process.cwd(),
   encoding: "utf8",
+  // pnpm repeats every transitive path in its JSON report. Expo's graph can
+  // exceed Node's 1 MiB child-process default even when only a few advisories
+  // exist, which previously truncated valid JSON and produced a false failure.
+  maxBuffer: 50 * 1024 * 1024,
   shell: process.platform === "win32",
 });
 

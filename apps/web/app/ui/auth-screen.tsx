@@ -204,7 +204,7 @@ export function AuthScreen({
           window.history.replaceState({}, "", "/entrar/");
           setIsLoading(false);
           if (result.ok) {
-            navigate("/conta/");
+            navigate("/comecar/");
           } else {
             setFeedback(copyByFailure[result.reason]);
           }
@@ -288,7 +288,7 @@ export function AuthScreen({
     }
 
     if (mode === "sign-in") {
-      navigate("/conta/");
+      navigate("/comecar/");
     } else if (mode === "sign-up" || mode === "recover") {
       setRecoveryRequested(true);
     } else {

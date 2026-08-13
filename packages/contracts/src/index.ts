@@ -3,6 +3,7 @@ declare const opaqueIdBrand: unique symbol;
 export * from "./auth.js";
 export * from "./events.js";
 export * from "./http.js";
+export * from "./onboarding.js";
 export * from "./openapi.js";
 
 /** A transport-safe identifier without binding a future storage implementation. */
