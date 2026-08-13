@@ -46,7 +46,7 @@ runSupabase([
   "--db-url",
   databaseUrl,
   "--schema",
-  "api",
+  "api,platform,private",
   "--level",
   "error",
   "--fail-on",
