@@ -159,7 +159,7 @@ select is(
 );
 select lives_ok(
   $$select api.save_onboarding_context(
-      1,
+      1::smallint,
       'health_return',
       null,
       null,
@@ -215,7 +215,7 @@ select ok(
 select ok(
   pg_temp.raises_sqlstate(
     $$select api.save_onboarding_context(
-        1,
+        1::smallint,
         'miracle_result',
         null,
         null,
@@ -231,11 +231,11 @@ select ok(
 select ok(
   pg_temp.raises_sqlstate(
     $$select api.save_onboarding_context(
-        6,
+        6::smallint,
         'health_return',
         'beginner',
-        3,
-        45,
+        3::smallint,
+        45::smallint,
         'full_gym',
         null,
         true
@@ -246,11 +246,11 @@ select ok(
 );
 select lives_ok(
   $$select api.save_onboarding_context(
-      6,
+      6::smallint,
       'health_return',
       'beginner',
-      3,
-      45,
+      3::smallint,
+      45::smallint,
       'full_gym',
       'not_informed',
       true
@@ -283,7 +283,7 @@ select is(
 );
 select lives_ok(
   $$select api.save_onboarding_context(
-      1,
+      1::smallint,
       'conditioning',
       null,
       null,
