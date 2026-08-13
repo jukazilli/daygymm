@@ -22,18 +22,14 @@ interface TrainingHubScreenProps {
 }
 
 const sourceContent: Record<PlanSource, { label: string; next: string }> = {
-  daygym_suggestion: {
-    label: "Sugestão DayGym",
-    next: "Escolher um plano sugerido",
-  },
   manual: { label: "Montagem manual", next: "Montar seu primeiro plano" },
   official_xlsx: {
     label: "Planilha oficial",
     next: "Importar sua planilha",
   },
   professional: {
-    label: "Plano de profissional",
-    next: "Receber um convite",
+    label: "Acompanhamento profissional",
+    next: "Conectar um profissional",
   },
 };
 

@@ -37,15 +37,17 @@ afterEach(() => {
 });
 
 describe("PlanSourceScreen", () => {
-  it("shows four equal paths without pre-confirming one", async () => {
+  it("shows three equal paths without pre-confirming one", async () => {
     render(createElement(PlanSourceScreen, { gateway: createGateway() }));
 
     expect(
       (
-        await screen.findByRole("button", { name: /Usar sugestão DayGym/ })
+        await screen.findByRole("button", {
+          name: /Preciso de um profissional/,
+        })
       ).getAttribute("aria-pressed"),
     ).toBe("false");
-    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(screen.getAllByRole("button")).toHaveLength(3);
     expect(
       screen.getByRole("button", { name: /Importar planilha oficial/ }),
     ).toBeTruthy();
@@ -53,8 +55,9 @@ describe("PlanSourceScreen", () => {
       screen.getByRole("button", { name: /Montar meu treino/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Receber de profissional/ }),
+      screen.getByRole("button", { name: /Preciso de um profissional/ }),
     ).toBeTruthy();
+    expect(screen.queryByText(/sugestão DayGym/i)).toBeNull();
   });
 
   it("persists the selected path and exposes the saved state", async () => {

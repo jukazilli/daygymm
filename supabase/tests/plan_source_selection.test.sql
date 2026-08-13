@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(24);
+select plan(29);
 
 create or replace function pg_temp.raises_sqlstate(
   statement text,
@@ -111,6 +111,29 @@ select lives_ok(
     )$$,
   'the second eligible plan-source owner exists'
 );
+select lives_ok(
+  $$insert into auth.users (
+      instance_id,
+      id,
+      aud,
+      role,
+      email,
+      raw_user_meta_data
+    ) values (
+      '00000000-0000-0000-0000-000000000000',
+      '75000000-0000-0000-0000-000000000005',
+      'authenticated',
+      'authenticated',
+      'plan-source-legacy@example.invalid',
+      '{
+        "daygym_account_creation": "v1",
+        "daygym_is_adult": true,
+        "daygym_terms_version": "2026-08-13",
+        "daygym_privacy_version": "2026-08-13"
+      }'::jsonb
+    )$$,
+  'a legacy plan-source owner exists'
+);
 
 set local role authenticated;
 select set_config(
@@ -139,18 +162,18 @@ select is(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select api.select_plan_source('unknown_path')$$,
+    $$select api.select_plan_source('daygym_suggestion')$$,
     '23514'
   ),
-  'a source outside the four approved paths fails closed'
+  'the retired DayGym suggestion path fails closed'
 );
 select lives_ok(
-  $$select api.select_plan_source('daygym_suggestion')$$,
-  'the owner can select the DayGym suggestion path'
+  $$select api.select_plan_source('professional')$$,
+  'the owner can select the professional path'
 );
 select is(
   (select plan_source from api.onboarding_contexts),
-  'daygym_suggestion',
+  'professional',
   'the selected path is persisted'
 );
 select ok(
@@ -252,6 +275,61 @@ select is(
   (select plan_source from api.onboarding_contexts),
   'official_xlsx',
   'the guarded direct write leaves the source unchanged'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '75000000-0000-0000-0000-000000000005',
+  true
+);
+select lives_ok(
+  $$select api.save_onboarding_context(
+      6::smallint,
+      'strength',
+      'intermediate',
+      3::smallint,
+      45::smallint,
+      'full_gym',
+      'none',
+      true
+    )$$,
+  'a legacy owner has a reviewed context without a current source'
+);
+
+reset role;
+select lives_ok(
+  $$insert into api.training_sessions (
+      session_id,
+      user_id,
+      operation_id,
+      completed_at,
+      version,
+      completion_event_id
+    ) values (
+      '75000000-0000-0000-0000-000000000105',
+      '75000000-0000-0000-0000-000000000005',
+      'legacy-plan-source-0005',
+      statement_timestamp(),
+      1,
+      '75000000-0000-0000-0000-000000000205'
+    )$$,
+  'a legacy owner can already have a completed session'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '75000000-0000-0000-0000-000000000005',
+  true
+);
+select lives_ok(
+  $$select api.select_plan_source('professional')$$,
+  'a legacy owner can replace the retired source once'
+);
+select is(
+  (select plan_source from api.onboarding_contexts),
+  'professional',
+  'the legacy replacement becomes canonical'
 );
 
 select * from finish();

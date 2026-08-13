@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const planSources = [
-  "daygym_suggestion",
-  "official_xlsx",
-  "manual",
-  "professional",
-] as const;
+export const planSources = ["official_xlsx", "manual", "professional"] as const;
 
 export const planSourceSchema = z.enum(planSources);
 export type PlanSource = z.infer<typeof planSourceSchema>;

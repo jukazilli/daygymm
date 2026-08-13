@@ -18,10 +18,9 @@ interface TodayScreenProps {
 }
 
 const sourceLabels: Record<PlanSource, string> = {
-  daygym_suggestion: "Sugestão DayGym",
   manual: "Montagem manual",
   official_xlsx: "Planilha oficial",
-  professional: "Plano de profissional",
+  professional: "Acompanhamento profissional",
 };
 
 function defaultNavigate(path: string) {
@@ -47,7 +46,7 @@ function TodayHero({ state }: Readonly<{ state: PlanSourceState }>) {
       <section className="today-hero">
         <p className="eyebrow">Seu próximo passo</p>
         <h1>Escolha como começar.</h1>
-        <p>Use uma sugestão, importe ou monte seu plano.</p>
+        <p>Importe, crie ou receba seu plano.</p>
         <Link className="button-primary" href="/escolher-plano/">
           Escolher caminho
         </Link>
