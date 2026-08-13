@@ -11,6 +11,11 @@
 | Banco e autenticação | Supabase                | Projeto DayGym de staging                         |
 | Infraestrutura       | Terraform + GitHub OIDC | State e identidades próprios do DayGym            |
 
+O frontend de staging está disponível em
+<https://daygym-web-staging.pages.dev>. Cloudflare Pages foi adotado para o
+ambiente hospedado atual. A decisão não libera uso comercial nem elimina o gate
+de reavaliar o hosting da web antes do beta.
+
 Enquanto o limite de projetos do Google Cloud não é ampliado, os recursos acima
 usam temporariamente o projeto host `pex-gsc`. Eles são separados por nomes,
 service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
@@ -22,7 +27,8 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
 1. Desenvolva em uma branch de trabalho e abra um PR.
 2. O GitHub Actions executa formato, lint, tipagem, testes, builds e
    verificações de segurança.
-3. O Cloudflare Pages publica uma prévia da interface estática para cada PR.
+3. O Cloudflare Pages publica a interface estática e registra o resultado como
+   check do commit.
 4. Depois da revisão, faça merge ou envie o corte aprovado para a branch
    `staging`.
 5. O GitHub Actions aplica somente as migrations versionadas em
@@ -32,6 +38,18 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
    imutável no Cloud Build e publica a mesma imagem na API e no worker.
 7. O pipeline confirma `/health/live` e `/health/ready` da API e confirma que
    o worker não aceita uma chamada anônima externa.
+
+## Governança do repositório
+
+- O repositório público contém somente a fundação revisável. Documentos
+  canônicos e backlog de produto permanecem fora do Git e não devem ser
+  reproduzidos em Issues públicas.
+- `main` exige pull request e o check `Quality gates`, bloqueia force push e
+  exclusão e exige que a branch esteja atualizada antes da promoção.
+- O PR de fundação usa uma exceção temporária de fundador solo, autorizada e
+  registrada em [governança da fundação M0](../governance/m0-foundation.md).
+  A exceção não autoriza merge automático nem se estende silenciosamente a
+  mudanças futuras.
 
 ## Operação de banco
 
@@ -93,3 +111,5 @@ uma instância por serviço.
   negativo correspondente.
 - O seed permanece vazio: o staging não recebe contas, dados de saúde ou
   registros de produção.
+- O backlog operacional aguarda uma fonte privada. Issues deste repositório não
+  recebem regras, jornadas ou critérios de aceite restritos.

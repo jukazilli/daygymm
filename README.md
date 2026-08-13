@@ -6,12 +6,14 @@ entre aluno e profissional.
 ## Estado do projeto
 
 O produto está em **M0 — Fundação e Setup**. Este repositório contém somente a
-fundação pública e segura: monorepo, shells, toolchain, Supabase de staging e
-CI.
+fundação pública e segura: monorepo, shells, toolchain, Supabase de staging,
+Cloudflare Pages, API e worker no Cloud Run e CI/CD hospedado.
 
 Os documentos canônicos de produto, UX, engenharia e backlog são material
 restrito. Eles permanecem fora deste repositório público e devem ser
 consultados por pessoas autorizadas antes de iniciar qualquer item de produto.
+Pelo mesmo motivo, o backlog canônico não é publicado como Issues neste
+repositório enquanto não houver uma fonte operacional privada.
 
 > **Nome canônico:** DayGym. “DayGynn” aparece apenas em material histórico
 > autorizado.
@@ -42,8 +44,10 @@ pnpm build
 ```
 
 O desenvolvimento é validado online: commits passam pelo CI, migrations
-aprovadas são aplicadas somente pela branch `staging` e a aplicação será
-publicada no staging hospedado. Docker Desktop não é necessário; o container é
-criado pelo Cloud Build.
+aprovadas são aplicadas somente pela branch `staging` e a aplicação é publicada
+no staging hospedado. Docker Desktop não é necessário; o container é criado
+pelo Cloud Build.
 
 Consulte o [runbook de staging](docs/runbooks/staging-setup.md).
+As decisões temporárias de governança deste corte estão registradas em
+[governança da fundação M0](docs/governance/m0-foundation.md).
