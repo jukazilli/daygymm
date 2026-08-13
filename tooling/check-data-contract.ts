@@ -9,13 +9,6 @@ const contractPath = join(
   "data",
   "data-dictionary-and-rls.md",
 );
-const testsPath = join(
-  repositoryRoot,
-  "supabase",
-  "tests",
-  "identity_foundation.test.sql",
-);
-
 const findings: string[] = [];
 const tables = new Set<string>();
 const policies = new Set<string>();
@@ -26,7 +19,7 @@ for (const file of readdirSync(migrationsDirectory).sort()) {
   const migration = readFileSync(join(migrationsDirectory, file), "utf8");
 
   for (const match of migration.matchAll(
-    /create\s+table\s+(?:if\s+not\s+exists\s+)?(api|private)\.([a-z_][a-z0-9_]*)/gi,
+    /create\s+table\s+(?:if\s+not\s+exists\s+)?(api|platform|private)\.([a-z_][a-z0-9_]*)/gi,
   )) {
     tables.add(`${match[1]?.toLowerCase()}.${match[2]?.toLowerCase()}`);
   }
@@ -45,7 +38,12 @@ for (const file of readdirSync(migrationsDirectory).sort()) {
 }
 
 const contract = readFileSync(contractPath, "utf8");
-const tests = readFileSync(testsPath, "utf8");
+const tests = readdirSync(join(repositoryRoot, "supabase", "tests"))
+  .filter((file) => file.endsWith(".test.sql"))
+  .map((file) =>
+    readFileSync(join(repositoryRoot, "supabase", "tests", file), "utf8"),
+  )
+  .join("\n");
 const testIds = [...tests.matchAll(/^-- (RLS-N\d+):/gm)]
   .map((match) => match[1])
   .filter((id): id is string => Boolean(id));

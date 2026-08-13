@@ -76,6 +76,27 @@ clientes não recebem acesso.
 | `is_active`        | boolean                            | Autorizar ou bloquear novos cadastros | Configuração interna | Mesmo ciclo do registro                                                         | Não         |
 | `published_at`     | timestamptz, obrigatório           | Registrar publicação                  | Configuração interna | Mesmo ciclo do registro                                                         | Não         |
 
+### `platform.job_outbox`
+
+Owner: plataforma e consumidores internos do worker.
+
+Finalidade: persistir a intenção de publicar eventos de domínio aprovados antes
+do despacho para a fila durável privada.
+
+| Campo              | Finalidade                                    | Classificação            | Retenção atual                                                           | Índice                           |
+| ------------------ | --------------------------------------------- | ------------------------ | ------------------------------------------------------------------------ | -------------------------------- |
+| `event_id`         | Identificar e deduplicar o evento             | Identificador técnico    | Sem expurgo automático no staging sintético; política final no `FND-029` | PK                               |
+| `event_name`       | Restringir o tipo aos eventos v1 aprovados    | Metadado operacional     | Mesmo ciclo do evento                                                    | Não                              |
+| `event_version`    | Fixar a versão do contrato                    | Metadado operacional     | Mesmo ciclo do evento                                                    | Não                              |
+| `event_envelope`   | Preservar o envelope mínimo para despacho     | Dado interno allowlisted | Mesmo ciclo do evento                                                    | Não                              |
+| `occurred_at`      | Registrar quando o fato ocorreu               | Metadado operacional     | Mesmo ciclo do evento                                                    | Não                              |
+| `correlation_id`   | Correlacionar comando, evento e processamento | Identificador técnico    | Mesmo ciclo do evento                                                    | Não                              |
+| `producer`         | Identificar o módulo emissor                  | Metadado operacional     | Mesmo ciclo do evento                                                    | Não                              |
+| `available_at`     | Controlar disponibilidade para despacho       | Metadado operacional     | Mesmo ciclo do evento                                                    | `job_outbox_pending_idx` parcial |
+| `dispatched_at`    | Registrar publicação na fila                  | Metadado operacional     | Mesmo ciclo do evento                                                    | Não                              |
+| `queue_message_id` | Vincular a mensagem pgmq                      | Identificador técnico    | Mesmo ciclo do evento                                                    | Unique                           |
+| `created_at`       | Registrar persistência no outbox              | Metadado operacional     | Mesmo ciclo do evento                                                    | `job_outbox_pending_idx` parcial |
+
 ## Matriz de acesso e RLS
 
 `anon` não possui `USAGE` no schema `api`. `authenticated` recebe somente leitura
@@ -93,6 +114,8 @@ cliente.
 | `api.consents`                    | função interna         |     N/A |    Sim |    Não |    Não | trigger `SECURITY DEFINER`            | testes do cadastro   |
 | `private.legal_document_versions` | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema privado; grants revogados      | `RLS-N04`            |
 | `private.legal_document_versions` | administração          |     Sim |    Sim |    Sim |    Sim | migration/operação privilegiada       | fora do cliente      |
+| `platform.job_outbox`             | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema interno; grants revogados      | `RLS-N07`            |
+| `platform.job_outbox`             | funções internas       |     Sim |    Sim |    Sim |    Não | definer boundary e fila privada       | testes do outbox     |
 
 As policies temporárias de inserção criadas na migration inicial foram removidas
 pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
@@ -104,6 +127,7 @@ pela migration seguinte. As únicas policies ativas são `profiles_select_own` e
 - `RLS-N04`: bloqueia leitura do registro privado de versões;
 - `RLS-N05`: prova isolamento entre perfis autenticados;
 - `RLS-N06`: prova isolamento entre históricos autenticados.
+- `RLS-N07`: bloqueia acesso de clientes ao outbox e aos payloads internos.
 
 ## Pendências deliberadas para `FND-029`
 
