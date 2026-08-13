@@ -3,7 +3,7 @@ import { URL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { getAppVariant, resolveAppVariant } from "../app.config";
+import appConfig, { getAppVariant, resolveAppVariant } from "../app.config";
 import appVariants from "./app-variants.json";
 
 interface EasBuildProfile {
@@ -55,6 +55,25 @@ describe("mobile app variants", () => {
     expect(() => resolveAppVariant("staging")).toThrow(
       'Invalid APP_VARIANT "staging"',
     );
+  });
+
+  it("enables SecureStore and SQLCipher in every native build", () => {
+    const config = appConfig({
+      config: { name: "DayGym", slug: "daygym" },
+      packageJsonPath: null,
+      projectRoot: "C:/daygym/apps/mobile",
+      staticConfigPath: null,
+    });
+
+    expect(config.plugins).toContainEqual([
+      "expo-secure-store",
+      { configureAndroidBackup: true },
+    ]);
+    expect(config.plugins).toContainEqual([
+      "expo-sqlite",
+      { useSQLCipher: true },
+    ]);
+    expect(config.android?.allowBackup).toBe(false);
   });
 });
 

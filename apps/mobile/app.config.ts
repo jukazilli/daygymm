@@ -49,6 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier: app.identifier,
     },
     android: {
+      allowBackup: false,
       package: app.identifier,
     },
     plugins: [
@@ -57,6 +58,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "expo-dev-client",
         {
           addGeneratedScheme: app.variant === "development",
+        },
+      ],
+      [
+        "expo-secure-store",
+        {
+          configureAndroidBackup: true,
+        },
+      ],
+      [
+        "expo-sqlite",
+        {
+          useSQLCipher: true,
         },
       ],
     ],
