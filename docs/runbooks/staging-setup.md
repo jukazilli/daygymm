@@ -29,8 +29,8 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
    verificações de segurança.
 3. O Cloudflare Pages publica a interface estática e registra o resultado como
    check do commit.
-4. Depois da revisão, faça merge ou envie o corte aprovado para a branch
-   `staging`.
+4. Depois dos checks do PR, avance `staging` por fast-forward até o SHA candidato
+   exato. Force push não faz parte do fluxo.
 5. O GitHub Actions aplica somente as migrations versionadas em
    `supabase/migrations` ao banco Supabase de staging.
 6. Quando o sinalizador `DAYGYM_STAGING_DEPLOY_ENABLED` estiver ativo, o
@@ -38,6 +38,10 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
    imutável no Cloud Build e publica a mesma imagem na API e no worker.
 7. O pipeline confirma `/health/live` e `/health/ready` da API e confirma que
    o worker não aceita uma chamada anônima externa.
+8. Somente depois da validação hospedada, promova o PR para `main` com merge
+   commit. Rebase e squash não preservam a ancestralidade do SHA validado.
+9. Se `staging` não puder avançar por fast-forward, interrompa a promoção e
+   reconcilie o histórico por PR; nunca reescreva a branch de ambiente.
 
 ## Governança do repositório
 
@@ -46,10 +50,11 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
   reproduzidos em Issues públicas.
 - `main` exige pull request e o check `Quality gates`, bloqueia force push e
   exclusão e exige que a branch esteja atualizada antes da promoção.
-- O PR de fundação usa uma exceção temporária de fundador solo, autorizada e
-  registrada em [governança da fundação M0](../governance/m0-foundation.md).
-  A exceção não autoriza merge automático nem se estende silenciosamente a
-  mudanças futuras.
+- A proteção de histórico linear permanece desligada para permitir merge
+  commits que preservem os SHAs já validados em `staging`.
+- Exceções temporárias de fundador solo são registradas por PR em
+  [governança da fundação M0](../governance/m0-foundation.md). Uma autorização
+  não se estende silenciosamente a mudanças futuras.
 
 ## Operação de banco
 
