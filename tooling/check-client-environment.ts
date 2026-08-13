@@ -23,6 +23,7 @@ const allowedByApplication = new Map<string, ReadonlySet<string>>([
   [
     "apps/mobile",
     new Set([
+      "APP_VARIANT",
       "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "EXPO_PUBLIC_SUPABASE_URL",
       "NODE_ENV",

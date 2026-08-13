@@ -5,10 +5,16 @@ logados ou copiados para issues.
 
 ## Clientes
 
-| Superfície | Origem/callback                   | URL pública do Supabase    | Chave publicável                       |
-| ---------- | --------------------------------- | -------------------------- | -------------------------------------- |
-| Web        | `NEXT_PUBLIC_DAYGYM_SITE_URL`     | `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
-| Mobile     | Definida com FND-016 por ambiente | `EXPO_PUBLIC_SUPABASE_URL` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Superfície | Origem/callback                              | URL pública do Supabase    | Chave publicável                       |
+| ---------- | -------------------------------------------- | -------------------------- | -------------------------------------- |
+| Web        | `NEXT_PUBLIC_DAYGYM_SITE_URL`                | `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Mobile     | Scheme e callback derivados de `APP_VARIANT` | `EXPO_PUBLIC_SUPABASE_URL` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+
+| Variante mobile | Identificador de instalação     | Callback permitido                   |
+| --------------- | ------------------------------- | ------------------------------------ |
+| `development`   | `com.daygym.mobile.development` | `daygym-development://auth/callback` |
+| `preview`       | `com.daygym.mobile.preview`     | `daygym-preview://auth/callback`     |
+| `production`    | `com.daygym.mobile`             | `daygym://auth/callback`             |
 
 `NEXT_PUBLIC_DAYGYM_SITE_URL` aceita somente uma origem HTTPS exata, sem path,
 query, fragmento ou credencial. O cliente deriva dela apenas os callbacks
@@ -20,12 +26,12 @@ nunca entram em código cliente, bundle, analytics ou log.
 
 ## Gestão por ambiente
 
-| Classe                      | Staging                                              | Production                                                 |
-| --------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
-| Configuração pública web    | Variáveis de build do Cloudflare Pages               | Projeto e domínio próprios antes do beta real              |
-| Configuração pública mobile | Ambiente preview do EAS quando FND-016 for executado | Ambiente production do EAS antes do beta real              |
-| Banco/migrations            | Secret `SUPABASE_DB_URL_STAGING` no GitHub Actions   | Secret e approval próprios antes de dados reais            |
-| Google Cloud                | OIDC federado, sem chave persistente no GitHub       | Service account e environment separados antes do beta real |
+| Classe                      | Staging                                               | Production                                                 |
+| --------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
+| Configuração pública web    | Variáveis de build do Cloudflare Pages                | Projeto e domínio próprios antes do beta real              |
+| Configuração pública mobile | Ambiente preview do EAS, isolado por perfil e channel | Ambiente production do EAS antes do beta real              |
+| Banco/migrations            | Secret `SUPABASE_DB_URL_STAGING` no GitHub Actions    | Secret e approval próprios antes de dados reais            |
+| Google Cloud                | OIDC federado, sem chave persistente no GitHub        | Service account e environment separados antes do beta real |
 
 ## Rotação e vazamento
 
@@ -42,6 +48,19 @@ A chave publicável também é rotacionada se houver abuso, mas sua exposição 
 cliente é esperada; a segurança dos dados continua dependendo de Auth, grants e
 RLS. O scanner `check:client-environment` bloqueia nomes ou prefixos
 privilegiados nas aplicações.
+
+## Estado da fundação Expo/EAS
+
+Os manifests locais fixam Node `22.12.0`, EAS CLI `21.8.0`, runtime por
+fingerprint e perfis explícitos `development`, `preview` e `production`. Cada
+perfil seleciona seu próprio ambiente, channel, identificador de instalação e
+deep link; a ausência de `APP_VARIANT` falha de forma segura em `development`.
+
+O projeto remoto Expo/EAS, os ambientes hospedados e as credenciais de loja
+ainda não foram criados neste corte porque a sessão operacional não está
+autenticada no EAS. FND-016 permanece `In Progress` até um owner conectar o
+project ID, definir recuperação das credenciais e provar ao menos os builds de
+development e preview sem compartilhar valores com production.
 
 ## Estado do subcorte de autenticação
 
