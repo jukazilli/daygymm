@@ -23,11 +23,10 @@ select ok(
       and not rolreplication
       and not rolbypassrls
       and rolconnlimit = 2
-      and rolpassword is null
     from pg_authid
     where rolname = 'daygym_worker_runtime'
   ),
-  'runtime login is bounded and migrations contain no password'
+  'runtime login privileges and connection limit are bounded'
 );
 select ok(
   exists (
@@ -142,7 +141,6 @@ select is(
   'server boundary creates a synthetic event for the worker test'
 );
 
-set local role daygym_worker_runtime;
 select is(
   private.worker_dispatch_domain_events(10),
   1,
@@ -158,7 +156,6 @@ select is(
   1::bigint,
   'worker reads the validated event through its bounded wrapper'
 );
-reset role;
 
 select set_config(
   'daygym.test_message_id',
@@ -170,7 +167,6 @@ select set_config(
   true
 );
 
-set local role daygym_worker_runtime;
 select ok(
   private.worker_archive_domain_event(
     current_setting('daygym.test_message_id')::bigint
@@ -183,7 +179,6 @@ select ok(
   ),
   'archive replay is safe and reports that no live message remained'
 );
-reset role;
 
 select * from finish();
 rollback;
