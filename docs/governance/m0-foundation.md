@@ -61,6 +61,14 @@ Abrir o PR antes dessa publicação pode tentar reutilizar o mesmo SHA de um
 preview e gerar um check duplicado sem atualizar o ambiente. Por isso, a prova
 da web ocorre em `staging` antes da abertura do PR.
 
+## Reprodutibilidade entre sistemas operacionais
+
+O repositório normaliza arquivos de texto como LF por `.gitattributes`. Essa
+regra evita que a configuração global `core.autocrlf=true` do Git no Windows
+faça um clone limpo divergir do mesmo SHA validado pela CI Linux. O gate de
+fundação exige instalação pelo lockfile e execução de `pnpm check:ci` e
+`pnpm security` em clone remoto limpo.
+
 ### Exceção de reconciliação M0-GAP-001
 
 O owner autorizou uma segunda exceção de fundador solo, limitada ao PR que
