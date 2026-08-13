@@ -71,20 +71,17 @@ development e preview sem compartilhar valores com production.
 ## Estado do subcorte de autenticação
 
 Os adapters, a validação tipada, os exemplos e o gate contra variáveis
-privilegiadas estão implementados. A URL pública de staging é conhecida, mas os
-valores ainda não foram ativados no Cloudflare Pages/EAS porque a conta
-operacional atual não possui permissão para consultar as API keys do projeto no
-Supabase. FND-018 permanece `In Progress` até uma conta autorizada fornecer a
-chave `sb_publishable_` diretamente aos stores dos provedores, sem copiá-la para
-código, documentação, issue ou log.
+privilegiadas estão implementados. Em 13 de agosto de 2026, um owner autenticado
+ativou as três variáveis públicas web diretamente no ambiente Production do
+projeto Cloudflare Pages de staging, sem persistir seus valores no repositório,
+na documentação, em issues ou logs. A publicação `348310b9-709d-4232-a31e-d788f484220a`
+foi concluída com sucesso.
 
-Em 13 de agosto de 2026, uma inspeção funcional do staging confirmou que o
-bundle publicado não contém nenhuma das três variáveis públicas web. O login
-falha antes de emitir request ao Supabase, com mensagem de configuração segura.
-Isso comprova o bloqueio sem expor valores: `NEXT_PUBLIC_DAYGYM_SITE_URL`,
-`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` precisam ser
-definidas no ambiente de build do Cloudflare e uma nova publicação deve ser
-inspecionada antes do teste hospedado de autenticação.
+A inspeção funcional posterior comprovou que o cliente passou a emitir o
+request de cadastro ao Supabase e recebeu HTTP 200. O fluxo chegou ao estado de
+confirmação por e-mail; login confirmado, callbacks, persistência de sessão e
+logout ainda precisam das evidências hospedadas previstas para fechar FND-018.
+O ambiente mobile EAS continua separado e não recebeu essas variáveis.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta

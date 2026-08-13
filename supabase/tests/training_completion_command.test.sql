@@ -124,7 +124,11 @@ select is(
   'the first command creates canonical state'
 );
 select is(
-  (select count(*) from api.training_sessions),
+  (
+    select count(*)
+    from api.training_sessions
+    where session_id = '93000000-0000-4000-8000-000000000003'
+  ),
   1::bigint,
   'the command stores one completed session'
 );
@@ -211,7 +215,11 @@ select is(
   'operation replay reuses the original event identity'
 );
 select is(
-  (select count(*) from api.training_sessions),
+  (
+    select count(*)
+    from api.training_sessions
+    where session_id = '93000000-0000-4000-8000-000000000003'
+  ),
   1::bigint,
   'operation replay does not duplicate canonical state'
 );

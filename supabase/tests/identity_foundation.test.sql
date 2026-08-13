@@ -209,12 +209,26 @@ select lives_ok(
   'valid metadata creates the second identity'
 );
 select is(
-  (select count(*) from api.profiles),
+  (
+    select count(*)
+    from api.profiles
+    where user_id in (
+      '10000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000002'
+    )
+  ),
   2::bigint,
   'each valid Auth user receives one eligible profile'
 );
 select is(
-  (select count(*) from api.consents),
+  (
+    select count(*)
+    from api.consents
+    where user_id in (
+      '10000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000002'
+    )
+  ),
   4::bigint,
   'each valid Auth user receives two required acceptances'
 );
@@ -222,7 +236,11 @@ select is(
   (
     select count(*)
     from api.consents
-    where document_version = '2026-08-13'
+    where user_id in (
+        '10000000-0000-0000-0000-000000000001',
+        '20000000-0000-0000-0000-000000000002'
+      )
+      and document_version = '2026-08-13'
   ),
   4::bigint,
   'the accepted versions are the server allowlisted versions'

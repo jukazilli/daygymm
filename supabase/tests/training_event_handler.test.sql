@@ -160,13 +160,24 @@ select is(
   (
     select count(*)
     from api.training_sessions
-    where completion_consumed_at is not null
+    where session_id in (
+        'b2000000-0000-4000-8000-000000000002',
+        'b5000000-0000-4000-8000-000000000005'
+      )
+      and completion_consumed_at is not null
   ),
   2::bigint,
   'out-of-order delivery consumes both independent sessions'
 );
 select is(
-  (select count(*) from platform.domain_event_receipts),
+  (
+    select count(*)
+    from platform.domain_event_receipts
+    where event_id in (
+      'b3000000-0000-4000-8000-000000000003',
+      'b6000000-0000-4000-8000-000000000006'
+    )
+  ),
   2::bigint,
   'each handled event has one payload-free durable receipt'
 );
@@ -193,7 +204,14 @@ select is(
   'an exact replay returns the durable idempotent outcome'
 );
 select is(
-  (select count(*) from platform.domain_event_receipts),
+  (
+    select count(*)
+    from platform.domain_event_receipts
+    where event_id in (
+      'b3000000-0000-4000-8000-000000000003',
+      'b6000000-0000-4000-8000-000000000006'
+    )
+  ),
   2::bigint,
   'replay does not duplicate the durable effect'
 );
@@ -263,7 +281,11 @@ select is(
   (
     select count(*)
     from platform.domain_event_receipts
-    where consumer_name = 'training.completion.v1'
+    where event_id in (
+        'b3000000-0000-4000-8000-000000000003',
+        'b6000000-0000-4000-8000-000000000006'
+      )
+      and consumer_name = 'training.completion.v1'
       and event_name = 'TrainingSessionCompleted'
       and event_version = 1
   ),

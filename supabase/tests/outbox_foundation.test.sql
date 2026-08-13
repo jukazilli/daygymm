@@ -88,7 +88,11 @@ select is(
   'a valid approved event enters the outbox'
 );
 select is(
-  (select count(*) from platform.job_outbox),
+  (
+    select count(*)
+    from platform.job_outbox
+    where event_id = '70000000-0000-4000-8000-000000000007'
+  ),
   1::bigint,
   'the outbox contains one event'
 );
@@ -113,14 +117,22 @@ select is(
   'exact replay returns the existing event identifier'
 );
 select is(
-  (select count(*) from platform.job_outbox),
+  (
+    select count(*)
+    from platform.job_outbox
+    where event_id = '70000000-0000-4000-8000-000000000007'
+  ),
   1::bigint,
   'exact replay does not duplicate the outbox event'
 );
 select throws_ok(
   $$select private.enqueue_domain_event(
     jsonb_set(
-      (select event_envelope from platform.job_outbox limit 1),
+      (
+        select event_envelope
+        from platform.job_outbox
+        where event_id = '70000000-0000-4000-8000-000000000007'
+      ),
       '{payload,version}',
       '2'::jsonb
     )
