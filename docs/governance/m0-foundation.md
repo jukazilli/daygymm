@@ -13,10 +13,20 @@ pendente.
 
 ### Staging hospedado
 
-Cloudflare Pages hospeda o frontend estático de staging. Cloud Run hospeda API
-e worker a partir da mesma imagem imutável, e Supabase hospeda banco e
-autenticação. Essa topologia é a decisão operacional do staging atual; o
-hosting do beta comercial continua sujeito a gate próprio.
+Cloudflare Pages hospeda o frontend estático de staging e do beta. Cloud Run
+hospeda API e worker a partir da mesma imagem imutável, e Supabase hospeda banco
+e autenticação. Essa é a topologia definitiva escolhida para o beta; Vercel não
+faz parte do plano. O gate comercial continua validando produção, custos,
+backup, segurança e capacidade nos provedores adotados.
+
+### Entrada funcional antes do beta-ready
+
+O trabalho funcional pode começar em staging com contas sintéticas antes do
+fechamento de todo o M0. O primeiro corte é autenticação: migration/RLS mínima,
+chaves apenas publicáveis no cliente, cadastro, login, logout, recuperação,
+sessão segura e threat model focado. Produção, dados reais e usuários externos
+continuam bloqueados até os gates completos de privacidade, restore,
+observabilidade e operação.
 
 ### Exceção temporária de fundador solo
 

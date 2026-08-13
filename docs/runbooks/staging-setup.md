@@ -13,8 +13,9 @@
 
 O frontend de staging está disponível em
 <https://daygym-web-staging.pages.dev>. Cloudflare Pages foi adotado para o
-ambiente hospedado atual. A decisão não libera uso comercial nem elimina o gate
-de reavaliar o hosting da web antes do beta.
+staging e para o beta. A decisão não libera uso comercial: production,
+capacidade, custos, domínio, segurança e rollback ainda passam por gate próprio,
+mas Vercel não faz parte da topologia planejada.
 
 Enquanto o limite de projetos do Google Cloud não é ampliado, os recursos acima
 usam temporariamente o projeto host `pex-gsc`. Eles são separados por nomes,
