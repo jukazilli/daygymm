@@ -34,7 +34,7 @@ describe("TodayScreen", () => {
       screen
         .getByRole("link", { name: "Continuar configuração" })
         .getAttribute("href"),
-    ).toBe("/comecar/");
+    ).toBe("/comecar");
   });
 
   it("opens the training hub when a plan path already exists", async () => {
@@ -51,10 +51,10 @@ describe("TodayScreen", () => {
     expect(await screen.findByText("Planilha oficial")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Abrir Treinos" }).getAttribute("href"),
-    ).toBe("/treinos/");
+    ).toBe("/treinos");
     expect(
       screen.getByRole("link", { name: /GdShop/ }).getAttribute("href"),
-    ).toBe("/gdshop/");
+    ).toBe("/gdshop");
   });
 
   it("redirects an unauthenticated visitor without exposing a false home state", async () => {

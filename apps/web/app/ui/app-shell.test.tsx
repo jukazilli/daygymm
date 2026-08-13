@@ -24,6 +24,6 @@ describe("AppShell", () => {
     ).toBe("page");
     expect(
       screen.getByRole("link", { name: "Treinos" }).getAttribute("href"),
-    ).toBe("/treinos/");
+    ).toBe("/treinos");
   });
 });

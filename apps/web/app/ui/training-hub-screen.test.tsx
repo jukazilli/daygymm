@@ -30,6 +30,6 @@ describe("TrainingHubScreen", () => {
       screen
         .getByRole("link", { name: "Alterar caminho" })
         .getAttribute("href"),
-    ).toBe("/escolher-plano/");
+    ).toBe("/escolher-plano");
   });
 });
