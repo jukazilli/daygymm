@@ -8,11 +8,11 @@ A dependência circular entre `FND-022` e `FND-024` foi removida. A ordem válid
 é contratos e RLS (`FND-010`, `FND-012`), outbox/fila (`FND-022`) e somente
 depois dashboards, SLOs e alertas (`FND-024`).
 
-Este corte cria o mecanismo privado e prova deduplicação e despacho, mas não
-marca `FND-022` como concluído. Ainda não existe um comando funcional de treino
-que possa gravar estado canônico e evento na mesma transação. O worker do Cloud
-Run já possui credencial e acesso mínimo ao banco, mas o ciclo ainda não é
-ativado sem handlers funcionais para os eventos aprovados.
+Este corte cria o mecanismo privado, prova deduplicação e despacho e adiciona o
+primeiro comando funcional de treino. `private.complete_training_session()`
+grava a finalização canônica e `TrainingSessionCompleted` na mesma transação. O
+worker do Cloud Run já possui credencial e acesso mínimo ao banco, mas o ciclo
+ainda não é ativado sem handlers funcionais para os eventos aprovados.
 
 O contrato de aplicação em `apps/api/src/domain-event-consumer.ts` valida o
 envelope compartilhado, exige um handler `handleOnce` idempotente e arquiva a
@@ -60,7 +60,9 @@ definitivos serão fechados no `FND-029` antes de dados reais.
 
 ## Critérios para concluir `FND-022`
 
-1. Um comando funcional grava estado e chama o enqueue na mesma transação.
+1. Fechado: `private.complete_training_session()` grava estado e chama o enqueue
+   na mesma transação; replay reaproveita o resultado e falha do enqueue reverte
+   o estado.
 2. Identidade, segredo e adaptador mínimos já existem; falta ativar e observar o
    ciclo no Cloud Run consumindo `domain_events` com um handler funcional.
 3. O consumidor prova repetição, arquivo após sucesso e visibility timeout
