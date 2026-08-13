@@ -137,7 +137,7 @@ export function TodayScreen({
               </span>
               <span>
                 <strong>Nutrição</strong>
-                <small>Refeições e acompanhamento diário</small>
+                <small>Refeições e metas</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
                 →
@@ -151,7 +151,7 @@ export function TodayScreen({
               </span>
               <span>
                 <strong>GdShop</strong>
-                <small>Produtos selecionados para sua rotina</small>
+                <small>Produtos para sua rotina</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
                 →
