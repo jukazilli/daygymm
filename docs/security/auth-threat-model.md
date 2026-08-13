@@ -1,16 +1,20 @@
-# Threat model de autenticação
+# Threat model inicial — autenticação e fronteiras sistêmicas
 
-Status do recorte: controles web e atomicidade server-side implementados
-localmente em 13 de agosto de 2026. FND-026 permanece `In Progress` até a prova
-hospedada, a configuração do Supabase e a fronteira mobile serem concluídas.
+Status do modelo: **aprovado para a fundação e o staging sintético em 13 de
+agosto de 2026**. FND-026 está `Done`. Aprovar o modelo significa aceitar o
+inventário, os controles esperados e as decisões sobre risco residual; não
+significa declarar que todos os controles estão implementados. Cada risco alto
+aberto continua bloqueando a funcionalidade ou o ambiente indicado.
 
 ## Escopo e condição de uso
 
-Este recorte cobre cadastro por e-mail e senha, declaração 18+, aceite dos
-documentos obrigatórios, login, recuperação, persistência, renovação e logout
-no web estático e no aplicativo mobile. Supabase Auth é o provedor de
-identidade; `api.profiles` e `api.consents` guardam somente elegibilidade e
-evidência de aceite.
+O primeiro recorte cobre cadastro por e-mail e senha, declaração 18+, aceite
+dos documentos obrigatórios, login, recuperação, persistência, renovação e
+logout no web estático e no aplicativo mobile. A extensão sistêmica cobre as
+fronteiras já materializadas de dados/RLS, API `/v1`, eventos, build/deploy,
+worker privado e persistência mobile. Supabase Auth é o provedor de identidade;
+`api.profiles` e `api.consents` guardam somente elegibilidade e evidência de
+aceite.
 
 O recorte autoriza apenas contas sintéticas em staging depois dos controles
 marcados como bloqueantes. Não autoriza production, usuários externos ou dados
@@ -43,6 +47,37 @@ Fronteiras:
 3. Supabase Auth e canal de e-mail;
 4. Data API, grants e RLS do schema `api`;
 5. CI e stores operacionais, que não podem receber senha ou token de usuário.
+
+## Atores e ativos sistêmicos
+
+| Classe         | Inclui                                                   | Regra de confiança                                                                               |
+| -------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Pessoa usuária | titular da conta e, futuramente, aluno                   | Não é confiada para escolher `user_id`, papel, prêmio ou estado de servidor.                     |
+| Profissional   | treinador/nutricionista convidado                        | Só recebe capacidade explícita enquanto o vínculo estiver ativo.                                 |
+| Operação       | mantenedor, suporte e contas de deploy                   | Menor privilégio, MFA quando disponível e nenhuma credencial persistente fora do store aprovado. |
+| Provider       | Supabase, Cloudflare, Google Cloud e integrações futuras | Toda entrada é não confiável até validar origem, contrato, limite e replay.                      |
+| Adversário     | bot, usuário malicioso ou dependência/build comprometido | Pode controlar cliente, parâmetros, ordem/repetição e conteúdo importado.                        |
+
+Ativos sistêmicos incluem identidade e sessão, dados de saúde e treino, autoria
+de planos, vínculos profissionais, ledger/rewards, artefatos de build,
+credenciais operacionais, eventos internos e telemetria. Logs, IDs técnicos e
+metadados também são dados: só entram quando têm finalidade e allowlist.
+
+```text
+Web/Cloudflare ---- TLS ----> Supabase Auth/Data API <---- TLS ---- Mobile
+       |                              |                              |
+       +--------- TLS ----------> API /v1                            +-> SecureStore/SQLCipher
+                                      |
+                                      +---- evento validado ----> Worker privado
+
+GitHub Actions -- OIDC curto --> Google Cloud -- imagem por SHA --> API/Worker
+       |
+       +---- build estático por SHA ----> Cloudflare Pages
+```
+
+Cada seta é uma trust boundary. O banco não confia no cliente, a API não
+confia em JWT sem validação/autorização, o consumer não confia em evento sem
+schema/versão e o deploy não confia em artefato sem vínculo com o SHA aprovado.
 
 ## Ativos e invariantes
 
@@ -90,10 +125,39 @@ Fronteiras:
 | AUTH-02 | Credential stuffing, criação automatizada e inundação de e-mail de confirmação/reset.                                    | Rate limits do Supabase; frequência mínima de 60 s por destinatário; resposta 429 recuperável; Cloudflare Turnstile antes do beta externo; alerta por volume sem e-mail em log. | Integração prova limite/retry; E2E prova desafio quando acionado; configuração hospedada registrada sem segredo.                    | Parcial: limites locais existem; CAPTCHA e configuração hospedada não foram validados.                                                                    | **Alto — Platform + Security.** Somente staging sintético sem CAPTCHA; beta externo bloqueado.                                                                     |
 | AUTH-03 | Open redirect, phishing por callback ou deep link capturado por outro app.                                               | Allowlist exata por ambiente; PKCE; callback valida tipo/origem e remove fragmentos; nenhum `redirectTo` arbitrário.                                                            | Testes negativos para host/caminho/scheme não permitidos e E2E dos callbacks web/mobile autorizados.                                | Parcial: callbacks e identificadores mobile distintos têm testes locais; allowlists web/mobile e E2E hospedados não foram validados.                      | **Alto — Platform.** Cadastro com confirmação e recuperação não podem ser declarados prontos até a allowlist hospedada passar.                                     |
 | AUTH-04 | Roubo/replay de sessão por XSS, storage inseguro, dispositivo perdido ou refresh token copiado.                          | TLS; JWT de 1 h; refresh rotation/reuse de 10 s; CSP sem terceiros em auth; redaction; SecureStore mobile; logout local/global explícitos.                                      | Testes verificam storage por plataforma, ausência de token em URL/log, renovação, expiração, logout local e global.                 | Parcial: web usa PKCE/renovação/logout; mobile tem adapter SecureStore, PKCE, lock e lifecycle com testes locais, mas falta device/E2E.                   | **Alto — Web/Mobile + Security.** Dados reais bloqueados até mobile, CSP e testes hospedados; o access token pode sobreviver ao logout até expirar.                |
-| AUTH-05 | BOLA/IDOR lê ou grava perfil/aceite de outra pessoa.                                                                     | Grants mínimos; RLS `to authenticated`; `auth.uid()` comparado ao `user_id`; tabelas forçam RLS; aceite imutável.                                                               | `identity_foundation.test.sql`: 35 verificações, incluindo tentativas cruzadas e `anon`; este padrão se repete em cada tabela nova. | Implementado e validado em staging.                                                                                                                       | **Baixo — Data.** Aceito para staging sintético; nova relação sem teste negativo bloqueia merge.                                                                   |
+| AUTH-05 | BOLA/IDOR lê ou grava perfil/aceite de outra pessoa.                                                                     | Grants mínimos; RLS `to authenticated`; `auth.uid()` comparado ao `user_id`; tabelas forçam RLS; aceite imutável.                                                               | `identity_foundation.test.sql`: 41 verificações, incluindo tentativas cruzadas e `anon`; este padrão se repete em cada tabela nova. | Implementado e validado em staging.                                                                                                                       | **Baixo — Data.** Aceito para staging sintético; nova relação sem teste negativo bloqueia merge.                                                                   |
 | AUTH-06 | Menor declarado, aceite forjado ou falha entre criar Auth e persistir perfil/consentimentos deixa conta órfã/utilizável. | Declaração positiva e duas versões aprovadas; operação server-side atômica; todas as políticas de produto exigem conta elegível; `user_metadata` nunca concede papel.           | SQL/integration rejeita falso, ausente, versão desconhecida e falha parcial; prova que conta incompleta não acessa produto.         | Parcial: trigger atômico, allowlist privada e 41 verificações SQL foram implementados; falta prova hospedada e versão jurídica aprovada.                  | **Alto — Produto + Privacy + Data.** Somente contas sintéticas; US-001 não fecha antes da aprovação jurídica e do teste hospedado.                                 |
 | AUTH-07 | Link de recuperação reutilizado, vazado, enviado em massa ou redirecionado para origem indevida.                         | Token gerado e validado pelo Supabase; redirect exato; mensagem genérica; limite/frequência; senha confirmada duas vezes; retorno ao login; opção de revogar todas as sessões.  | Integração/E2E cobre e-mail existente/inexistente, token inválido/expirado/reutilizado e troca seguida de login.                    | Parcial: fluxos web/mobile usam PKCE, senha confirmada e retorno ao login; callbacks e e-mail hospedados não foram provados.                              | **Alto — Security + Platform.** Recuperação permanece bloqueada até e-mail e callbacks hospedados serem provados.                                                  |
 | AUTH-08 | Chave privilegiada, senha ou token entra no bundle, commit, CI, log ou ferramenta de produto.                            | Apenas URL e chave publicável no cliente; scanner bloqueante; stores por ambiente; allowlist de telemetry sem payload de auth.                                                  | `check:client-environment`, `check:secrets`, inspeção do bundle e testes que falham se logger recebe campos proibidos.              | Parcial: contrato tipado tem 11 testes, scanners e builds passaram; inspeção do staging provou que as três variáveis públicas ainda não entram no bundle. | **Alto — Platform.** FND-018 e login real continuam bloqueados até a ativação direta e nova auditoria dos bundles.                                                 |
+
+## Ameaças sistêmicas e decisão residual
+
+| ID     | Ameaça/cenário                                                             | Controle e teste obrigatório                                                                                                                  | Estado observado                                                                                             | Risco residual, owner e decisão                                                                                                                     |
+| ------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SYS-01 | BOLA/IDOR em treino, plano, vínculo ou recurso futuro.                     | Ator resolvido no servidor; RLS deny-by-default; grant mínimo; teste negativo entre usuários/papéis em cada relação e rota.                   | Perfis/aceites têm RLS e 41 verificações SQL; demais domínios ainda não existem.                             | **Alto — Data + Backend.** Nenhuma relação ou rota de domínio entra sem matriz e teste cruzado; aceito apenas o recorte atual em staging sintético. |
+| SYS-02 | Papel profissional, convite ou JWT antigo amplia acesso.                   | Papel autoritativo em `app_metadata`/servidor, vínculo ativo, expiração, revogação e revalidação em operação crítica.                         | Fronteira profissional ainda não foi implementada.                                                           | **Alto — Backend + Security.** Bloqueia toda capacidade profissional até o slice declarar vínculo, revogação e prova negativa.                      |
+| SYS-03 | Replay duplica finalização, publicação, Coin/reward ou efeito assíncrono.  | `Idempotency-Key`, unique de origem, ledger/outbox append-only e consumer idempotente; teste repete e reordena a mesma intenção.              | FND-012 limita/valida a chave e versiona eventos; persistência idempotente/outbox permanece no FND-022.      | **Alto — Backend + Data.** Nenhuma rota com efeito econômico ou publicação abre antes da deduplicação executável.                                   |
+| SYS-04 | Dependência, action ou imagem comprometida altera o artefato.              | Versões e actions por SHA, lockfile congelado, audit bloqueante, OIDC curto, imagem imutável e, antes do beta, SBOM/proveniência verificável. | Lock/actions/OIDC/imagem por SHA e auditoria high/critical estão ativos; SBOM/proveniência aguardam FND-019. | **Médio — Platform + Security.** Staging sintético aceito; produção e dado real bloqueados até a prova de supply chain.                             |
+| SYS-05 | XLSX hostil executa fórmula/macro ou esgota memória.                       | Parse como dado em sandbox, sem macro/fórmula ativa, limites de arquivo/linhas/células, timeout e validação server-side.                      | Importador ainda não foi implementado.                                                                       | **Alto — Web + Backend.** Importação permanece indisponível até testes com zip bomb, fórmula e células extremas.                                    |
+| SYS-06 | Webhook/provider falso, atrasado ou repetido altera oferta/job.            | Assinatura, timestamp, nonce, allowlist, limite, dedupe e payload por schema; testes de origem, expiração e replay.                           | Não há webhook ou integração mutável exposta neste corte.                                                    | **Alto — Integrations.** Cada provider reabre este modelo e fica desligado até sandbox e verificação de origem passarem.                            |
+| SYS-07 | Telemetria ou erro registra saúde, conteúdo, token ou query sensível.      | Catálogo allowlist, minimização, scrubbing e teste de artefato/log; replay e IP sensíveis desligados por padrão.                              | API usa Problem Details e log allowlisted sem URL crua; analytics/Sentry ainda não foram conectados.         | **Alto — Platform + Privacy.** FND-020/FND-024 não podem enviar evento antes do catálogo e da inspeção negativa.                                    |
+| SYS-08 | Dispositivo perdido, backup do SO ou storage inseguro expõe sessão/treino. | Sessão no SecureStore/Keychain; banco SQLCipher com chave separada; lock, rotação, logout e testes em release/device/backup.                  | Implementação e 18 testes locais de storage/DB existem; EAS, aparelho e backup/restore permanecem sem prova. | **Alto — Mobile + Security.** Somente dados sintéticos até FND-016/FND-017 provarem build e aparelho reais.                                         |
+
+## Regra de reabertura
+
+O modelo deve ser revisado no mesmo PR do slice quando surgir qualquer um dos
+itens abaixo:
+
+1. novo papel, tenant, dado sensível, tabela/RLS ou capacidade administrativa;
+2. nova rota com escrita, idempotência, upload, redirect ou efeito econômico;
+3. novo evento, consumer, fila, webhook ou provider externo;
+4. nova persistência no cliente, permissão nativa, deep link ou variante mobile;
+5. nova telemetria, script de terceiro, segredo, privilégio de CI ou ambiente;
+6. mudança que invalide controle, teste, owner ou decisão residual desta matriz.
+
+O PR referencia os IDs afetados, atualiza estado/evidência e não marca o risco
+como reduzido apenas porque o código compila. Risco sem owner ou decisão bloqueia
+o slice.
 
 ## Matriz mínima de verificação de FND-013/US-001
 
@@ -125,6 +189,7 @@ Fronteiras:
 
 ## Referências normativas e técnicas
 
+- OWASP: [Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html), decomposição, identificação/priorização, mitigação e revisão.
 - [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS/tree/v5.0.0), áreas de
   autenticação, sessão, autorização e proteção de dados.
 - OWASP: [Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
