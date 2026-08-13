@@ -24,24 +24,30 @@ service accounts, Workload Identity Pool, secrets, bucket, registry e rótulos
 
 ## Fluxo
 
-1. Desenvolva em uma branch de trabalho e abra um PR.
-2. O GitHub Actions executa formato, lint, tipagem, testes, builds e
-   verificações de segurança.
-3. O Cloudflare Pages publica a interface estática e registra o resultado como
-   check do commit.
-4. Depois dos checks do PR, avance `staging` por fast-forward até o SHA candidato
-   exato. Force push não faz parte do fluxo.
-5. O GitHub Actions aplica somente as migrations versionadas em
+1. Desenvolva em uma branch local criada a partir de `main` e execute os gates
+   locais antes de publicar o candidato.
+2. Avance `staging` por fast-forward até o SHA candidato exato. Force push não
+   faz parte do fluxo.
+3. O GitHub Actions executa formato, lint, tipagem, testes, builds e
+   verificações de segurança no SHA de `staging`.
+4. O Cloudflare Pages publica esse SHA no projeto de staging e registra o
+   resultado como check do commit.
+5. O pipeline aplica somente as migrations versionadas em
    `supabase/migrations` ao banco Supabase de staging.
 6. Quando o sinalizador `DAYGYM_STAGING_DEPLOY_ENABLED` estiver ativo, o
    GitHub Actions autentica no Google Cloud por OIDC, constrói uma imagem
    imutável no Cloud Build e publica a mesma imagem na API e no worker.
 7. O pipeline confirma `/health/live` e `/health/ready` da API e confirma que
    o worker não aceita uma chamada anônima externa.
-8. Somente depois da validação hospedada, promova o PR para `main` com merge
-   commit. Rebase e squash não preservam a ancestralidade do SHA validado.
+8. Somente depois de todos os gates hospedados, abra um PR de `staging` para
+   `main` e promova com merge commit. Rebase e squash não preservam a
+   ancestralidade do SHA validado.
 9. Se `staging` não puder avançar por fast-forward, interrompa a promoção e
    reconcilie o histórico por PR; nunca reescreva a branch de ambiente.
+
+O Cloudflare pode registrar um check adicional ao abrir o PR com um SHA já
+publicado. O gate da web é o deployment de produção do projeto disparado pela
+branch `staging`; um preview duplicado não substitui nem invalida essa prova.
 
 ## Governança do repositório
 
