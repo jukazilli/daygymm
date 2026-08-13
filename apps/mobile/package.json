@@ -6,10 +6,11 @@
   "scripts": {
     "build": "expo export --platform all --output-dir dist",
     "dev": "expo start",
-    "lint": "eslint app",
+    "lint": "eslint app lib",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@daygym/config": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
     "@expo/metro-runtime": "55.0.12",
     "expo": "55.0.28",

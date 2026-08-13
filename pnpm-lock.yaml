@@ -52,6 +52,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      "@daygym/config":
+        specifier: workspace:*
+        version: link:../../packages/config
       "@daygym/design-tokens":
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -94,6 +97,9 @@ importers:
 
   apps/web:
     dependencies:
+      "@daygym/config":
+        specifier: workspace:*
+        version: link:../../packages/config
       "@daygym/design-tokens":
         specifier: workspace:*
         version: link:../../packages/design-tokens

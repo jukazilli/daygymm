@@ -5,12 +5,14 @@
     "strict": true,
     "moduleResolution": "bundler",
     "paths": {
+      "@daygym/config": ["../../packages/config/src/index.ts"],
       "@daygym/design-tokens": ["../../packages/design-tokens/src/index.ts"]
     }
   },
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
+    "lib/**/*.ts",
     "expo-env.d.ts",
     ".expo/types/**/*.ts"
   ]

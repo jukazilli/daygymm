@@ -2,7 +2,18 @@
   "name": "@daygym/config",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
   "files": [
+    "src",
     "tsconfig.base.json"
-  ]
+  ],
+  "scripts": {
+    "lint": "eslint src",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
 }
