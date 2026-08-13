@@ -78,10 +78,21 @@ na documentação, em issues ou logs. A publicação `348310b9-709d-4232-a31e-d7
 foi concluída com sucesso.
 
 A inspeção funcional posterior comprovou que o cliente passou a emitir o
-request de cadastro ao Supabase e recebeu HTTP 200. O fluxo chegou ao estado de
-confirmação por e-mail; login confirmado, callbacks, persistência de sessão e
-logout ainda precisam das evidências hospedadas previstas para fechar FND-018.
-O ambiente mobile EAS continua separado e não recebeu essas variáveis.
+request de cadastro ao Supabase e recebeu HTTP 200. O Supabase Auth usa Resend
+por SMTP sobre TLS, com remetente no domínio verificado `soberania.tech`, limite
+de 30 e-mails por hora e intervalo mínimo de 60 segundos por destinatário. A
+credencial exposta durante a configuração foi substituída por uma chave restrita
+a envio e revogada depois de um envio de recuperação entregue com a nova chave;
+nenhum valor foi persistido no repositório ou nesta documentação.
+
+O `Site URL` e as duas URLs exatas de confirmação e recuperação apontam para o
+Cloudflare Pages. Um e-mail de recuperação foi entregue e seu destino foi
+inspecionado sem consumir o token, confirmando `/redefinir-senha/`. A autenticação
+por senha também retornou HTTP 200, mas a leitura de elegibilidade falhou com
+`PGRST106` porque o schema `api` ainda não está exposto no Data API hospedado.
+Exposição mínima do schema, persistência da sessão, logout e consumo completo do
+link ainda precisam das evidências previstas para fechar FND-018. O ambiente
+mobile EAS continua separado e não recebeu essas variáveis.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
