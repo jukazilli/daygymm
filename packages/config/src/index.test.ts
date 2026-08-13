@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parsePublicSupabaseConfig } from "./index";
+import { parsePublicSupabaseConfig, parsePublicWebConfig } from "./index";
 
 const publishableKey = `sb_publishable_${"a".repeat(24)}`;
 
@@ -80,5 +80,41 @@ describe("parsePublicSupabaseConfig", () => {
         message: expect.stringContaining(rejectedValue),
       }),
     );
+  });
+});
+
+describe("parsePublicWebConfig", () => {
+  it("accepts an exact HTTPS site origin", () => {
+    expect(
+      parsePublicWebConfig({
+        siteUrl: "https://daygym-web-staging.pages.dev/",
+        url: "https://daygym-staging.supabase.co",
+        publishableKey,
+      }),
+    ).toEqual({
+      siteUrl: "https://daygym-web-staging.pages.dev",
+      url: "https://daygym-staging.supabase.co",
+      publishableKey,
+    });
+  });
+
+  it("rejects a site URL containing a redirect path", () => {
+    expect(() =>
+      parsePublicWebConfig({
+        siteUrl: "https://daygym-web-staging.pages.dev/redirect",
+        url: "https://daygym-staging.supabase.co",
+        publishableKey,
+      }),
+    ).toThrow("unsafe URL");
+  });
+
+  it("reports a missing site URL without exposing another value", () => {
+    expect(() =>
+      parsePublicWebConfig({
+        siteUrl: undefined,
+        url: "https://daygym-staging.supabase.co",
+        publishableKey,
+      }),
+    ).toThrow("site URL");
   });
 });

@@ -5,10 +5,14 @@ logados ou copiados para issues.
 
 ## Clientes
 
-| Superfície | URL pública                | Chave publicável                       |
-| ---------- | -------------------------- | -------------------------------------- |
-| Web        | `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
-| Mobile     | `EXPO_PUBLIC_SUPABASE_URL` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Superfície | Origem/callback                   | URL pública do Supabase    | Chave publicável                       |
+| ---------- | --------------------------------- | -------------------------- | -------------------------------------- |
+| Web        | `NEXT_PUBLIC_DAYGYM_SITE_URL`     | `NEXT_PUBLIC_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Mobile     | Definida com FND-016 por ambiente | `EXPO_PUBLIC_SUPABASE_URL` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+
+`NEXT_PUBLIC_DAYGYM_SITE_URL` aceita somente uma origem HTTPS exata, sem path,
+query, fragmento ou credencial. O cliente deriva dela apenas os callbacks
+fixos versionados; retorno arbitrário recebido por parâmetro é proibido.
 
 Os clientes aceitam exclusivamente chaves com prefixo `sb_publishable_`.
 Chaves `sb_secret_`, service role, conexão PostgreSQL, SMTP, OAuth e signing
