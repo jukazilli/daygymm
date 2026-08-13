@@ -1,15 +1,17 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import { Onest_400Regular } from "@expo-google-fonts/onest/400Regular";
-import { Onest_600SemiBold } from "@expo-google-fonts/onest/600SemiBold";
-import { Onest_700Bold } from "@expo-google-fonts/onest/700Bold";
+import { Nunito_400Regular } from "@expo-google-fonts/nunito/400Regular";
+import { Nunito_500Medium } from "@expo-google-fonts/nunito/500Medium";
+import { Nunito_600SemiBold } from "@expo-google-fonts/nunito/600SemiBold";
+import { Nunito_700Bold } from "@expo-google-fonts/nunito/700Bold";
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Onest: Onest_400Regular,
-    "Onest-Bold": Onest_700Bold,
-    "Onest-SemiBold": Onest_600SemiBold,
+    Nunito: Nunito_400Regular,
+    "Nunito-Bold": Nunito_700Bold,
+    "Nunito-Medium": Nunito_500Medium,
+    "Nunito-SemiBold": Nunito_600SemiBold,
   });
 
   if (!fontsLoaded && !fontError) {

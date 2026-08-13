@@ -1,7 +1,7 @@
 # Dicionário de dados e matriz RLS
 
 Status: baseline executável do `FND-011`, atualizado pelo comando transacional
-de finalização do `FND-022`.
+de finalização do `FND-022` e pelo contexto progressivo da `US-003`.
 
 ## Escopo e precedência
 
@@ -118,6 +118,29 @@ sem reescrever uma finalização já confirmada.
 | `completion_consumed_at` | timestamptz, opcional                       | Confirmar aplicação idempotente do handler     | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
 | `created_at`             | timestamptz, obrigatório                    | Registrar a persistência no servidor           | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
 
+### `api.onboarding_contexts`
+
+Owner: usuário autenticado, limitado por grants de coluna, RLS e pela função
+`api.save_onboarding_context()` executada como invoker.
+
+Finalidade: salvar e retomar apenas o contexto mínimo usado para escolher o
+caminho do plano: objetivo, experiência comportamental, frequência, duração,
+equipamentos e estado amplo de limitação. Não armazena peso, diagnóstico,
+descrição clínica ou texto livre.
+
+| Campo               | Tipo/restrição                                  | Finalidade                                      | Classificação              | Retenção atual                                                               | Índice |
+| ------------------- | ----------------------------------------------- | ----------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- | ------ |
+| `user_id`           | UUID, PK, FK `api.profiles.user_id`, cascade    | Vincular o contexto ao titular                  | Identificador pessoal      | Removido em cascade com o perfil enquanto não houver decisão legal diferente | PK     |
+| `goal`              | text opcional, allowlist                        | Registrar o objetivo principal                  | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `experience`        | text opcional, allowlist comportamental         | Adequar linguagem e caminho do plano            | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `weekly_days`       | smallint opcional, entre 2 e 5                  | Registrar frequência sustentável                | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `session_minutes`   | smallint opcional, 30/45/60/75                  | Registrar tempo disponível                      | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `equipment_context` | text opcional, allowlist                        | Limitar o plano ao ambiente disponível          | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `limitation_status` | text opcional, allowlist sem detalhe clínico    | Direcionar revisão profissional quando indicada | Dado de atividade sensível | Mesmo ciclo do contexto                                                      | Não    |
+| `current_step`      | smallint, entre 0 e 6, progresso coerente       | Retomar sem repetir respostas                   | Metadado de uso            | Mesmo ciclo do contexto                                                      | Não    |
+| `completed_at`      | timestamptz opcional, normalizado pelo servidor | Registrar confirmação explícita                 | Metadado de uso            | Mesmo ciclo do contexto                                                      | Não    |
+| `updated_at`        | timestamptz, normalizado pelo servidor          | Registrar a última atualização                  | Metadado operacional       | Mesmo ciclo do contexto                                                      | Não    |
+
 ### `platform.domain_event_receipts`
 
 Owner: handlers internos executados pelo worker.
@@ -137,35 +160,39 @@ serve apenas para impedir reaplicação após replay da fila.
 
 ## Matriz de acesso e RLS
 
-`anon` não possui `USAGE` no schema `api`. `authenticated` recebe somente leitura
-nas relações expostas, filtrada por `auth.uid()`. Operações de escrita passam pela
-fronteira server-owned do trigger de Auth. O schema `private` não é exposto ao
-cliente.
+`anon` não possui `USAGE` no schema `api`. `authenticated` recebe somente os
+grants exigidos por cada caso de uso, sempre filtrados por `auth.uid()`. Escritas
+canônicas críticas continuam server-owned; o contexto progressivo, pertencente
+ao próprio titular, usa grants de coluna, constraints e RLS. O schema `private`
+não é exposto ao cliente.
 
-| Recurso                           | Papel                  |  SELECT | INSERT | UPDATE | DELETE | Política/controle                              | Teste negativo       |
-| --------------------------------- | ---------------------- | ------: | -----: | -----: | -----: | ---------------------------------------------- | -------------------- |
-| `api.profiles`                    | `anon`                 |     Não |    Não |    Não |    Não | sem `USAGE` em `api`                           | `RLS-N01`            |
-| `api.profiles`                    | `authenticated`        | Próprio |    Não |    Não |    Não | `profiles_select_own`; grants mínimos          | `RLS-N02`, `RLS-N05` |
-| `api.profiles`                    | função interna         |     N/A |    Sim |    Não |    Não | trigger `SECURITY DEFINER`                     | testes do cadastro   |
-| `api.consents`                    | `anon`                 |     Não |    Não |    Não |    Não | sem `USAGE` em `api`                           | `RLS-N01`            |
-| `api.consents`                    | `authenticated`        | Próprio |    Não |    Não |    Não | `consents_select_own`; grants mínimos          | `RLS-N03`, `RLS-N06` |
-| `api.consents`                    | função interna         |     N/A |    Sim |    Não |    Não | trigger `SECURITY DEFINER`                     | testes do cadastro   |
-| `private.legal_document_versions` | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema privado; grants revogados               | `RLS-N04`            |
-| `private.legal_document_versions` | administração          |     Sim |    Sim |    Sim |    Sim | migration/operação privilegiada                | fora do cliente      |
-| `platform.job_outbox`             | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema interno; grants revogados               | `RLS-N07`            |
-| `platform.job_outbox`             | funções internas       |     Sim |    Sim |    Sim |    Não | definer boundary e fila privada                | testes do outbox     |
-| `platform.job_outbox`             | worker runtime         |     Não |    Não |    Não |    Não | apenas wrappers privados bounded               | `RLS-N08`            |
-| `api.training_sessions`           | `anon`                 |     Não |    Não |    Não |    Não | sem `USAGE` em `api`                           | `RLS-N01`            |
-| `api.training_sessions`           | `authenticated`        | Próprio |    Não |    Não |    Não | `training_sessions_select_own`; grants mínimos | `RLS-N09`            |
-| `api.training_sessions`           | função interna         |     Sim |    Sim |    Não |    Não | comando transacional server-owned              | testes do comando    |
-| `platform.domain_event_receipts`  | `anon`/`authenticated` |     Não |    Não |    Não |    Não | schema interno; grants revogados               | `RLS-N10`            |
-| `platform.domain_event_receipts`  | worker runtime         |     Não |    Não |    Não |    Não | somente router privado bounded                 | `RLS-N10`            |
-| `platform.domain_event_receipts`  | handler interno        |     Sim |    Sim |    Não |    Não | definer boundary sem payload                   | testes do handler    |
+| Recurso                           | Papel                  |  SELECT |  INSERT |  UPDATE | DELETE | Política/controle                                                                                                                    | Teste negativo       |
+| --------------------------------- | ---------------------- | ------: | ------: | ------: | -----: | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| `api.profiles`                    | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`            |
+| `api.profiles`                    | `authenticated`        | Próprio |     Não |     Não |    Não | `profiles_select_own`; grants mínimos                                                                                                | `RLS-N02`, `RLS-N05` |
+| `api.profiles`                    | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro   |
+| `api.consents`                    | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`            |
+| `api.consents`                    | `authenticated`        | Próprio |     Não |     Não |    Não | `consents_select_own`; grants mínimos                                                                                                | `RLS-N03`, `RLS-N06` |
+| `api.consents`                    | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro   |
+| `private.legal_document_versions` | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; grants revogados                                                                                                     | `RLS-N04`            |
+| `private.legal_document_versions` | administração          |     Sim |     Sim |     Sim |    Sim | migration/operação privilegiada                                                                                                      | fora do cliente      |
+| `platform.job_outbox`             | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N07`            |
+| `platform.job_outbox`             | funções internas       |     Sim |     Sim |     Sim |    Não | definer boundary e fila privada                                                                                                      | testes do outbox     |
+| `platform.job_outbox`             | worker runtime         |     Não |     Não |     Não |    Não | apenas wrappers privados bounded                                                                                                     | `RLS-N08`            |
+| `api.training_sessions`           | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`            |
+| `api.training_sessions`           | `authenticated`        | Próprio |     Não |     Não |    Não | `training_sessions_select_own`; grants mínimos                                                                                       | `RLS-N09`            |
+| `api.training_sessions`           | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando    |
+| `api.onboarding_contexts`         | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`            |
+| `api.onboarding_contexts`         | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12` |
+| `platform.domain_event_receipts`  | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`            |
+| `platform.domain_event_receipts`  | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`            |
+| `platform.domain_event_receipts`  | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler    |
 
-As policies temporárias de inserção criadas na migration inicial foram removidas
-pela migration seguinte. As policies ativas são `profiles_select_own`,
-`consents_select_own` e `training_sessions_select_own`. Os controles negativos
-estáveis são:
+As policies temporárias de inserção da fundação foram removidas pela migration
+seguinte. As policies ativas são `profiles_select_own`, `consents_select_own`,
+`training_sessions_select_own`, `onboarding_contexts_select_own`,
+`onboarding_contexts_insert_own` e `onboarding_contexts_update_own`. Os controles
+negativos estáveis são:
 
 - `RLS-N01`: bloqueia acesso anônimo ao schema exposto;
 - `RLS-N02`: bloqueia mutação direta de elegibilidade;
@@ -179,6 +206,8 @@ estáveis são:
   direta por clientes autenticados.
 - `RLS-N10`: bloqueia leitura direta dos recibos e execução do handler concreto
   pelo worker; o runtime recebe somente o router bounded.
+- `RLS-N11`: isola a leitura do contexto progressivo entre titulares.
+- `RLS-N12`: bloqueia escrita do contexto progressivo em nome de outro titular.
 
 ## Pendências deliberadas para `FND-029`
 

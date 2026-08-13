@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   },
   primaryPressed: { backgroundColor: color.light.actionPressed },
   primaryLabel: {
-    color: color.light.card,
+    color: color.light.actionContrast,
     fontFamily: typography.familyBold,
     fontSize: typography.body,
   },

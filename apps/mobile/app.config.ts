@@ -38,6 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: app.name,
     slug: "daygym",
     version: "0.1.0",
+    icon: "./assets/icon.png",
     orientation: "portrait",
     userInterfaceStyle: "light",
     scheme: app.scheme,
@@ -47,10 +48,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       supportsTablet: false,
       bundleIdentifier: app.identifier,
+      icon: "./assets/icon.png",
     },
     android: {
       allowBackup: false,
       package: app.identifier,
+      adaptiveIcon: {
+        backgroundColor: "#FF6B00",
+        foregroundImage: "./assets/adaptive-icon.png",
+      },
     },
     plugins: [
       "expo-router",
@@ -70,6 +76,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "expo-sqlite",
         {
           useSQLCipher: true,
+        },
+      ],
+      [
+        "expo-splash-screen",
+        {
+          backgroundColor: "#FF6B00",
+          dark: {
+            backgroundColor: "#17110E",
+            image: "./assets/splash-icon.png",
+          },
+          image: "./assets/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
         },
       ],
     ],

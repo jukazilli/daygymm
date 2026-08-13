@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 import {
   stagingLegalVersions,
   type AuthFailure,
@@ -7,6 +5,7 @@ import {
 } from "@daygym/contracts";
 
 import { getWebPublicConfig } from "./supabase-public-config";
+import { getWebSupabaseClient } from "./supabase-browser";
 
 export { stagingLegalVersions } from "@daygym/contracts";
 export type {
@@ -62,19 +61,7 @@ function exactCallback(siteUrl: string, path: string): string {
 }
 
 export function createWebAuthGateway(): AuthGateway {
-  function buildClient(url: string, publishableKey: string) {
-    return createClient(url, publishableKey, {
-      auth: {
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        flowType: "pkce",
-        persistSession: true,
-      },
-      db: { schema: "api" },
-    });
-  }
-
-  type WebSupabaseClient = ReturnType<typeof buildClient>;
+  type WebSupabaseClient = ReturnType<typeof getWebSupabaseClient>;
 
   let client: WebSupabaseClient | undefined;
   let siteUrl: string | undefined;
@@ -87,7 +74,7 @@ export function createWebAuthGateway(): AuthGateway {
     try {
       const config = getWebPublicConfig();
       siteUrl = config.siteUrl;
-      client = buildClient(config.url, config.publishableKey);
+      client = getWebSupabaseClient();
       return client;
     } catch {
       throw new AuthConfigurationError();

@@ -70,6 +70,15 @@ development e preview sem compartilhar valores com production.
 
 ## Estado do subcorte de autenticação
 
+### Continuidade de sessão
+
+Web e mobile usam `persistSession: true` e `autoRefreshToken: true`. No mobile,
+o refresh token permanece no SecureStore fragmentado e a renovação volta ao
+primeiro plano junto com o app. O access token continua curto e rotativo por
+segurança; a pessoa permanece autenticada entre reinícios até sair da conta,
+revogar a sessão ou a plataforma invalidá-la por incidente/política. Token eterno
+não faz parte do contrato.
+
 Os adapters, a validação tipada, os exemplos e o gate contra variáveis
 privilegiadas estão implementados. Em 13 de agosto de 2026, um owner autenticado
 ativou as três variáveis públicas web diretamente no ambiente Production do

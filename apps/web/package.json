@@ -15,7 +15,7 @@
     "@daygym/config": "workspace:*",
     "@daygym/contracts": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
-    "@fontsource/onest": "5.3.0",
+    "@fontsource/nunito": "5.3.0",
     "@supabase/supabase-js": "2.112.3",
     "next": "16.3.0",
     "react": "19.2.8",

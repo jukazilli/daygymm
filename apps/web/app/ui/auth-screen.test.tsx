@@ -140,7 +140,7 @@ describe("AuthScreen", () => {
         "confirmation-code",
       ),
     );
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/conta/"));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/comecar/"));
     expect(window.location.search).toBe("");
   });
 });
