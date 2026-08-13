@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DayGym">
+  <rect width="64" height="64" rx="16" fill="#101828"/>
+  <path d="M19 26h26v12H19z" fill="#f97316"/>
+  <path d="M12 22h7v20h-7zm33 0h7v20h-7z" fill="#f8fafc"/>
+  <path d="M7 27h5v10H7zm45 0h5v10h-5z" fill="#f8fafc"/>
+</svg>
