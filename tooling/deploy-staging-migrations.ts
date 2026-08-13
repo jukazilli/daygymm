@@ -40,3 +40,16 @@ function runSupabase(argumentsList: string[]): void {
 
 runSupabase(["db", "push", "--db-url", databaseUrl, "--yes"]);
 runSupabase(["migration", "list", "--db-url", databaseUrl]);
+runSupabase([
+  "db",
+  "lint",
+  "--db-url",
+  databaseUrl,
+  "--schema",
+  "api",
+  "--level",
+  "error",
+  "--fail-on",
+  "error",
+]);
+runSupabase(["test", "db", "supabase/tests", "--db-url", databaseUrl]);
