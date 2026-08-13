@@ -4,7 +4,7 @@ export default function GdShopPage() {
   return (
     <ConstructionScreen
       active="today"
-      eyebrow="GdShop · 18+"
+      eyebrow="GdShop"
       title="GdShop em construção."
     />
   );

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { AuthGateway } from "../../lib/auth-gateway";
 import { createWebAuthGateway } from "../../lib/auth-gateway";
-import { AppShell } from "./app-shell";
+import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface ProfileScreenProps {
   readonly gateway?: AuthGateway;
@@ -68,9 +68,7 @@ export function ProfileScreen({
   return (
     <AppShell active="profile">
       {sessionState === "checking" ? (
-        <div className="app-loading" role="status">
-          Verificando acesso…
-        </div>
+        <AppLoadingSkeleton label="Verificando acesso" />
       ) : null}
       {sessionState === "ready" ? (
         <div className="profile-layout">

@@ -10,7 +10,7 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { AppShell } from "./app-shell";
+import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TodayScreenProps {
   readonly gateway?: PlanSourceGateway;
@@ -108,9 +108,7 @@ export function TodayScreen({
       <div className="today-layout">
         {state ? <TodayHero state={state} /> : null}
         {!state && !failed ? (
-          <div className="app-loading" role="status">
-            Carregando seu dia…
-          </div>
+          <AppLoadingSkeleton label="Carregando seu dia" />
         ) : null}
         {failed ? (
           <section className="app-state-card" role="alert">
@@ -128,16 +126,18 @@ export function TodayScreen({
 
         <section className="home-modules" aria-labelledby="home-modules-title">
           <div className="section-heading">
-            <h2 id="home-modules-title">Nutrição e GdShop</h2>
+            <h2 id="home-modules-title">Acessos rápidos</h2>
           </div>
           <div className="home-module-grid">
             <Link className="home-module-card" href="/nutricao/">
               <span className="module-icon" aria-hidden="true">
-                N
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 3v7m3-7v7M5 7h7m-3 3v11m8-18v18m0-18c-2 2-3 5-3 8h3" />
+                </svg>
               </span>
               <span>
                 <strong>Nutrição</strong>
-                <small>Em construção</small>
+                <small>Refeições e acompanhamento diário</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
                 →
@@ -145,11 +145,13 @@ export function TodayScreen({
             </Link>
             <Link className="home-module-card" href="/gdshop/">
               <span className="module-icon" aria-hidden="true">
-                G
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 8h14l-1 12H6ZM9 9V6a3 3 0 0 1 6 0v3" />
+                </svg>
               </span>
               <span>
                 <strong>GdShop</strong>
-                <small>18+ · Em construção</small>
+                <small>Produtos selecionados para sua rotina</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
                 →

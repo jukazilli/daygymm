@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 export type AppDestination =
-  "community" | "profile" | "progress" | "today" | "workouts";
+  "feed" | "profile" | "progress" | "today" | "workouts";
 
 interface AppShellProps {
   readonly active: AppDestination;
@@ -18,7 +18,7 @@ interface NavigationItem {
 const navigationItems: readonly NavigationItem[] = [
   { href: "/hoje/", icon: "today", label: "Hoje" },
   { href: "/treinos/", icon: "workouts", label: "Treinos" },
-  { href: "/comunidade/", icon: "community", label: "Comunidade" },
+  { href: "/feed/", icon: "feed", label: "Feed" },
   { href: "/progresso/", icon: "progress", label: "Progresso" },
   { href: "/conta/", icon: "profile", label: "Perfil" },
 ];
@@ -40,10 +40,11 @@ function NavigationIcon({ name }: Readonly<{ name: AppDestination }>) {
     );
   }
 
-  if (name === "community") {
+  if (name === "feed") {
     return (
       <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7-1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3 19c.4-3.2 2.2-5 5.5-5s5.1 1.8 5.5 5m0-5c3.8-.7 6.2 1 7 4" />
+        <circle cx="12" cy="12" r="8" />
+        <path d="m15.5 8.5-2.1 4.9-4.9 2.1 2.1-4.9Z" />
       </svg>
     );
   }
@@ -60,6 +61,21 @@ function NavigationIcon({ name }: Readonly<{ name: AppDestination }>) {
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8c.5-3.7 2.8-5.5 7-5.5s6.5 1.8 7 5.5" />
     </svg>
+  );
+}
+
+export function AppLoadingSkeleton({
+  label = "Carregando conteúdo",
+}: Readonly<{ label?: string }>) {
+  return (
+    <div className="app-skeleton" role="status" aria-label={label}>
+      <span className="sr-only">{label}…</span>
+      <span className="skeleton-line skeleton-line-short" />
+      <span className="skeleton-line skeleton-line-title" />
+      <span className="skeleton-line skeleton-line-title skeleton-line-medium" />
+      <span className="skeleton-line skeleton-line-body" />
+      <span className="skeleton-button" />
+    </div>
   );
 }
 

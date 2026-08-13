@@ -31,7 +31,10 @@ function createGateway(
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.history.replaceState({}, "", "/");
+});
 
 describe("PlanSourceScreen", () => {
   it("shows four equal paths without pre-confirming one", async () => {
@@ -72,5 +75,48 @@ describe("PlanSourceScreen", () => {
       ).toBe("true"),
     );
     expect(screen.getByRole("status").textContent).toBe("Escolha salva.");
+  });
+
+  it("does not reopen automatically after a path was already selected", async () => {
+    const navigate = vi.fn();
+    const gateway = createGateway({
+      load: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          onboardingCompleted: true,
+          selectedAt: "2026-08-13T17:00:00.000Z",
+          source: "official_xlsx",
+        },
+      }),
+    });
+
+    render(createElement(PlanSourceScreen, { gateway, navigate }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/hoje/"));
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("allows an explicit path change", async () => {
+    window.history.replaceState({}, "", "/escolher-plano/?alterar=1");
+    const gateway = createGateway({
+      load: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          onboardingCompleted: true,
+          selectedAt: "2026-08-13T17:00:00.000Z",
+          source: "official_xlsx",
+        },
+      }),
+    });
+
+    render(createElement(PlanSourceScreen, { gateway }));
+
+    expect(
+      (
+        await screen.findByRole("button", {
+          name: /Importar planilha oficial/,
+        })
+      ).getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });

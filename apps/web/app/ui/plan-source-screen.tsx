@@ -10,6 +10,7 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
+import { AppLoadingSkeleton } from "./app-shell";
 
 interface PlanSourceScreenProps {
   readonly gateway?: PlanSourceGateway;
@@ -86,6 +87,14 @@ export function PlanSourceScreen({
           return;
         }
 
+        const isChanging = new URL(window.location.href).searchParams.has(
+          "alterar",
+        );
+        if (result.value.source && !isChanging) {
+          navigate("/hoje/");
+          return;
+        }
+
         setState(result.value);
       });
   }, [navigate]);
@@ -155,13 +164,12 @@ export function PlanSourceScreen({
               );
             })}
           </div>
-        ) : (
-          <div
-            className="onboarding-loading plan-source-loading"
-            aria-live="polite"
-          >
-            {feedback ?? "Carregando opções…"}
+        ) : feedback ? (
+          <div className="onboarding-loading plan-source-loading" role="alert">
+            {feedback}
           </div>
+        ) : (
+          <AppLoadingSkeleton label="Carregando opções de plano" />
         )}
 
         {state && feedback ? (

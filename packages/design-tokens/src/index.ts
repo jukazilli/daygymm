@@ -15,7 +15,7 @@ export const dayGymTokens = {
     },
     light: {
       action: "#FF6B00",
-      actionContrast: "#24150B",
+      actionContrast: "#FFFFFF",
       actionPressed: "#D95300",
       actionSoft: "#FFF0E5",
       border: "#E5D8D0",
@@ -30,7 +30,7 @@ export const dayGymTokens = {
     },
     dark: {
       action: "#FF8A3D",
-      actionContrast: "#21130B",
+      actionContrast: "#FFFFFF",
       actionPressed: "#FF6B00",
       actionSoft: "#3A2115",
       border: "#4A352B",

@@ -14,6 +14,7 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebOnboardingGateway } from "../../lib/onboarding-gateway";
+import { AppLoadingSkeleton } from "./app-shell";
 
 type AnswerValue =
   | OnboardingEquipmentContext
@@ -235,7 +236,7 @@ export function OnboardingScreen({
         }
 
         if (result.value.completedAt) {
-          navigate("/escolher-plano/");
+          navigate("/hoje/");
           return;
         }
 
@@ -314,9 +315,13 @@ export function OnboardingScreen({
   if (!context) {
     return (
       <main className="onboarding-shell">
-        <div className="onboarding-loading" aria-live="polite">
-          {feedback ?? "Carregando seu treino…"}
-        </div>
+        {feedback ? (
+          <div className="onboarding-loading" role="alert">
+            {feedback}
+          </div>
+        ) : (
+          <AppLoadingSkeleton label="Carregando seu treino" />
+        )}
       </main>
     );
   }

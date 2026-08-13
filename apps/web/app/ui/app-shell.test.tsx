@@ -25,5 +25,8 @@ describe("AppShell", () => {
     expect(
       screen.getByRole("link", { name: "Treinos" }).getAttribute("href"),
     ).toBe("/treinos");
+    expect(
+      screen.getByRole("link", { name: "Feed" }).getAttribute("href"),
+    ).toBe("/feed");
   });
 });
