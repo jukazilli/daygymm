@@ -24,6 +24,7 @@ function createClient(overrides: Record<string, unknown> = {}) {
     signOut: vi.fn().mockResolvedValue({ error: null }),
     signUp: vi.fn().mockResolvedValue({ error: null }),
     updateUser: vi.fn().mockResolvedValue({ error: null }),
+    verifyOtp: vi.fn().mockResolvedValue({ error: null }),
     ...overrides,
   };
   const from = vi.fn((table: string) => {

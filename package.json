@@ -28,6 +28,7 @@
     "lint": "turbo run lint && eslint tooling eslint.config.mjs && pnpm check:boundaries",
     "security": "pnpm check:secrets && pnpm check:client-environment && pnpm check:mobile-storage && pnpm audit:dependencies",
     "supabase": "supabase",
+    "supabase:auth:sync": "node scripts/sync-supabase-auth-templates.mjs",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck && tsc --project tooling/tsconfig.json --noEmit"
   },

@@ -39,11 +39,15 @@ function failureFromError(error: unknown, fallback: AuthFailure): AuthFailure {
   if (error instanceof AuthConfigurationError) {
     return "configuration";
   }
-  if (getErrorProperty(error, "status") === 429) {
+  const code = getErrorProperty(error, "code");
+  if (
+    getErrorProperty(error, "status") === 429 ||
+    code === "over_email_send_rate_limit" ||
+    code === "email_rate_limit_exceeded"
+  ) {
     return "rate-limited";
   }
 
-  const code = getErrorProperty(error, "code");
   if (
     code === "invalid_credentials" ||
     code === "email_not_confirmed" ||
@@ -213,6 +217,23 @@ export function createMobileAuthGateway(
       try {
         const { error } =
           await configuredClient().auth.exchangeCodeForSession(code);
+        return error
+          ? { ok: false, reason: "link-invalid" }
+          : { ok: true, value: undefined };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: failureFromError(error, "link-invalid"),
+        };
+      }
+    },
+
+    async verifyEmailToken(tokenHash, purpose) {
+      try {
+        const { error } = await configuredClient().auth.verifyOtp({
+          token_hash: tokenHash,
+          type: purpose === "confirmation" ? "email" : "recovery",
+        });
         return error
           ? { ok: false, reason: "link-invalid" }
           : { ok: true, value: undefined };

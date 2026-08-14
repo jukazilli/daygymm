@@ -27,6 +27,10 @@ function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
       ok: true,
       value: undefined,
     }),
+    verifyEmailToken: vi.fn().mockResolvedValue({
+      ok: true,
+      value: undefined,
+    }),
     ...overrides,
   };
 }
@@ -142,5 +146,89 @@ describe("AuthScreen", () => {
     );
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/hoje/"));
     expect(window.location.search).toBe("");
+  });
+
+  it("keeps a confirmation GET inert and verifies the token only after a click", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway();
+    const navigate = vi.fn();
+    window.history.replaceState(
+      {},
+      "",
+      "/confirmar-email/#token_hash=synthetic-hash&type=email",
+    );
+
+    render(
+      createElement(AuthScreen, {
+        gateway,
+        mode: "confirm-email",
+        navigate,
+      }),
+    );
+
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    expect(gateway.verifyEmailToken).not.toHaveBeenCalled();
+    expect(gateway.exchangeAuthCode).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Confirmar meu e-mail" }),
+    );
+
+    expect(gateway.verifyEmailToken).toHaveBeenCalledWith(
+      "synthetic-hash",
+      "confirmation",
+    );
+    expect(navigate).toHaveBeenCalledWith("/hoje/");
+  });
+
+  it("requires an explicit action before starting password recovery", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway();
+    window.history.replaceState(
+      {},
+      "",
+      "/redefinir-senha/#token_hash=recovery-hash&type=recovery",
+    );
+
+    render(createElement(AuthScreen, { gateway, mode: "reset-password" }));
+
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    expect(gateway.verifyEmailToken).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Nova senha")).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: "Continuar com segurança" }),
+    );
+
+    expect(gateway.verifyEmailToken).toHaveBeenCalledWith(
+      "recovery-hash",
+      "recovery",
+    );
+    expect(await screen.findByLabelText("Nova senha")).toBeTruthy();
+  });
+
+  it("offers sign in without revealing whether a confirmation link was reused", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway({
+      verifyEmailToken: vi.fn().mockResolvedValue({
+        ok: false,
+        reason: "link-invalid",
+      }),
+    });
+    window.history.replaceState(
+      {},
+      "",
+      "/confirmar-email/#token_hash=used-hash&type=email",
+    );
+
+    render(createElement(AuthScreen, { gateway, mode: "confirm-email" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Confirmar meu e-mail" }),
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "O e-mail pode já estar confirmado ou o link pode ter expirado.",
+    );
+    expect(screen.getByRole("link", { name: "Ir para entrar" })).toBeTruthy();
   });
 });
