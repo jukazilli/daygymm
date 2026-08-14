@@ -32,6 +32,7 @@ const plannedSession = {
   ],
   name: "Treino A",
   sessionId: "72000000-0000-4000-8000-000000000002",
+  weekday: 1,
 };
 
 const plan = {
@@ -62,7 +63,7 @@ describe("ActiveTrainingScreen", () => {
     const activeRun: ActiveTrainingRun = {
       runId: "75000000-0000-4000-8000-000000000005",
       session: plannedSession,
-      startedAt: new Date().toISOString(),
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
     };
     const completedRun: ActiveTrainingRun = {
       ...activeRun,
@@ -77,6 +78,7 @@ describe("ActiveTrainingScreen", () => {
       },
     };
     const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
       completeExercise: vi.fn().mockResolvedValue({
         ok: true,
         value: { completedCount: 1, totalCount: 1, wasCreated: true },
@@ -97,7 +99,12 @@ describe("ActiveTrainingScreen", () => {
       start: vi.fn().mockResolvedValue({ ok: true, value: activeRun }),
     };
 
-    render(createElement(ActiveTrainingScreen, { gateway }));
+    render(
+      createElement(ActiveTrainingScreen, {
+        gateway,
+        plannedSessionId: plannedSession.sessionId,
+      }),
+    );
 
     await user.click(
       await screen.findByRole("button", { name: "Iniciar treino" }),
@@ -114,10 +121,42 @@ describe("ActiveTrainingScreen", () => {
 
     expect(await screen.findByText("Treino concluído.")).toBeTruthy();
     expect(gateway.start).toHaveBeenCalledWith(plannedSession.sessionId);
+    expect(gateway.load).toHaveBeenNthCalledWith(1, plannedSession.sessionId);
     expect(gateway.completeExercise).toHaveBeenCalledWith(
       activeRun.runId,
       plannedSession.items[0]?.itemId,
     );
     expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
+  });
+
+  it("requires confirmation before discarding an active training", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const activeRun: ActiveTrainingRun = {
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: plannedSession,
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
+    };
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { runId: activeRun.runId, wasCancelled: true },
+      }),
+      completeExercise: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      start: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway, navigate }));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Cancelar treino" }),
+    );
+    expect(gateway.cancel).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Sim, cancelar" }));
+
+    expect(gateway.cancel).toHaveBeenCalledWith(activeRun.runId);
+    expect(navigate).toHaveBeenCalledWith("/treinos/");
   });
 });

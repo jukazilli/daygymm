@@ -10,6 +10,7 @@ import {
 import { getWebSupabaseClient } from "./supabase-browser";
 import type {
   TrainingPlanImportRpcRow,
+  TrainingPlanRenameRpcRow,
   TrainingPlanRow,
 } from "./supabase-database";
 
@@ -137,6 +138,30 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
         if (error instanceof Error && error.name === "ZodError") {
           return failure(error);
         }
+        return { ok: false, reason: "configuration" };
+      }
+    },
+
+    async rename(planId, name) {
+      try {
+        const normalizedName = name.trim();
+        if (!normalizedName || normalizedName.length > 80) {
+          return { ok: false, reason: "invalid" };
+        }
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("rename_training_plan", {
+          p_name: normalizedName,
+          p_plan_id: planId,
+        });
+        const row = data?.[0] as TrainingPlanRenameRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: { name: row.plan_name, planId: row.plan_id },
+        };
+      } catch {
         return { ok: false, reason: "configuration" };
       }
     },

@@ -119,9 +119,10 @@ function sanitizedFileName(name: string): string {
   return clean.slice(Math.max(0, clean.length - 120));
 }
 
-function planNameFromFile(name: string): string {
-  const withoutExtension = name.replace(/\.xlsx$/i, "").trim();
-  return (withoutExtension || "Meu treino importado").slice(0, 80);
+export function defaultImportedPlanName(date = new Date()): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `Treino - ${day}/${month}/${date.getFullYear()}`;
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -266,7 +267,7 @@ export async function parseOfficialXlsxFile(
 ): Promise<ParsedOfficialXlsx> {
   const safeFileName = sanitizedFileName(file.name);
   const baseResult = {
-    planName: planNameFromFile(safeFileName),
+    planName: defaultImportedPlanName(),
     sessions: [] as OfficialXlsxPlanSession[],
   };
   if (!safeFileName.toLocaleLowerCase("pt-BR").endsWith(".xlsx")) {

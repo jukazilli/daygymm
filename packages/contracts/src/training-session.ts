@@ -10,7 +10,7 @@ const uuidSchema = z.string().uuid();
 export const practicalTrainingExerciseSchema = z
   .object({
     circuitGroup: z.string().min(1).max(40).nullable(),
-    completedAt: z.string().datetime().nullable(),
+    completedAt: z.string().datetime({ offset: true }).nullable(),
     distanceMeters: z.number().int().min(1).max(100_000).nullable(),
     durationSeconds: z.number().int().min(1).max(7_200).nullable(),
     exerciseName: z.string().min(1).max(120),
@@ -31,6 +31,7 @@ export const practicalTrainingPlanSessionSchema = z
     items: z.array(practicalTrainingExerciseSchema).min(1).max(100),
     name: z.string().min(1).max(80),
     sessionId: uuidSchema,
+    weekday: z.number().int().min(1).max(7),
   })
   .strict();
 
@@ -38,14 +39,14 @@ export const activeTrainingRunSchema = z
   .object({
     runId: uuidSchema,
     session: practicalTrainingPlanSessionSchema,
-    startedAt: z.string().datetime(),
+    startedAt: z.string().datetime({ offset: true }),
   })
   .strict();
 
 export const practicalTrainingStateSchema = z
   .object({
     activeRun: activeTrainingRunSchema.nullable(),
-    lastCompletedAt: z.string().datetime().nullable(),
+    lastCompletedAt: z.string().datetime({ offset: true }).nullable(),
     nextSession: practicalTrainingPlanSessionSchema.nullable(),
     plan: importedTrainingPlanSchema.nullable(),
     sessions: z.array(practicalTrainingPlanSessionSchema).max(14),
@@ -62,7 +63,7 @@ export const exerciseCompletionSchema = z
 
 export const completedTrainingSessionSchema = z
   .object({
-    completedAt: z.string().datetime(),
+    completedAt: z.string().datetime({ offset: true }),
     durationSeconds: z.number().int().nonnegative(),
     sessionId: uuidSchema,
     wasCreated: z.boolean(),
@@ -83,6 +84,10 @@ export type ExerciseCompletion = z.infer<typeof exerciseCompletionSchema>;
 export type CompletedTrainingSession = z.infer<
   typeof completedTrainingSessionSchema
 >;
+export interface CancelledTrainingSession {
+  readonly runId: string;
+  readonly wasCancelled: boolean;
+}
 
 export type TrainingSessionFailure =
   "configuration" | "conflict" | "invalid" | "session" | "unexpected";
@@ -91,6 +96,9 @@ export type TrainingSessionResult<T> =
   | { readonly ok: false; readonly reason: TrainingSessionFailure };
 
 export interface TrainingSessionGateway {
+  cancel(
+    runId: string,
+  ): Promise<TrainingSessionResult<CancelledTrainingSession>>;
   completeExercise(
     runId: string,
     itemId: string,
@@ -98,7 +106,9 @@ export interface TrainingSessionGateway {
   finish(
     runId: string,
   ): Promise<TrainingSessionResult<CompletedTrainingSession>>;
-  load(): Promise<TrainingSessionResult<PracticalTrainingState>>;
+  load(
+    preferredSessionId?: string,
+  ): Promise<TrainingSessionResult<PracticalTrainingState>>;
   start(
     plannedSessionId: string,
   ): Promise<TrainingSessionResult<ActiveTrainingRun>>;

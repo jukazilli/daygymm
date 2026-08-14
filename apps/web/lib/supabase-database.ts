@@ -53,6 +53,15 @@ export interface TrainingPlanSessionRow extends Record<string, unknown> {
   version_id: string;
 }
 
+export interface TrainingPlanScheduleEntryRow extends Record<string, unknown> {
+  planned_session_id: string;
+  schedule_entry_id: string;
+  slot_order: number;
+  user_id: string;
+  version_id: string;
+  weekday: number;
+}
+
 export interface TrainingPlanItemRow extends Record<string, unknown> {
   circuit_group: string | null;
   distance_meters: number | null;
@@ -133,6 +142,11 @@ export interface TrainingFinishRpcRow extends Record<string, unknown> {
   was_created: boolean;
 }
 
+export interface TrainingCancelRpcRow extends Record<string, unknown> {
+  run_id: string;
+  was_cancelled: boolean;
+}
+
 export interface TrainingPlanImportRpcRow extends Record<string, unknown> {
   item_count: number;
   plan_id: string;
@@ -141,6 +155,12 @@ export interface TrainingPlanImportRpcRow extends Record<string, unknown> {
   session_count: number;
   version_id: string;
   was_created: boolean;
+}
+
+export interface TrainingPlanRenameRpcRow extends Record<string, unknown> {
+  plan_id: string;
+  plan_name: string;
+  updated_at: string;
 }
 
 type TableDefinition<Row extends Record<string, unknown>> = {
@@ -157,6 +177,7 @@ export interface WebDatabase {
       onboarding_contexts: TableDefinition<OnboardingContextRow>;
       profiles: TableDefinition<ProfileRow>;
       training_plan_items: TableDefinition<TrainingPlanItemRow>;
+      training_plan_schedule_entries: TableDefinition<TrainingPlanScheduleEntryRow>;
       training_plan_sessions: TableDefinition<TrainingPlanSessionRow>;
       training_plan_versions: TableDefinition<TrainingPlanVersionRow>;
       training_plans: TableDefinition<TrainingPlanRow>;
@@ -166,6 +187,12 @@ export interface WebDatabase {
     };
     Views: Record<string, never>;
     Functions: {
+      cancel_training_session: {
+        Args: {
+          p_run_id: string;
+        };
+        Returns: TrainingCancelRpcRow[];
+      };
       import_official_xlsx_plan: {
         Args: {
           p_operation_id: string;
@@ -176,6 +203,13 @@ export interface WebDatabase {
           p_source_size_bytes: number;
         };
         Returns: TrainingPlanImportRpcRow[];
+      };
+      rename_training_plan: {
+        Args: {
+          p_name: string;
+          p_plan_id: string;
+        };
+        Returns: TrainingPlanRenameRpcRow[];
       };
       complete_training_exercise: {
         Args: {

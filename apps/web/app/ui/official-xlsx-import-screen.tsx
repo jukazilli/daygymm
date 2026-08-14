@@ -16,6 +16,7 @@ import {
 } from "../../lib/official-xlsx-parser";
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
 import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
+import { trainingWeekdayName } from "../../lib/training-weekdays";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface OfficialXlsxImportScreenProps {
@@ -237,7 +238,7 @@ export function OfficialXlsxImportScreen({
                   </h2>
                 </div>
                 <label className="compact-field">
-                  <span>Nome do plano</span>
+                  <span>Nome do treino</span>
                   <input
                     maxLength={80}
                     onChange={(event) => changePlanName(event.target.value)}
@@ -285,7 +286,9 @@ export function OfficialXlsxImportScreen({
                     key={session.dayOrder}
                   >
                     <div>
-                      <span>Dia {session.dayOrder}</span>
+                      <span>
+                        {trainingWeekdayName(((session.dayOrder - 1) % 7) + 1)}
+                      </span>
                       <h3>{session.name}</h3>
                     </div>
                     <ul>

@@ -10,11 +10,13 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import { trainingWeekdayName } from "../../lib/training-weekdays";
 import { AppLoadingSkeleton } from "./app-shell";
 
 interface ActiveTrainingScreenProps {
   readonly gateway?: TrainingSessionGateway;
   readonly navigate?: (path: string) => void;
+  readonly plannedSessionId?: string;
 }
 
 function defaultNavigate(path: string) {
@@ -89,6 +91,7 @@ function ElapsedTimer({ startedAt }: Readonly<{ startedAt: string }>) {
 export function ActiveTrainingScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  plannedSessionId,
 }: ActiveTrainingScreenProps) {
   const gatewayRef = useRef<TrainingSessionGateway | undefined>(
     providedGateway,
@@ -96,6 +99,7 @@ export function ActiveTrainingScreen({
   const [state, setState] = useState<PracticalTrainingState>();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [confirmCancellation, setConfirmCancellation] = useState(false);
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
 
@@ -120,8 +124,12 @@ export function ActiveTrainingScreen({
 
   useEffect(() => {
     let active = true;
+    const requestedSessionId =
+      plannedSessionId ??
+      new URLSearchParams(window.location.search).get("sessao") ??
+      undefined;
     void gateway()
-      .load()
+      .load(requestedSessionId)
       .then((result) => {
         if (!active) {
           return;
@@ -145,7 +153,7 @@ export function ActiveTrainingScreen({
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [navigate, plannedSessionId]);
 
   async function startTraining() {
     if (!state?.nextSession || busy) {
@@ -226,6 +234,26 @@ export function ActiveTrainingScreen({
     setFinishedDuration(result.value.durationSeconds);
   }
 
+  async function cancelTraining() {
+    const run = state?.activeRun;
+    if (!run || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    const result = await gateway().cancel(run.runId);
+    setBusy(false);
+    if (!result.ok) {
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(result.reason));
+      return;
+    }
+    navigate("/treinos/");
+  }
+
   if (finishedDuration !== undefined) {
     return (
       <main className="session-shell session-finished">
@@ -269,7 +297,10 @@ export function ActiveTrainingScreen({
         <section className="session-intro">
           <p className="eyebrow">{state.plan.name}</p>
           <h1>{state.nextSession.name}</h1>
-          <p>{state.nextSession.items.length} exercícios</p>
+          <p>
+            {trainingWeekdayName(state.nextSession.weekday)} ·{" "}
+            {state.nextSession.items.length} exercícios
+          </p>
         </section>
         <ol className="session-exercise-preview">
           {state.nextSession.items.map((exercise) => (
@@ -400,6 +431,41 @@ export function ActiveTrainingScreen({
           </button>
         </section>
       ) : null}
+
+      <section className="cancel-training">
+        {confirmCancellation ? (
+          <div role="alert">
+            <strong>Cancelar treino em andamento?</strong>
+            <p>O progresso desta execução será descartado.</p>
+            <div>
+              <button
+                className="button-danger"
+                disabled={busy}
+                onClick={() => void cancelTraining()}
+                type="button"
+              >
+                {busy ? "Cancelando…" : "Sim, cancelar"}
+              </button>
+              <button
+                className="button-text"
+                disabled={busy}
+                onClick={() => setConfirmCancellation(false)}
+                type="button"
+              >
+                Manter treino
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="button-text"
+            onClick={() => setConfirmCancellation(true)}
+            type="button"
+          >
+            Cancelar treino
+          </button>
+        )}
+      </section>
     </main>
   );
 }

@@ -1,9 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   PlanSourceGateway,
+  TrainingPlanGateway,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
@@ -13,6 +15,7 @@ function createTrainingGateway(
   value: Awaited<ReturnType<TrainingSessionGateway["load"]>>,
 ): TrainingSessionGateway {
   return {
+    cancel: vi.fn(),
     completeExercise: vi.fn(),
     finish: vi.fn(),
     load: vi.fn().mockResolvedValue(value),
@@ -57,6 +60,7 @@ describe("TrainingHubScreen", () => {
   });
 
   it("makes an imported plan executable", async () => {
+    const user = userEvent.setup();
     const gateway: PlanSourceGateway = {
       load: vi.fn().mockResolvedValue({
         ok: true,
@@ -89,6 +93,7 @@ describe("TrainingHubScreen", () => {
       ],
       name: "Treino A",
       sessionId: "62000000-0000-4000-8000-000000000002",
+      weekday: 1,
     };
     const trainingGateway = createTrainingGateway({
       ok: true,
@@ -108,14 +113,47 @@ describe("TrainingHubScreen", () => {
         sessions: [plannedSession],
       },
     });
+    const trainingPlanGateway: TrainingPlanGateway = {
+      importOfficialXlsx: vi.fn(),
+      loadActive: vi.fn(),
+      rename: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          name: "Treino - 14/08/2026",
+          planId: "63000000-0000-4000-8000-000000000003",
+        },
+      }),
+    };
 
-    render(createElement(TrainingHubScreen, { gateway, trainingGateway }));
+    render(
+      createElement(TrainingHubScreen, {
+        gateway,
+        trainingGateway,
+        trainingPlanGateway,
+      }),
+    );
 
     expect(
       await screen.findByRole("heading", { name: "Treino A" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Abrir treino" }).getAttribute("href"),
-    ).toBe("/treinos/sessao");
+    ).toBe("/treinos/sessao?sessao=62000000-0000-4000-8000-000000000002");
+    expect(screen.getByText("Agenda semanal")).toBeTruthy();
+    expect(screen.getByText("Segunda")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Editar nome" }));
+    const nameField = screen.getByRole("textbox", { name: "Nome do treino" });
+    await user.clear(nameField);
+    await user.type(nameField, "Treino - 14/08/2026");
+    await user.click(screen.getByRole("button", { name: "Salvar nome" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Treino - 14/08/2026" }),
+    ).toBeTruthy();
+    expect(trainingPlanGateway.rename).toHaveBeenCalledWith(
+      "63000000-0000-4000-8000-000000000003",
+      "Treino - 14/08/2026",
+    );
   });
 });

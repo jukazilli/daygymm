@@ -157,4 +157,8 @@ export interface TrainingPlanGateway {
     proposal: OfficialXlsxPlanProposal,
   ): Promise<TrainingPlanResult<ImportedTrainingPlan>>;
   loadActive(): Promise<TrainingPlanResult<ImportedTrainingPlan | null>>;
+  rename(
+    planId: string,
+    name: string,
+  ): Promise<TrainingPlanResult<{ name: string; planId: string }>>;
 }

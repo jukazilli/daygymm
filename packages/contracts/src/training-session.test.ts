@@ -26,6 +26,7 @@ const session = {
   ],
   name: "Treino A",
   sessionId: "52000000-0000-4000-8000-000000000002",
+  weekday: 1,
 } as const;
 
 describe("practical training contracts", () => {
@@ -62,5 +63,21 @@ describe("practical training contracts", () => {
 
     expect(state.activeRun?.session.items[0]?.completedAt).toBeNull();
     expect(state.plan?.version).toBe(1);
+  });
+
+  it("accepts the timestamp offset returned by PostgREST", () => {
+    const result = practicalTrainingStateSchema.safeParse({
+      activeRun: {
+        runId: "53000000-0000-4000-8000-000000000003",
+        session,
+        startedAt: "2026-08-14T03:30:00.123456+00:00",
+      },
+      lastCompletedAt: null,
+      nextSession: session,
+      plan: null,
+      sessions: [session],
+    });
+
+    expect(result.success).toBe(true);
   });
 });

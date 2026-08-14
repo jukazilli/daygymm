@@ -8,16 +8,24 @@ import type {
   PlanSourceGateway,
   PlanSourceState,
   PracticalTrainingState,
+  TrainingPlanGateway,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
+import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import {
+  currentTrainingWeekday,
+  trainingSessionHref,
+  trainingWeekdayName,
+} from "../../lib/training-weekdays";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TrainingHubScreenProps {
   readonly gateway?: PlanSourceGateway;
   readonly navigate?: (path: string) => void;
+  readonly trainingPlanGateway?: TrainingPlanGateway;
   readonly trainingGateway?: TrainingSessionGateway;
 }
 
@@ -38,12 +46,18 @@ function defaultNavigate(path: string) {
 }
 
 function TrainingState({
+  onRename,
   sourceState,
   trainingState,
 }: Readonly<{
+  onRename: (planId: string, name: string) => Promise<boolean>;
   sourceState: PlanSourceState;
   trainingState: PracticalTrainingState;
 }>) {
+  const [editingName, setEditingName] = useState(false);
+  const [planName, setPlanName] = useState(trainingState.plan?.name ?? "");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameFailed, setRenameFailed] = useState(false);
   if (!sourceState.onboardingCompleted) {
     return (
       <section className="app-state-card training-card">
@@ -68,7 +82,7 @@ function TrainingState({
     );
   }
 
-  if (trainingState.plan && trainingState.nextSession) {
+  if (trainingState.plan) {
     const activeRun = trainingState.activeRun;
     const completedCount = activeRun
       ? activeRun.session.items.filter((item) => item.completedAt).length
@@ -84,49 +98,146 @@ function TrainingState({
             {trainingState.plan.sessionCount} sessões ·{" "}
             {trainingState.plan.itemCount} exercícios
           </p>
+          {editingName ? (
+            <form
+              className="plan-name-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (renameBusy) {
+                  return;
+                }
+                setRenameBusy(true);
+                setRenameFailed(false);
+                void onRename(trainingState.plan!.planId, planName).then(
+                  (saved) => {
+                    setRenameBusy(false);
+                    setRenameFailed(!saved);
+                    if (saved) {
+                      setEditingName(false);
+                    }
+                  },
+                );
+              }}
+            >
+              <label>
+                <span>Nome do treino</span>
+                <input
+                  maxLength={80}
+                  onChange={(event) => setPlanName(event.target.value)}
+                  value={planName}
+                />
+              </label>
+              <div>
+                <button
+                  className="button-primary"
+                  disabled={renameBusy || !planName.trim()}
+                  type="submit"
+                >
+                  {renameBusy ? "Salvando…" : "Salvar nome"}
+                </button>
+                <button
+                  className="button-text"
+                  onClick={() => {
+                    setPlanName(trainingState.plan!.name);
+                    setEditingName(false);
+                    setRenameFailed(false);
+                  }}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+              </div>
+              {renameFailed ? (
+                <p className="status-message status-error" role="alert">
+                  Não foi possível salvar o nome.
+                </p>
+              ) : null}
+            </form>
+          ) : (
+            <button
+              className="button-text plan-name-edit"
+              onClick={() => setEditingName(true)}
+              type="button"
+            >
+              Editar nome
+            </button>
+          )}
         </section>
 
-        <section className="next-training-card">
-          <div>
-            <p className="eyebrow">
-              {activeRun ? "Em andamento" : "Próximo treino"}
-            </p>
-            <h2>{trainingState.nextSession.name}</h2>
-            <p>
-              {activeRun
-                ? `${completedCount} de ${activeRun.session.items.length} exercícios`
-                : `${trainingState.nextSession.items.length} exercícios`}
-            </p>
-          </div>
-          <Link className="button-primary" href="/treinos/sessao/">
-            {activeRun ? "Continuar treino" : "Abrir treino"}
-          </Link>
-        </section>
+        {trainingState.nextSession ? (
+          <section className="next-training-card">
+            <div>
+              <p className="eyebrow">
+                {activeRun ? "Em andamento" : "Treino de hoje"}
+              </p>
+              <h2>{trainingState.nextSession.name}</h2>
+              <p>
+                {activeRun
+                  ? `${completedCount} de ${activeRun.session.items.length} exercícios`
+                  : `${trainingState.nextSession.items.length} exercícios`}
+              </p>
+            </div>
+            <Link
+              className="button-primary"
+              href={trainingSessionHref(trainingState.nextSession.sessionId)}
+            >
+              {activeRun ? "Continuar treino" : "Abrir treino"}
+            </Link>
+          </section>
+        ) : (
+          <section className="next-training-card training-rest-card">
+            <div>
+              <p className="eyebrow">Hoje</p>
+              <h2>Dia de descanso.</h2>
+            </div>
+          </section>
+        )}
 
         <section
-          className="plan-session-list"
-          aria-labelledby="plan-session-title"
+          className="weekly-training-schedule"
+          aria-labelledby="weekly-training-title"
         >
           <div className="section-heading">
-            <h2 id="plan-session-title">Plano</h2>
+            <h2 id="weekly-training-title">Agenda semanal</h2>
           </div>
           <ol>
-            {trainingState.sessions.map((session) => (
-              <li
-                data-next={
-                  session.sessionId === trainingState.nextSession?.sessionId
-                    ? "true"
-                    : undefined
-                }
-                key={session.sessionId}
-              >
-                <span>{session.dayOrder}</span>
-                <div>
-                  <strong>{session.name}</strong>
-                  <small>{session.items.length} exercícios</small>
-                </div>
-              </li>
-            ))}
+            {[1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+              const scheduledSessions = trainingState.sessions.filter(
+                (session) => session.weekday === weekday,
+              );
+              return (
+                <li
+                  data-today={
+                    weekday === currentTrainingWeekday() ? "true" : undefined
+                  }
+                  key={weekday}
+                >
+                  <div className="schedule-day">
+                    <strong>{trainingWeekdayName(weekday)}</strong>
+                    {weekday === currentTrainingWeekday() ? (
+                      <small>Hoje</small>
+                    ) : null}
+                  </div>
+                  <div className="schedule-sessions">
+                    {scheduledSessions.length > 0 ? (
+                      scheduledSessions.map((session) => (
+                        <div key={session.sessionId}>
+                          <span>
+                            <strong>{session.name}</strong>
+                            <small>{session.items.length} exercícios</small>
+                          </span>
+                          <Link href={trainingSessionHref(session.sessionId)}>
+                            Abrir
+                          </Link>
+                        </div>
+                      ))
+                    ) : (
+                      <small>Descanso</small>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </section>
       </div>
@@ -164,11 +275,15 @@ function TrainingState({
 export function TrainingHubScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  trainingPlanGateway: providedTrainingPlanGateway,
   trainingGateway: providedTrainingGateway,
 }: TrainingHubScreenProps) {
   const gatewayRef = useRef<PlanSourceGateway | undefined>(providedGateway);
   const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
     providedTrainingGateway,
+  );
+  const trainingPlanGatewayRef = useRef<TrainingPlanGateway | undefined>(
+    providedTrainingPlanGateway,
   );
   const [sourceState, setSourceState] = useState<PlanSourceState>();
   const [trainingState, setTrainingState] = useState<PracticalTrainingState>();
@@ -182,6 +297,27 @@ export function TrainingHubScreen({
   function trainingGateway() {
     trainingGatewayRef.current ??= createWebTrainingSessionGateway();
     return trainingGatewayRef.current;
+  }
+
+  function trainingPlanGateway() {
+    trainingPlanGatewayRef.current ??= createWebTrainingPlanGateway();
+    return trainingPlanGatewayRef.current;
+  }
+
+  async function renamePlan(planId: string, name: string) {
+    const result = await trainingPlanGateway().rename(planId, name);
+    if (!result.ok) {
+      if (result.reason === "session") {
+        navigate("/entrar/");
+      }
+      return false;
+    }
+    setTrainingState((current) =>
+      current?.plan
+        ? { ...current, plan: { ...current.plan, name: result.value.name } }
+        : current,
+    );
+    return true;
   }
 
   useEffect(() => {
@@ -218,6 +354,7 @@ export function TrainingHubScreen({
       ) : null}
       {sourceState && trainingState ? (
         <TrainingState
+          onRename={renamePlan}
           sourceState={sourceState}
           trainingState={trainingState}
         />

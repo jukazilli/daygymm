@@ -118,6 +118,7 @@ const trainingRows = [
 const instructionRows = [
   ["Modelo oficial de treino DayGym"],
   ["Preencha somente a aba Treinos. Não altere os títulos da primeira linha."],
+  ["Na coluna Dia: 1 é segunda, 2 terça, 3 quarta e assim até 7 domingo."],
   ["Tipos aceitos: força, tempo, distância, cardio e circuito."],
   ["Força exige Reps mín e Reps máx. Tempo exige Duração (s)."],
   ["Distância e cardio exigem Duração (s) ou Distância (m)."],

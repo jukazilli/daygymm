@@ -14,9 +14,11 @@ import { getWebSupabaseClient } from "./supabase-browser";
 import type {
   CompletedTrainingSessionRow,
   ExerciseCompletionRpcRow,
+  TrainingCancelRpcRow,
   TrainingFinishRpcRow,
   TrainingPlanItemRow,
   TrainingPlanRow,
+  TrainingPlanScheduleEntryRow,
   TrainingPlanSessionRow,
   TrainingSessionRunItemRow,
   TrainingSessionRunRow,
@@ -110,36 +112,43 @@ function mapRunItem(row: TrainingSessionRunItemRow): PracticalTrainingExercise {
 function buildSessions(
   sessionRows: TrainingPlanSessionRow[],
   itemRows: TrainingPlanItemRow[],
+  scheduleRows: TrainingPlanScheduleEntryRow[],
 ): PracticalTrainingPlanSession[] {
-  return sessionRows.map((session) => ({
-    dayOrder: session.day_order,
-    items: itemRows
-      .filter((item) => item.session_id === session.session_id)
-      .sort((left, right) => left.item_order - right.item_order)
-      .map((item) => mapPlanItem(item)),
-    name: session.name,
-    sessionId: session.session_id,
-  }));
+  const weekdayBySession = new Map(
+    scheduleRows.map((entry) => [entry.planned_session_id, entry.weekday]),
+  );
+  return sessionRows.map((session) => {
+    const fallbackWeekday = ((session.day_order - 1) % 7) + 1;
+    return {
+      dayOrder: session.day_order,
+      items: itemRows
+        .filter((item) => item.session_id === session.session_id)
+        .sort((left, right) => left.item_order - right.item_order)
+        .map((item) => mapPlanItem(item)),
+      name: session.name,
+      sessionId: session.session_id,
+      weekday: weekdayBySession.get(session.session_id) ?? fallbackWeekday,
+    };
+  });
 }
 
-function nextSessionAfter(
+function selectedSession(
   sessions: PracticalTrainingPlanSession[],
-  lastCompleted: CompletedTrainingSessionRow | null,
+  preferredSessionId?: string,
 ) {
-  if (sessions.length === 0) {
-    return null;
-  }
-  if (!lastCompleted?.planned_session_id) {
-    return sessions[0] ?? null;
-  }
-  const lastIndex = sessions.findIndex(
-    (session) => session.sessionId === lastCompleted.planned_session_id,
+  const preferred = sessions.find(
+    (session) => session.sessionId === preferredSessionId,
   );
-  return sessions[(lastIndex + 1) % sessions.length] ?? sessions[0] ?? null;
+  if (preferred) {
+    return preferred;
+  }
+  const browserDay = new Date().getDay();
+  const weekday = browserDay === 0 ? 7 : browserDay;
+  return sessions.find((session) => session.weekday === weekday) ?? null;
 }
 
 export function createWebTrainingSessionGateway(): TrainingSessionGateway {
-  const load: TrainingSessionGateway["load"] = async () => {
+  const load: TrainingSessionGateway["load"] = async (preferredSessionId) => {
     try {
       const client = getWebSupabaseClient();
       const { data: sessionData, error: sessionError } =
@@ -177,41 +186,55 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       if (!activeVersionId) {
         return { ok: false, reason: "conflict" };
       }
-      const [sessionsResult, itemsResult, runResult, completedResult] =
-        await Promise.all([
-          client
-            .from("training_plan_sessions")
-            .select("session_id,version_id,user_id,day_order,name")
-            .eq("version_id", activeVersionId)
-            .order("day_order"),
-          client
-            .from("training_plan_items")
-            .select(
-              "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
-            )
-            .eq("version_id", activeVersionId)
-            .order("item_order"),
-          client
-            .from("training_session_runs")
-            .select(
-              "run_id,user_id,plan_id,plan_version_id,planned_session_id,operation_id,started_at,updated_at",
-            )
-            .limit(1)
-            .maybeSingle(),
-          client
-            .from("training_sessions")
-            .select(
-              "session_id,user_id,plan_id,plan_version_id,planned_session_id,started_at,completed_at,exercise_count,completed_exercise_count,duration_seconds",
-            )
-            .eq("plan_version_id", activeVersionId)
-            .order("completed_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+      const [
+        sessionsResult,
+        itemsResult,
+        scheduleResult,
+        runResult,
+        completedResult,
+      ] = await Promise.all([
+        client
+          .from("training_plan_sessions")
+          .select("session_id,version_id,user_id,day_order,name")
+          .eq("version_id", activeVersionId)
+          .order("day_order"),
+        client
+          .from("training_plan_items")
+          .select(
+            "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
+          )
+          .eq("version_id", activeVersionId)
+          .order("item_order"),
+        client
+          .from("training_plan_schedule_entries")
+          .select(
+            "schedule_entry_id,version_id,planned_session_id,user_id,weekday,slot_order",
+          )
+          .eq("version_id", activeVersionId)
+          .order("weekday")
+          .order("slot_order"),
+        client
+          .from("training_session_runs")
+          .select(
+            "run_id,user_id,plan_id,plan_version_id,planned_session_id,operation_id,started_at,updated_at",
+          )
+          .limit(1)
+          .maybeSingle(),
+        client
+          .from("training_sessions")
+          .select(
+            "session_id,user_id,plan_id,plan_version_id,planned_session_id,started_at,completed_at,exercise_count,completed_exercise_count,duration_seconds",
+          )
+          .eq("plan_version_id", activeVersionId)
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       const queryError =
         sessionsResult.error ??
         itemsResult.error ??
+        scheduleResult.error ??
         runResult.error ??
         completedResult.error;
       if (queryError) {
@@ -221,6 +244,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       const sessions = buildSessions(
         (sessionsResult.data ?? []) as TrainingPlanSessionRow[],
         (itemsResult.data ?? []) as TrainingPlanItemRow[],
+        (scheduleResult.data ?? []) as TrainingPlanScheduleEntryRow[],
       );
       const runRow = runResult.data as TrainingSessionRunRow | null;
       const lastCompleted =
@@ -262,7 +286,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
           activeRun,
           lastCompletedAt: lastCompleted?.completed_at ?? null,
           nextSession:
-            activeRun?.session ?? nextSessionAfter(sessions, lastCompleted),
+            activeRun?.session ?? selectedSession(sessions, preferredSessionId),
           plan: mapPlan(planRow),
           sessions,
         }),
@@ -277,6 +301,24 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
 
   return {
     load,
+    async cancel(runId) {
+      try {
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("cancel_training_session", {
+          p_run_id: runId,
+        });
+        const row = data?.[0] as TrainingCancelRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: { runId: row.run_id, wasCancelled: row.was_cancelled },
+        };
+      } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    },
     async start(plannedSessionId) {
       try {
         const client = getWebSupabaseClient();

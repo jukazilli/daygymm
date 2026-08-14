@@ -13,6 +13,7 @@ import type {
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import { trainingSessionHref } from "../../lib/training-weekdays";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TodayScreenProps {
@@ -111,8 +112,24 @@ function TodayHero({
           {trainingState.nextSession.items.length} exercícios ·{" "}
           {trainingState.plan.name}
         </p>
-        <Link className="button-primary" href="/treinos/sessao/">
+        <Link
+          className="button-primary"
+          href={trainingSessionHref(trainingState.nextSession.sessionId)}
+        >
           Abrir treino
+        </Link>
+      </section>
+    );
+  }
+
+  if (trainingState.plan) {
+    return (
+      <section className="today-hero today-training-hero">
+        <p className="eyebrow">Hoje</p>
+        <h1>Dia de descanso.</h1>
+        <p>Se quiser treinar, escolha uma sessão da sua agenda.</p>
+        <Link className="button-secondary" href="/treinos/">
+          Escolher treino
         </Link>
       </section>
     );
