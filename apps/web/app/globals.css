@@ -915,9 +915,20 @@ input:focus-visible {
   margin-bottom: var(--space-6);
 }
 
-.session-topbar a {
+.session-topbar a,
+.session-pause-action {
   width: fit-content;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 800;
   text-decoration: none;
+}
+
+.session-pause-action {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .session-topbar > span:last-child {
@@ -950,6 +961,11 @@ input:focus-visible {
 .session-primary-action {
   width: 100%;
   margin-top: var(--space-6);
+}
+
+.session-overview .session-primary-action {
+  margin-top: 0;
+  margin-bottom: var(--space-6);
 }
 
 .session-progress {
@@ -1099,10 +1115,9 @@ input:focus-visible {
 
 .exercise-play {
   display: grid;
-  justify-items: center;
-  gap: var(--space-1);
+  place-items: center;
   width: 72px;
-  min-height: 72px;
+  height: 72px;
   margin: var(--space-5) auto 0;
   padding: var(--space-2);
   border: 0;
@@ -1115,10 +1130,7 @@ input:focus-visible {
 .exercise-play > span {
   transform: translateX(2px);
   font-size: 1.5rem;
-}
-
-.exercise-play > small {
-  font-weight: 800;
+  line-height: 1;
 }
 
 .set-execution {
@@ -1288,29 +1300,66 @@ input:focus-visible {
   margin: 0;
 }
 
-.cancel-training {
-  margin-top: var(--space-8);
-  text-align: center;
+.session-active .finish-training {
+  margin: 0 0 var(--space-5);
 }
 
-.cancel-training > div {
+.resume-training {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-action-soft);
+}
+
+.resume-training h2,
+.resume-training p {
+  margin: 0;
+}
+
+.resume-training .button-primary {
+  width: 100%;
+}
+
+.session-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgb(25 18 14 / 58%);
+}
+
+.session-dialog {
+  display: grid;
+  gap: var(--space-4);
+  width: min(100%, 25rem);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: 0 24px 70px rgb(25 18 14 / 25%);
+}
+
+.session-dialog h2,
+.session-dialog p {
+  margin: 0;
+}
+
+.session-dialog p {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.session-dialog-actions {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  text-align: left;
 }
 
-.cancel-training p {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-.cancel-training > div > div {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+.session-dialog-actions button {
+  width: 100%;
 }
 
 .session-finished,

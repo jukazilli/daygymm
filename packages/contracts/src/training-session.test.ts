@@ -47,6 +47,8 @@ describe("practical training contracts", () => {
   it("represents an active run without mutating the immutable plan", () => {
     const state = practicalTrainingStateSchema.parse({
       activeRun: {
+        pausedAt: null,
+        pausedDurationSeconds: 0,
         runId: "53000000-0000-4000-8000-000000000003",
         session,
         startedAt: "2026-08-14T03:30:00.000Z",
@@ -72,6 +74,8 @@ describe("practical training contracts", () => {
   it("accepts the timestamp offset returned by PostgREST", () => {
     const result = practicalTrainingStateSchema.safeParse({
       activeRun: {
+        pausedAt: null,
+        pausedDurationSeconds: 0,
         runId: "53000000-0000-4000-8000-000000000003",
         session,
         startedAt: "2026-08-14T03:30:00.123456+00:00",

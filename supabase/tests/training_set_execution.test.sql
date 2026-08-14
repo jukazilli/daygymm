@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(42);
+select plan(54);
 
 select has_table('api', 'training_session_run_sets', 'active performed sets exist');
 select has_table('api', 'training_session_sets', 'canonical performed sets exist');
@@ -18,6 +18,18 @@ select has_function(
   'complete_training_set',
   array['uuid', 'uuid', 'integer', 'text', 'integer', 'numeric', 'integer', 'integer'],
   'the authenticated set completion command exists'
+);
+select has_function(
+  'api',
+  'pause_training_session',
+  array['uuid'],
+  'the authenticated training pause command exists'
+);
+select has_function(
+  'api',
+  'resume_training_session',
+  array['uuid'],
+  'the authenticated training resume command exists'
 );
 select has_function(
   'api',
@@ -53,6 +65,14 @@ select ok(
 select ok(
   not has_function_privilege('anon', 'api.start_training_exercise(uuid,uuid)', 'execute'),
   'anonymous clients cannot start an exercise'
+);
+select ok(
+  not has_function_privilege('anon', 'api.pause_training_session(uuid)', 'execute'),
+  'anonymous clients cannot pause a training'
+);
+select ok(
+  not has_function_privilege('anon', 'api.resume_training_session(uuid)', 'execute'),
+  'anonymous clients cannot resume a training'
 );
 select ok(
   not has_function_privilege(
@@ -218,6 +238,64 @@ select is(
   40.00::numeric,
   'the active snapshot keeps the planned weight'
 );
+select is(
+  (select was_changed from api.pause_training_session(
+    'b8000000-0000-4000-8000-000000000008'
+  )),
+  true,
+  'pausing changes an active run exactly once'
+);
+select ok(
+  (select paused_at is not null from api.training_session_runs
+   where run_id = 'b8000000-0000-4000-8000-000000000008'),
+  'the active run stores its paused instant'
+);
+select throws_ok(
+  $$select * from api.start_training_exercise(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006'
+  )$$,
+  '23514',
+  'Resume the training before recording progress.',
+  'a paused run rejects exercise progress'
+);
+
+select set_config('request.jwt.claim.sub', 'b2000000-0000-4000-8000-000000000002', true);
+select throws_ok(
+  $$select * from api.pause_training_session(
+    'b8000000-0000-4000-8000-000000000008'
+  )$$,
+  '23514',
+  'Active training was not found.',
+  'another user cannot pause the active run'
+);
+
+select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
+select is(
+  (select was_changed from api.resume_training_session(
+    'b8000000-0000-4000-8000-000000000008'
+  )),
+  true,
+  'the owner can resume the paused run'
+);
+select ok(
+  (select paused_at is null from api.training_session_runs
+   where run_id = 'b8000000-0000-4000-8000-000000000008'),
+  'resuming clears the paused instant'
+);
+select is(
+  (select was_changed from api.resume_training_session(
+    'b8000000-0000-4000-8000-000000000008'
+  )),
+  false,
+  'repeated resume is idempotent'
+);
+
+update api.training_session_runs
+set started_at = statement_timestamp() - interval '120 seconds',
+  paused_duration_seconds = 60
+where run_id = 'b8000000-0000-4000-8000-000000000008';
+
 select is(
   (select was_created from api.start_training_exercise(
     'b8000000-0000-4000-8000-000000000008',
@@ -422,6 +500,11 @@ select is(
   (select count(*) from api.training_session_sets),
   4::bigint,
   'the owner can read canonical performed sets'
+);
+select ok(
+  (select duration_seconds between 59 and 65 from api.training_sessions
+   where session_id = 'b8000000-0000-4000-8000-000000000008'),
+  'final duration excludes accumulated paused time'
 );
 
 select set_config('request.jwt.claim.sub', 'b2000000-0000-4000-8000-000000000002', true);

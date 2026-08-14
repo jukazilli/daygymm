@@ -33,6 +33,8 @@ function createTrainingGateway(): TrainingSessionGateway {
         sessions: [],
       },
     }),
+    pause: vi.fn(),
+    resume: vi.fn(),
     start: vi.fn(),
     startExercise: vi.fn(),
   };

@@ -22,6 +22,7 @@ import type {
   SetCompletionRpcRow,
   TrainingCancelRpcRow,
   TrainingFinishRpcRow,
+  TrainingPauseRpcRow,
   TrainingPlanItemRow,
   TrainingPlanRow,
   TrainingPlanScheduleEntryRow,
@@ -252,7 +253,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         client
           .from("training_session_runs")
           .select(
-            "run_id,user_id,plan_id,plan_version_id,planned_session_id,operation_id,started_at,updated_at",
+            "run_id,user_id,plan_id,plan_version_id,planned_session_id,operation_id,started_at,paused_at,paused_duration_seconds,updated_at",
           )
           .limit(1)
           .maybeSingle(),
@@ -315,6 +316,8 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
           return { ok: false, reason: "conflict" };
         }
         activeRun = activeTrainingRunSchema.parse({
+          pausedAt: runRow.paused_at,
+          pausedDurationSeconds: runRow.paused_duration_seconds,
           runId: runRow.run_id,
           session: {
             ...planned,
@@ -400,6 +403,52 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         return {
           ok: true,
           value: { runId: row.run_id, wasCancelled: row.was_cancelled },
+        };
+      } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    },
+    async pause(runId) {
+      try {
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("pause_training_session", {
+          p_run_id: runId,
+        });
+        const row = data?.[0] as TrainingPauseRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: {
+            pausedAt: row.paused_at,
+            pausedDurationSeconds: row.paused_duration_seconds,
+            runId: row.run_id,
+            wasChanged: row.was_changed,
+          },
+        };
+      } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    },
+    async resume(runId) {
+      try {
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("resume_training_session", {
+          p_run_id: runId,
+        });
+        const row = data?.[0] as TrainingPauseRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: {
+            pausedAt: row.paused_at,
+            pausedDurationSeconds: row.paused_duration_seconds,
+            runId: row.run_id,
+            wasChanged: row.was_changed,
+          },
         };
       } catch {
         return { ok: false, reason: "configuration" };

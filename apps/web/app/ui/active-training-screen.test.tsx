@@ -64,6 +64,8 @@ describe("ActiveTrainingScreen", () => {
   it("runs the imported session from start through completion", async () => {
     const user = userEvent.setup();
     const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
       runId: "75000000-0000-4000-8000-000000000005",
       session: plannedSession,
       startedAt: "2026-08-14T03:30:00.123456+00:00",
@@ -176,6 +178,8 @@ describe("ActiveTrainingScreen", () => {
         .mockResolvedValueOnce({ ok: true, value: state(firstSetRun) })
         .mockResolvedValueOnce({ ok: true, value: state(completedRun) }),
       start: vi.fn().mockResolvedValue({ ok: true, value: activeRun }),
+      pause: vi.fn(),
+      resume: vi.fn(),
       startExercise: vi.fn().mockResolvedValue({
         ok: true,
         value: {
@@ -227,10 +231,12 @@ describe("ActiveTrainingScreen", () => {
     expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
   });
 
-  it("requires confirmation before discarding an active training", async () => {
+  it("pauses an active training only after confirming in the dialog", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
       runId: "75000000-0000-4000-8000-000000000005",
       session: plannedSession,
       startedAt: "2026-08-14T03:30:00.123456+00:00",
@@ -244,19 +250,30 @@ describe("ActiveTrainingScreen", () => {
       completeExercise: vi.fn(),
       finish: vi.fn(),
       load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          pausedAt: "2026-08-14T03:35:00.000+00:00",
+          pausedDurationSeconds: 0,
+          runId: activeRun.runId,
+          wasChanged: true,
+        },
+      }),
+      resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),
     };
 
     render(createElement(ActiveTrainingScreen, { gateway, navigate }));
 
-    await user.click(
-      await screen.findByRole("button", { name: "Cancelar treino" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    expect(screen.getByRole("dialog", { name: "Pausar treino?" })).toBeTruthy();
     expect(gateway.cancel).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Sim, cancelar" }));
+    expect(gateway.pause).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Pausar treino" }));
 
-    expect(gateway.cancel).toHaveBeenCalledWith(activeRun.runId);
+    expect(gateway.pause).toHaveBeenCalledWith(activeRun.runId);
+    expect(gateway.cancel).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("/treinos/");
   });
 
@@ -279,6 +296,8 @@ describe("ActiveTrainingScreen", () => {
       ],
     };
     const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
       runId: "75000000-0000-4000-8000-000000000005",
       session: timedSession,
       startedAt: "2026-08-14T03:30:00.123456+00:00",
@@ -297,6 +316,8 @@ describe("ActiveTrainingScreen", () => {
           sessions: [timedSession],
         },
       }),
+      pause: vi.fn(),
+      resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),
     };

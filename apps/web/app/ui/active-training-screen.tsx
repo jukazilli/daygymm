@@ -178,13 +178,13 @@ function ExerciseExecution({
     return (
       <button
         aria-label={`Iniciar ${exercise.exerciseName}`}
+        aria-busy={busy}
         className="exercise-play"
         disabled={busy}
         onClick={onStart}
         type="button"
       >
         <span aria-hidden="true">▶</span>
-        <small>{busy ? "Iniciando…" : "Iniciar"}</small>
       </button>
     );
   }
@@ -323,7 +323,15 @@ function sessionError(reason: string) {
   return "Não foi possível salvar agora.";
 }
 
-function ElapsedTimer({ startedAt }: Readonly<{ startedAt: string }>) {
+function ElapsedTimer({
+  pausedAt,
+  pausedDurationSeconds,
+  startedAt,
+}: Readonly<{
+  pausedAt: string | null;
+  pausedDurationSeconds: number;
+  startedAt: string;
+}>) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -331,17 +339,88 @@ function ElapsedTimer({ startedAt }: Readonly<{ startedAt: string }>) {
       setElapsedSeconds(
         Math.max(
           0,
-          Math.floor((Date.now() - new Date(startedAt).getTime()) / 1_000),
+          Math.floor(
+            ((pausedAt ? new Date(pausedAt).getTime() : Date.now()) -
+              new Date(startedAt).getTime()) /
+              1_000,
+          ) - pausedDurationSeconds,
         ),
       );
     }
     updateElapsed();
+    if (pausedAt) {
+      return;
+    }
     const timer = window.setInterval(updateElapsed, 1_000);
     return () => window.clearInterval(timer);
-  }, [startedAt]);
+  }, [pausedAt, pausedDurationSeconds, startedAt]);
 
   const formatted = formatClock(elapsedSeconds);
   return <time aria-label={`Tempo de treino ${formatted}`}>{formatted}</time>;
+}
+
+function PauseTrainingDialog({
+  busy,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}>) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    confirmRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  return (
+    <div
+      className="session-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="pause-training-title"
+        aria-modal="true"
+        className="session-dialog"
+        role="dialog"
+      >
+        <h2 id="pause-training-title">Pausar treino?</h2>
+        <p>Seu progresso está salvo. Você pode continuar depois.</p>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            disabled={busy}
+            onClick={onConfirm}
+            ref={confirmRef}
+            type="button"
+          >
+            {busy ? "Pausando…" : "Pausar treino"}
+          </button>
+          <button
+            className="button-secondary"
+            disabled={busy}
+            onClick={onClose}
+            type="button"
+          >
+            Continuar treino
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export function ActiveTrainingScreen({
@@ -355,7 +434,7 @@ export function ActiveTrainingScreen({
   const [state, setState] = useState<PracticalTrainingState>();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [confirmCancellation, setConfirmCancellation] = useState(false);
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
 
@@ -444,6 +523,7 @@ export function ActiveTrainingScreen({
     const currentExercise = run?.session.items[selectedIndex];
     if (
       !run ||
+      run.pausedAt ||
       !currentExercise ||
       currentExercise.completedAt ||
       currentExercise.startedAt ||
@@ -475,7 +555,13 @@ export function ActiveTrainingScreen({
   ) {
     const run = state?.activeRun;
     const currentExercise = run?.session.items[selectedIndex];
-    if (!run || !currentExercise || currentExercise.completedAt || busy) {
+    if (
+      !run ||
+      run.pausedAt ||
+      !currentExercise ||
+      currentExercise.completedAt ||
+      busy
+    ) {
       return;
     }
     setBusy(true);
@@ -508,7 +594,7 @@ export function ActiveTrainingScreen({
 
   async function finishTraining() {
     const run = state?.activeRun;
-    if (!run || busy) {
+    if (!run || run.pausedAt || busy) {
       return;
     }
     setBusy(true);
@@ -526,14 +612,14 @@ export function ActiveTrainingScreen({
     setFinishedDuration(result.value.durationSeconds);
   }
 
-  async function cancelTraining() {
+  async function pauseTraining() {
     const run = state?.activeRun;
-    if (!run || busy) {
+    if (!run || run.pausedAt || busy) {
       return;
     }
     setBusy(true);
     setError(undefined);
-    const result = await gateway().cancel(run.runId);
+    const result = await gateway().pause(run.runId);
     setBusy(false);
     if (!result.ok) {
       if (result.reason === "session") {
@@ -541,9 +627,31 @@ export function ActiveTrainingScreen({
         return;
       }
       setError(sessionError(result.reason));
+      setPauseDialogOpen(false);
       return;
     }
     navigate("/treinos/");
+  }
+
+  async function resumeTraining() {
+    const run = state?.activeRun;
+    if (!run?.pausedAt || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    const result = await gateway().resume(run.runId);
+    if (!result.ok) {
+      setBusy(false);
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(result.reason));
+      return;
+    }
+    await refresh();
+    setBusy(false);
   }
 
   if (finishedDuration !== undefined) {
@@ -594,6 +702,14 @@ export function ActiveTrainingScreen({
             {state.nextSession.items.length} exercícios
           </p>
         </section>
+        <button
+          className="button-primary session-primary-action"
+          disabled={busy}
+          onClick={startTraining}
+          type="button"
+        >
+          {busy ? "Iniciando…" : "Iniciar treino"}
+        </button>
         <ol className="session-exercise-preview">
           {state.nextSession.items.map((exercise) => (
             <li key={exercise.itemId}>
@@ -610,14 +726,6 @@ export function ActiveTrainingScreen({
             {error}
           </p>
         ) : null}
-        <button
-          className="button-primary session-primary-action"
-          disabled={busy}
-          onClick={startTraining}
-          type="button"
-        >
-          {busy ? "Iniciando…" : "Iniciar treino"}
-        </button>
       </main>
     );
   }
@@ -633,9 +741,26 @@ export function ActiveTrainingScreen({
   return (
     <main className="session-shell session-active">
       <header className="session-topbar">
-        <Link href="/treinos/">Sair</Link>
-        <ElapsedTimer startedAt={run.startedAt} />
-        <span className="session-saved">{busy ? "Salvando…" : "Salvo"}</span>
+        {run.pausedAt ? (
+          <Link href="/treinos/">Voltar</Link>
+        ) : (
+          <button
+            className="session-pause-action"
+            disabled={busy}
+            onClick={() => setPauseDialogOpen(true)}
+            type="button"
+          >
+            Pausar
+          </button>
+        )}
+        <ElapsedTimer
+          pausedAt={run.pausedAt}
+          pausedDurationSeconds={run.pausedDurationSeconds}
+          startedAt={run.startedAt}
+        />
+        <span className="session-saved">
+          {run.pausedAt ? "Pausado" : busy ? "Salvando…" : "Salvo"}
+        </span>
       </header>
 
       <section
@@ -653,77 +778,24 @@ export function ActiveTrainingScreen({
         </progress>
       </section>
 
-      <nav className="exercise-stepper" aria-label="Exercícios do treino">
-        {run.session.items.map((exercise, index) => (
+      {run.pausedAt ? (
+        <section className="resume-training" aria-labelledby="resume-title">
+          <div>
+            <p className="eyebrow">Treino pausado</p>
+            <h2 id="resume-title">Continue de onde parou.</h2>
+          </div>
           <button
-            aria-current={index === selectedIndex ? "step" : undefined}
-            data-completed={exercise.completedAt ? "true" : undefined}
-            data-selected={index === selectedIndex ? "true" : undefined}
-            key={exercise.itemId}
-            onClick={() => setSelectedIndex(index)}
+            className="button-primary"
+            disabled={busy}
+            onClick={() => void resumeTraining()}
             type="button"
           >
-            <span>{index + 1}</span>
-            <small>
-              {exercise.completedAt ? "Concluído" : exercise.exerciseName}
-            </small>
+            {busy ? "Retomando…" : "Retomar treino"}
           </button>
-        ))}
-      </nav>
-
-      {currentExercise ? (
-        <section className="current-exercise">
-          <div className="current-exercise-heading">
-            <div>
-              <p className="eyebrow">
-                Exercício {selectedIndex + 1} de {run.session.items.length}
-              </p>
-              <h1>{currentExercise.exerciseName}</h1>
-            </div>
-            <span>
-              {currentExercise.setExecutions.length}/{currentExercise.sets}
-            </span>
-          </div>
-          {!currentExercise.startedAt && !currentExercise.completedAt ? (
-            <ExerciseExecution
-              busy={busy}
-              exercise={currentExercise}
-              key={`${currentExercise.itemId}:pending`}
-              onCompleteSet={(input) => void completeCurrentSet(input)}
-              onStart={() => void startCurrentExercise()}
-            />
-          ) : null}
-          <div className="exercise-target">
-            <span>Planejado</span>
-            <strong>{exerciseTarget(currentExercise)}</strong>
-          </div>
-          {currentExercise.restSeconds > 0 ? (
-            <p className="exercise-rest">
-              Descanso previsto: {formatDuration(currentExercise.restSeconds)}
-            </p>
-          ) : null}
-          {currentExercise.notes ? (
-            <p className="exercise-notes">{currentExercise.notes}</p>
-          ) : null}
-          {currentExercise.startedAt || currentExercise.completedAt ? (
-            <ExerciseExecution
-              busy={busy}
-              exercise={currentExercise}
-              key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "complete"}`}
-              onCompleteSet={(input) => void completeCurrentSet(input)}
-              onStart={() => void startCurrentExercise()}
-            />
-          ) : null}
         </section>
       ) : null}
 
-      {error ? (
-        <p className="status-message status-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {allCompleted ? (
+      {!run.pausedAt && allCompleted ? (
         <section className="finish-training">
           <h2>Treino completo.</h2>
           <button
@@ -737,40 +809,74 @@ export function ActiveTrainingScreen({
         </section>
       ) : null}
 
-      <section className="cancel-training">
-        {confirmCancellation ? (
-          <div role="alert">
-            <strong>Cancelar treino em andamento?</strong>
-            <p>O progresso desta execução será descartado.</p>
+      {!run.pausedAt ? (
+        <nav className="exercise-stepper" aria-label="Exercícios do treino">
+          {run.session.items.map((exercise, index) => (
+            <button
+              aria-current={index === selectedIndex ? "step" : undefined}
+              data-completed={exercise.completedAt ? "true" : undefined}
+              data-selected={index === selectedIndex ? "true" : undefined}
+              key={exercise.itemId}
+              onClick={() => setSelectedIndex(index)}
+              type="button"
+            >
+              <span>{index + 1}</span>
+              <small>
+                {exercise.completedAt ? "Concluído" : exercise.exerciseName}
+              </small>
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      {!run.pausedAt && currentExercise ? (
+        <section className="current-exercise">
+          <div className="current-exercise-heading">
             <div>
-              <button
-                className="button-danger"
-                disabled={busy}
-                onClick={() => void cancelTraining()}
-                type="button"
-              >
-                {busy ? "Cancelando…" : "Sim, cancelar"}
-              </button>
-              <button
-                className="button-text"
-                disabled={busy}
-                onClick={() => setConfirmCancellation(false)}
-                type="button"
-              >
-                Manter treino
-              </button>
+              <p className="eyebrow">
+                Exercício {selectedIndex + 1} de {run.session.items.length}
+              </p>
+              <h1>{currentExercise.exerciseName}</h1>
             </div>
+            <span>
+              {currentExercise.setExecutions.length}/{currentExercise.sets}
+            </span>
           </div>
-        ) : (
-          <button
-            className="button-text"
-            onClick={() => setConfirmCancellation(true)}
-            type="button"
-          >
-            Cancelar treino
-          </button>
-        )}
-      </section>
+          <ExerciseExecution
+            busy={busy}
+            exercise={currentExercise}
+            key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "pending"}`}
+            onCompleteSet={(input) => void completeCurrentSet(input)}
+            onStart={() => void startCurrentExercise()}
+          />
+          <div className="exercise-target">
+            <span>Planejado</span>
+            <strong>{exerciseTarget(currentExercise)}</strong>
+          </div>
+          {currentExercise.restSeconds > 0 ? (
+            <p className="exercise-rest">
+              Descanso previsto: {formatDuration(currentExercise.restSeconds)}
+            </p>
+          ) : null}
+          {currentExercise.notes ? (
+            <p className="exercise-notes">{currentExercise.notes}</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {error ? (
+        <p className="status-message status-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {pauseDialogOpen ? (
+        <PauseTrainingDialog
+          busy={busy}
+          onClose={() => setPauseDialogOpen(false)}
+          onConfirm={() => void pauseTraining()}
+        />
+      ) : null}
     </main>
   );
 }

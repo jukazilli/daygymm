@@ -254,7 +254,8 @@ nesta relação.
 
 ### `api.training_session_runs`
 
-Owner: comandos `private.start_training_session()` e
+Owner: comandos `private.start_training_session()`,
+`private.pause_training_session()`, `private.resume_training_session()` e
 `private.finish_practical_training_session()`.
 
 Finalidade: manter no servidor uma única sessão ativa por usuário, ligada à
@@ -269,6 +270,12 @@ offline e sua outbox local continuam fora deste recorte e pertencem à US-009.
 | referências do plano        | FKs de plano, versão e sessão     | Fixar o alvo da execução          | Identificador técnico      | Mesmo ciclo da execução              | Índices individuais de FK                         |
 | `operation_id`              | texto técnico, unique por usuário | Deduplicar o início               | Identificador técnico      | Mesmo ciclo da execução              | Unique composto                                   |
 | `started_at` / `updated_at` | timestamptz do servidor           | Medir duração e última gravação   | Dado de atividade sensível | Mesmo ciclo da execução              | Início por usuário                                |
+| `paused_at`                 | timestamptz opcional do servidor  | Bloquear avanço durante a pausa   | Dado de atividade sensível | Mesmo ciclo da execução              | Não                                               |
+| `paused_duration_seconds`   | inteiro não negativo              | Excluir pausas da duração final   | Dado de atividade sensível | Mesmo ciclo da execução              | Não                                               |
+
+Os comandos de pausa e retomada são idempotentes. Enquanto `paused_at` estiver
+preenchido, gatilhos internos recusam início/conclusão de exercício e novas
+séries; a finalização também exige retomada prévia.
 
 ### `api.training_session_run_items`
 

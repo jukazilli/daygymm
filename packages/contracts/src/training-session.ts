@@ -63,6 +63,8 @@ export const practicalTrainingPlanSessionSchema = z
 
 export const activeTrainingRunSchema = z
   .object({
+    pausedAt: z.string().datetime({ offset: true }).nullable(),
+    pausedDurationSeconds: z.number().int().nonnegative(),
     runId: uuidSchema,
     session: practicalTrainingPlanSessionSchema,
     startedAt: z.string().datetime({ offset: true }),
@@ -159,6 +161,13 @@ export interface CancelledTrainingSession {
   readonly wasCancelled: boolean;
 }
 
+export interface TrainingPauseState {
+  readonly pausedAt: string | null;
+  readonly pausedDurationSeconds: number;
+  readonly runId: string;
+  readonly wasChanged: boolean;
+}
+
 export type TrainingSessionFailure =
   "configuration" | "conflict" | "invalid" | "session" | "unexpected";
 export type TrainingSessionResult<T> =
@@ -182,6 +191,8 @@ export interface TrainingSessionGateway {
   load(
     preferredSessionId?: string,
   ): Promise<TrainingSessionResult<PracticalTrainingState>>;
+  pause(runId: string): Promise<TrainingSessionResult<TrainingPauseState>>;
+  resume(runId: string): Promise<TrainingSessionResult<TrainingPauseState>>;
   start(
     plannedSessionId: string,
   ): Promise<TrainingSessionResult<ActiveTrainingRun>>;

@@ -20,6 +20,8 @@ function createTrainingGateway(
     completeExercise: vi.fn(),
     finish: vi.fn(),
     load: vi.fn().mockResolvedValue(value),
+    pause: vi.fn(),
+    resume: vi.fn(),
     start: vi.fn(),
     startExercise: vi.fn(),
   };

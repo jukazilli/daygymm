@@ -83,6 +83,8 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
 
 export interface TrainingSessionRunRow extends Record<string, unknown> {
   operation_id: string;
+  paused_at: string | null;
+  paused_duration_seconds: number;
   plan_id: string;
   plan_version_id: string;
   planned_session_id: string;
@@ -205,6 +207,13 @@ export interface TrainingCancelRpcRow extends Record<string, unknown> {
   was_cancelled: boolean;
 }
 
+export interface TrainingPauseRpcRow extends Record<string, unknown> {
+  paused_at: string | null;
+  paused_duration_seconds: number;
+  run_id: string;
+  was_changed: boolean;
+}
+
 export interface TrainingPlanImportRpcRow extends Record<string, unknown> {
   item_count: number;
   plan_id: string;
@@ -264,6 +273,12 @@ export interface WebDatabase {
         };
         Returns: TrainingPlanImportRpcRow[];
       };
+      pause_training_session: {
+        Args: {
+          p_run_id: string;
+        };
+        Returns: TrainingPauseRpcRow[];
+      };
       import_official_xlsx_plan_v2: {
         Args: {
           p_operation_id: string;
@@ -281,6 +296,12 @@ export interface WebDatabase {
           p_plan_id: string;
         };
         Returns: TrainingPlanRenameRpcRow[];
+      };
+      resume_training_session: {
+        Args: {
+          p_run_id: string;
+        };
+        Returns: TrainingPauseRpcRow[];
       };
       complete_training_exercise: {
         Args: {
