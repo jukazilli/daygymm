@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(40);
+select plan(42);
 
 select has_table('api', 'training_session_run_sets', 'active performed sets exist');
 select has_table('api', 'training_session_sets', 'canonical performed sets exist');
@@ -88,7 +88,29 @@ values
       "daygym_terms_version": "2026-08-13",
       "daygym_privacy_version": "2026-08-13"
     }'::jsonb
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    'bb000000-0000-4000-8000-000000000011',
+    'authenticated', 'authenticated', 'set-import-owner@example.invalid',
+    '{
+      "daygym_account_creation": "v1",
+      "daygym_is_adult": true,
+      "daygym_terms_version": "2026-08-13",
+      "daygym_privacy_version": "2026-08-13"
+    }'::jsonb
   );
+
+update api.onboarding_contexts
+set goal = 'strength', experience = 'intermediate', weekly_days = 3,
+  session_minutes = 45, equipment_context = 'full_gym',
+  limitation_status = 'none', current_step = 6,
+  completed_at = statement_timestamp()
+where user_id = 'bb000000-0000-4000-8000-000000000011';
+
+update api.onboarding_contexts
+set plan_source = 'official_xlsx'
+where user_id = 'bb000000-0000-4000-8000-000000000011';
 
 insert into api.training_plans (
   plan_id, user_id, name, provenance, current_version, session_count, item_count
@@ -147,6 +169,38 @@ set active_version_id = 'b4000000-0000-4000-8000-000000000004'
 where plan_id = 'b3000000-0000-4000-8000-000000000003';
 
 set local role authenticated;
+select set_config('request.jwt.claim.sub', 'bb000000-0000-4000-8000-000000000011', true);
+select is(
+  (select was_created from api.import_official_xlsx_plan_v2(
+    'set-import-with-weight-0001', repeat('c', 64), 'weighted-plan.xlsx',
+    1024, 'Plano com carga', '[{
+      "day_order": 1,
+      "name": "Treino A",
+      "items": [{
+        "order": 1,
+        "exercise_name": "Stiff",
+        "modality": "strength",
+        "sets": 3,
+        "reps_min": 10,
+        "reps_max": 12,
+        "planned_weight_kg": 42.5,
+        "duration_seconds": null,
+        "distance_meters": null,
+        "rest_seconds": 60,
+        "circuit_group": null,
+        "notes": null
+      }]
+    }]'::jsonb
+  )),
+  true,
+  'the v2 command imports a proposal containing planned load'
+);
+select is(
+  (select planned_weight_kg from api.training_plan_items),
+  42.50::numeric,
+  'the imported planned load is persisted without replacing repetitions'
+);
+
 select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
 
 select is(
