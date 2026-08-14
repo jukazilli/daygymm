@@ -101,16 +101,16 @@ values
     }'::jsonb
   );
 
-update api.onboarding_contexts
-set goal = 'strength', experience = 'intermediate', weekly_days = 3,
-  session_minutes = 45, equipment_context = 'full_gym',
-  limitation_status = 'none', current_step = 6,
-  completed_at = statement_timestamp()
-where user_id = 'bb000000-0000-4000-8000-000000000011';
-
-update api.onboarding_contexts
-set plan_source = 'official_xlsx'
-where user_id = 'bb000000-0000-4000-8000-000000000011';
+insert into api.onboarding_contexts (
+  user_id, goal, experience, weekly_days, session_minutes,
+  equipment_context, limitation_status, current_step, completed_at,
+  plan_source, plan_source_selected_at
+)
+values (
+  'bb000000-0000-4000-8000-000000000011', 'strength', 'intermediate', 3, 45,
+  'full_gym', 'none', 6, statement_timestamp(),
+  'official_xlsx', statement_timestamp()
+);
 
 insert into api.training_plans (
   plan_id, user_id, name, provenance, current_version, session_count, item_count
