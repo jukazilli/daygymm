@@ -227,7 +227,7 @@ describe("AuthScreen", () => {
     );
 
     expect((await screen.findByRole("alert")).textContent).toContain(
-      "O e-mail pode já estar confirmado ou o link pode ter expirado.",
+      "E-mail já confirmado ou link expirado.",
     );
     expect(screen.getByRole("link", { name: "Ir para entrar" })).toBeTruthy();
   });

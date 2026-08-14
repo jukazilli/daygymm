@@ -409,9 +409,10 @@ export function AuthScreen({
           <p className="support">{pageCopy.support}</p>
           {feedback ? (
             <div className="status-message status-error" role="alert">
-              <strong>Não foi possível confirmar por este link.</strong>
+              <strong>E-mail já confirmado ou link expirado.</strong>
               <span>
-                O e-mail pode já estar confirmado ou o link pode ter expirado.
+                Tente entrar na sua conta. Se ainda precisar confirmar, crie a
+                conta novamente para receber um novo link.
               </span>
             </div>
           ) : null}
