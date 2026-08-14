@@ -28,6 +28,7 @@ const expectedHeaders = [
   "Circuito",
   "Observações",
 ] as const;
+const optionalPlannedWeightHeader = "Carga (kg)";
 
 type CellValue = string | number | boolean | Date | null;
 
@@ -85,6 +86,20 @@ function cellInteger(value: CellValue): number | null {
 
 function optionalInteger(value: CellValue): number | null {
   return value === null || value === "" ? null : cellInteger(value);
+}
+
+function optionalDecimal(value: CellValue): number | null {
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+(?:[.,]\d{1,2})?$/.test(value.trim())) {
+    const parsed = Number(value.trim().replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function modalityFromCell(value: CellValue): TrainingModality | null {
@@ -238,6 +253,7 @@ function buildItem(
     modality,
     notes: cellText(row[12] ?? null),
     order: cellInteger(row[2] ?? null),
+    plannedWeightKg: optionalDecimal(row[13] ?? null),
     repsMax: optionalInteger(row[7] ?? null),
     repsMin: optionalInteger(row[6] ?? null),
     restSeconds: rest ?? 60,
@@ -352,9 +368,13 @@ export async function parseOfficialXlsxFile(
     };
   }
   const [header, ...rows] = sheet.data.map((row) => row.map(trustedCell));
-  const headerMatches = expectedHeaders.every(
-    (expected, index) => cellText(header?.[index] ?? null) === expected,
-  );
+  const headerMatches =
+    expectedHeaders.every(
+      (expected, index) => cellText(header?.[index] ?? null) === expected,
+    ) &&
+    (header?.[13] === undefined ||
+      header?.[13] === null ||
+      cellText(header[13]) === optionalPlannedWeightHeader);
   if (!headerMatches) {
     return {
       ...baseResult,

@@ -6,6 +6,29 @@ import {
 } from "./training-plan-import.js";
 
 const uuidSchema = z.string().uuid();
+const optionalWeightSchema = z
+  .number()
+  .min(0.25)
+  .max(2_000)
+  .multipleOf(0.01)
+  .nullable();
+
+export const practicalTrainingSetSchema = z
+  .object({
+    actualDistanceMeters: z.number().int().min(1).max(100_000).nullable(),
+    actualDurationSeconds: z.number().int().min(1).max(7_200).nullable(),
+    actualReps: z.number().int().min(1).max(1_000).nullable(),
+    actualWeightKg: optionalWeightSchema,
+    completedAt: z.string().datetime({ offset: true }),
+    plannedDistanceMeters: z.number().int().min(1).max(100_000).nullable(),
+    plannedDurationSeconds: z.number().int().min(1).max(7_200).nullable(),
+    plannedRepsMax: z.number().int().min(1).max(1_000).nullable(),
+    plannedRepsMin: z.number().int().min(1).max(1_000).nullable(),
+    plannedWeightKg: optionalWeightSchema,
+    setExecutionId: uuidSchema,
+    setNumber: z.number().int().min(1).max(20),
+  })
+  .strict();
 
 export const practicalTrainingExerciseSchema = z
   .object({
@@ -18,10 +41,13 @@ export const practicalTrainingExerciseSchema = z
     modality: trainingModalitySchema,
     notes: z.string().max(500).nullable(),
     order: z.number().int().min(1).max(100),
+    plannedWeightKg: optionalWeightSchema,
     repsMax: z.number().int().min(1).max(1_000).nullable(),
     repsMin: z.number().int().min(1).max(1_000).nullable(),
     restSeconds: z.number().int().min(0).max(1_800),
     sets: z.number().int().min(1).max(20),
+    setExecutions: z.array(practicalTrainingSetSchema).max(20),
+    startedAt: z.string().datetime({ offset: true }).nullable(),
   })
   .strict();
 
@@ -61,6 +87,46 @@ export const exerciseCompletionSchema = z
   })
   .strict();
 
+export const exerciseStartSchema = z
+  .object({
+    nextSetNumber: z.number().int().min(1).max(20),
+    startedAt: z.string().datetime({ offset: true }),
+    totalSets: z.number().int().min(1).max(20),
+    wasCreated: z.boolean(),
+  })
+  .strict();
+
+export const setCompletionInputSchema = z
+  .object({
+    actualDistanceMeters: z.number().int().min(1).max(100_000).nullable(),
+    actualDurationSeconds: z.number().int().min(1).max(7_200).nullable(),
+    actualReps: z.number().int().min(1).max(1_000).nullable(),
+    actualWeightKg: optionalWeightSchema,
+    itemId: uuidSchema,
+    runId: uuidSchema,
+    setNumber: z.number().int().min(1).max(20),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      input.actualReps !== null ||
+      input.actualDurationSeconds !== null ||
+      input.actualDistanceMeters !== null,
+    { message: "A completed set requires one performed measure." },
+  );
+
+export const setCompletionSchema = z
+  .object({
+    completedAt: z.string().datetime({ offset: true }),
+    completedSetCount: z.number().int().min(1).max(20),
+    exerciseCompleted: z.boolean(),
+    setExecutionId: uuidSchema,
+    setNumber: z.number().int().min(1).max(20),
+    totalSets: z.number().int().min(1).max(20),
+    wasCreated: z.boolean(),
+  })
+  .strict();
+
 export const completedTrainingSessionSchema = z
   .object({
     completedAt: z.string().datetime({ offset: true }),
@@ -73,6 +139,7 @@ export const completedTrainingSessionSchema = z
 export type PracticalTrainingExercise = z.infer<
   typeof practicalTrainingExerciseSchema
 >;
+export type PracticalTrainingSet = z.infer<typeof practicalTrainingSetSchema>;
 export type PracticalTrainingPlanSession = z.infer<
   typeof practicalTrainingPlanSessionSchema
 >;
@@ -81,6 +148,9 @@ export type PracticalTrainingState = z.infer<
   typeof practicalTrainingStateSchema
 >;
 export type ExerciseCompletion = z.infer<typeof exerciseCompletionSchema>;
+export type ExerciseStart = z.infer<typeof exerciseStartSchema>;
+export type SetCompletionInput = z.infer<typeof setCompletionInputSchema>;
+export type SetCompletion = z.infer<typeof setCompletionSchema>;
 export type CompletedTrainingSession = z.infer<
   typeof completedTrainingSessionSchema
 >;
@@ -103,6 +173,9 @@ export interface TrainingSessionGateway {
     runId: string,
     itemId: string,
   ): Promise<TrainingSessionResult<ExerciseCompletion>>;
+  completeSet(
+    input: SetCompletionInput,
+  ): Promise<TrainingSessionResult<SetCompletion>>;
   finish(
     runId: string,
   ): Promise<TrainingSessionResult<CompletedTrainingSession>>;
@@ -112,4 +185,8 @@ export interface TrainingSessionGateway {
   start(
     plannedSessionId: string,
   ): Promise<TrainingSessionResult<ActiveTrainingRun>>;
+  startExercise(
+    runId: string,
+    itemId: string,
+  ): Promise<TrainingSessionResult<ExerciseStart>>;
 }

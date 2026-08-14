@@ -20,6 +20,7 @@ function createGateway(state: PlanSourceState): PlanSourceGateway {
 function createTrainingGateway(): TrainingSessionGateway {
   return {
     cancel: vi.fn(),
+    completeSet: vi.fn(),
     completeExercise: vi.fn(),
     finish: vi.fn(),
     load: vi.fn().mockResolvedValue({
@@ -33,6 +34,7 @@ function createTrainingGateway(): TrainingSessionGateway {
       },
     }),
     start: vi.fn(),
+    startExercise: vi.fn(),
   };
 }
 

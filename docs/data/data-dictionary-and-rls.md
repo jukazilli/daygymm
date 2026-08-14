@@ -3,7 +3,8 @@
 Status: baseline executável do `FND-011`, atualizado pelo comando transacional
 de finalização do `FND-022`, pelo contexto progressivo da `US-003`, pela
 escolha de origem do plano da `US-004` e pela importação oficial da `US-005`.
-O recorte pré-US-007 acrescenta a projeção semanal explícita do plano importado.
+O recorte pré-US-007 acrescenta a projeção semanal explícita do plano importado;
+a antecipação `US-008A` registra o início do exercício e cada série realizada.
 
 ## Escopo e precedência
 
@@ -176,7 +177,8 @@ seu nome pelo comando dedicado; não recebe escrita direta neste agregado.
 
 ### `api.training_plan_versions`
 
-Owner: comando `private.import_official_xlsx_plan()`.
+Owner: comandos `private.import_official_xlsx_plan()` e
+`private.import_official_xlsx_plan_with_weights()`.
 
 Finalidade: preservar uma versão imutável confirmada a partir da proposta
 normalizada no aparelho. Guarda somente hash, nome sanitizado e tamanho como
@@ -236,18 +238,19 @@ Finalidade: armazenar itens normalizados e limitados de cada sessão importada.
 Fórmulas, macros, links, objetos e conteúdo arbitrário da planilha não entram
 nesta relação.
 
-| Campo              | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
-| ------------------ | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
-| `item_id`          | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
-| `session_id`       | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
-| `version_id`       | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
-| `user_id`          | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
-| `item_order`       | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
-| `exercise_name`    | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `modality`         | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `sets`             | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| medidas e descanso | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| circuito e notas   | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| Campo               | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
+| ------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
+| `item_id`           | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
+| `session_id`        | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
+| `version_id`        | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
+| `user_id`           | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
+| `item_order`        | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
+| `exercise_name`     | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `modality`          | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `sets`              | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `planned_weight_kg` | decimal opcional, 0,25–2.000 kg                | Sugerir carga sem substituir o realizado   | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| medidas e descanso  | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| circuito e notas    | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
 
 ### `api.training_session_runs`
 
@@ -269,19 +272,58 @@ offline e sua outbox local continuam fora deste recorte e pertencem à US-009.
 
 ### `api.training_session_run_items`
 
-Owner: `private.start_training_session()` cria o snapshot e
-`private.complete_training_exercise()` marca sua conclusão.
+Owner: `private.start_training_session()` cria o snapshot;
+`private.start_training_exercise()` inicia o item e
+`private.complete_training_set()` conclui automaticamente o item na última série.
 
 Finalidade: copiar os alvos dos exercícios da versão selecionada para a sessão
-ativa e registrar somente o checklist de conclusão deste primeiro recorte. Não
-representa séries efetivamente executadas, carga, volume, PR ou progressão.
+ativa e manter o estado resumido do exercício. Os valores realizados ficam nas
+relações de séries e nunca sobrescrevem o alvo planejado.
 
 | Campo                     | Tipo/restrição                                    | Finalidade                      | Classificação              | Retenção atual                | Índice                                    |
 | ------------------------- | ------------------------------------------------- | ------------------------------- | -------------------------- | ----------------------------- | ----------------------------------------- |
 | `run_id` + `plan_item_id` | FKs, PK composta                                  | Vincular execução e exercício   | Identificador técnico      | Até a finalização da execução | PK e índice da FK do item                 |
 | `user_id`                 | UUID, FK de perfil                                | Aplicar isolamento redundante   | Identificador pessoal      | Mesmo ciclo da execução       | `training_session_run_items_user_run_idx` |
 | alvo do exercício         | ordem, nome, modalidade, sets e medidas limitadas | Preservar o alvo apresentado    | Conteúdo de treino         | Mesmo ciclo da execução       | Ordem unique por execução                 |
-| `completed_at`            | timestamptz opcional do servidor                  | Registrar o checklist concluído | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+| `planned_weight_kg`       | decimal opcional, 0,25–2.000 kg                   | Preservar a carga planejada     | Conteúdo de treino         | Mesmo ciclo da execução       | Não                                       |
+| `started_at`              | timestamptz opcional do servidor                  | Retomar o exercício iniciado    | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+| `completed_at`            | timestamptz opcional do servidor                  | Marcar a última série concluída | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+
+### `api.training_session_run_sets`
+
+Owner: comando `private.complete_training_set()`.
+
+Finalidade: persistir imediatamente cada série de uma execução ativa. A chave
+de operação e a unicidade por exercício/série tornam o comando idempotente; os
+campos planejados e realizados permanecem separados. As linhas são removidas
+em cascade depois da cópia atômica para o histórico canônico.
+
+| Campo              | Tipo/restrição                                  | Finalidade                         | Classificação              | Retenção atual                    | Índice                     |
+| ------------------ | ----------------------------------------------- | ---------------------------------- | -------------------------- | --------------------------------- | -------------------------- |
+| `set_execution_id` | UUID, PK                                        | Identificar a série realizada      | Identificador técnico      | Até finalizar/cancelar a execução | PK                         |
+| referências        | FKs de execução, item e titular                 | Fixar origem e isolamento          | Identificador pessoal      | Mesmo ciclo da execução           | Índices de execução e item |
+| `operation_id`     | texto técnico, unique por usuário               | Deduplicar double-submit e replay  | Identificador técnico      | Mesmo ciclo da execução           | Unique composto            |
+| `set_number`       | inteiro, 1–20, unique por item da execução      | Ordenar e impedir salto/duplicação | Conteúdo de treino         | Mesmo ciclo da execução           | Unique composto            |
+| medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo da série          | Conteúdo de treino         | Mesmo ciclo da execução           | Não                        |
+| medidas realizadas | ao menos repetição, duração ou distância        | Registrar o que foi realizado      | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| `completed_at`     | timestamptz do servidor                         | Confirmar persistência imediata    | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+
+### `api.training_session_sets`
+
+Owner: comando `private.finish_practical_training_session()`.
+
+Finalidade: preservar no histórico canônico as séries realizadas depois da
+finalização da sessão, inclusive quando valores reais diferem dos planejados.
+O cliente possui apenas leitura das próprias linhas.
+
+| Campo              | Tipo/restrição                                  | Finalidade                            | Classificação              | Retenção atual                  | Índice                       |
+| ------------------ | ----------------------------------------------- | ------------------------------------- | -------------------------- | ------------------------------- | ---------------------------- |
+| `set_execution_id` | UUID, PK                                        | Preservar a identidade da série ativa | Identificador técnico      | Mesmo ciclo da sessão concluída | PK                           |
+| referências        | FKs de sessão, item e titular                   | Fixar proveniência e isolamento       | Identificador pessoal      | Mesmo ciclo da sessão concluída | Índices por sessão e item    |
+| exercício e série  | nome, ordem e número limitados                  | Manter o snapshot legível             | Conteúdo de treino         | Mesmo ciclo da sessão concluída | Unique por sessão/item/série |
+| medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo histórico            | Conteúdo de treino         | Mesmo ciclo da sessão concluída | Não                          |
+| medidas realizadas | repetição, carga, duração e distância opcionais | Preservar o resultado histórico       | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+| `completed_at`     | timestamptz do servidor                         | Registrar quando a série terminou     | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
 
 ### `platform.domain_event_receipts`
 
@@ -333,6 +375,8 @@ não é exposto ao cliente.
 | `api.training_plan_schedule_entries` | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_schedule_entries_select_own`; projeção escrita somente pelo trigger                                                   | `RLS-N20`                       |
 | `api.training_session_runs`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_runs_select_own`; mutação somente por comandos                                                                     | `RLS-N18`, `RLS-N22`            |
 | `api.training_session_run_items`     | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_items_select_own`; mutação somente por comandos                                                                | `RLS-N19`                       |
+| `api.training_session_run_sets`      | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_sets_select_own`; cada série é gravada somente pelo comando idempotente                                        | `RLS-N23`                       |
+| `api.training_session_sets`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_sets_select_own`; histórico escrito somente durante a finalização                                                  | `RLS-N24`                       |
 | `platform.domain_event_receipts`     | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`                       |
 | `platform.domain_event_receipts`     | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`                       |
 | `platform.domain_event_receipts`     | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler               |
@@ -340,7 +384,8 @@ não é exposto ao cliente.
 As policies temporárias de inserção da fundação foram removidas pela migration
 seguinte. As policies ativas são `profiles_select_own`, `consents_select_own`,
 `training_sessions_select_own`, `training_session_runs_select_own`,
-`training_session_run_items_select_own`, `onboarding_contexts_select_own`,
+`training_session_run_items_select_own`, `training_session_run_sets_select_own`,
+`training_session_sets_select_own`, `onboarding_contexts_select_own`,
 `onboarding_contexts_insert_own`, `onboarding_contexts_update_own` e
 `training_plan_schedule_entries_select_own`. Os controles
 negativos estáveis são:
@@ -369,6 +414,8 @@ negativos estáveis são:
 - `RLS-N20`: isola a agenda semanal entre titulares.
 - `RLS-N21`: bloqueia a renomeação de plano pertencente a outro titular.
 - `RLS-N22`: bloqueia o cancelamento da execução ativa de outro titular.
+- `RLS-N23`: isola as séries persistidas de uma execução ativa entre titulares.
+- `RLS-N24`: isola o histórico canônico de séries entre titulares.
 
 ## Pendências deliberadas para `FND-029`
 

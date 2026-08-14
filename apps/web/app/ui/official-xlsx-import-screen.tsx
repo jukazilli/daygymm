@@ -33,7 +33,8 @@ function itemSummary(
   item: OfficialXlsxPlanProposal["sessions"][number]["items"][number],
 ) {
   if (item.repsMin !== null && item.repsMax !== null) {
-    return `${item.sets} × ${item.repsMin}–${item.repsMax}`;
+    const weight = item.plannedWeightKg ? ` · ${item.plannedWeightKg} kg` : "";
+    return `${item.sets} × ${item.repsMin}–${item.repsMax}${weight}`;
   }
   if (item.durationSeconds !== null) {
     return `${item.sets} × ${item.durationSeconds}s`;

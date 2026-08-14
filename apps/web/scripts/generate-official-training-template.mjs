@@ -64,6 +64,7 @@ const headers = [
   "Descanso (s)",
   "Circuito",
   "Observações",
+  "Carga (kg)",
 ];
 
 const trainingRows = [
@@ -82,6 +83,7 @@ const trainingRows = [
     90,
     null,
     "",
+    40,
   ],
   [
     1,
@@ -97,6 +99,7 @@ const trainingRows = [
     45,
     null,
     "Manter postura",
+    null,
   ],
   [
     2,
@@ -112,6 +115,7 @@ const trainingRows = [
     0,
     null,
     "Ritmo confortável",
+    null,
   ],
 ];
 
@@ -123,6 +127,7 @@ const instructionRows = [
   ["Força exige Reps mín e Reps máx. Tempo exige Duração (s)."],
   ["Distância e cardio exigem Duração (s) ou Distância (m)."],
   ["Circuito exige um nome na coluna Circuito."],
+  ["Carga (kg) é opcional e aceita até duas casas decimais."],
   ["O arquivo deve permanecer .xlsx e ter no máximo 2 MB."],
   [
     "Macros, fórmulas, links, proteção e objetos incorporados bloqueiam a importação.",

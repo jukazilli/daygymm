@@ -2,8 +2,12 @@ import {
   activeTrainingRunSchema,
   completedTrainingSessionSchema,
   exerciseCompletionSchema,
+  exerciseStartSchema,
   practicalTrainingStateSchema,
+  setCompletionInputSchema,
+  setCompletionSchema,
   type PracticalTrainingExercise,
+  type PracticalTrainingSet,
   type PracticalTrainingPlanSession,
   type TrainingSessionFailure,
   type TrainingSessionGateway,
@@ -14,6 +18,8 @@ import { getWebSupabaseClient } from "./supabase-browser";
 import type {
   CompletedTrainingSessionRow,
   ExerciseCompletionRpcRow,
+  ExerciseStartRpcRow,
+  SetCompletionRpcRow,
   TrainingCancelRpcRow,
   TrainingFinishRpcRow,
   TrainingPlanItemRow,
@@ -21,6 +27,7 @@ import type {
   TrainingPlanScheduleEntryRow,
   TrainingPlanSessionRow,
   TrainingSessionRunItemRow,
+  TrainingSessionRunSetRow,
   TrainingSessionRunRow,
   TrainingStartRpcRow,
 } from "./supabase-database";
@@ -84,14 +91,37 @@ function mapPlanItem(
     modality: row.modality as PracticalTrainingExercise["modality"],
     notes: row.notes,
     order: row.item_order,
+    plannedWeightKg: row.planned_weight_kg,
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
     sets: row.sets,
+    setExecutions: [],
+    startedAt: null,
   };
 }
 
-function mapRunItem(row: TrainingSessionRunItemRow): PracticalTrainingExercise {
+function mapRunSet(row: TrainingSessionRunSetRow): PracticalTrainingSet {
+  return {
+    actualDistanceMeters: row.actual_distance_meters,
+    actualDurationSeconds: row.actual_duration_seconds,
+    actualReps: row.actual_reps,
+    actualWeightKg: row.actual_weight_kg,
+    completedAt: row.completed_at,
+    plannedDistanceMeters: row.planned_distance_meters,
+    plannedDurationSeconds: row.planned_duration_seconds,
+    plannedRepsMax: row.planned_reps_max,
+    plannedRepsMin: row.planned_reps_min,
+    plannedWeightKg: row.planned_weight_kg,
+    setExecutionId: row.set_execution_id,
+    setNumber: row.set_number,
+  };
+}
+
+function mapRunItem(
+  row: TrainingSessionRunItemRow,
+  sets: TrainingSessionRunSetRow[],
+): PracticalTrainingExercise {
   return {
     circuitGroup: row.circuit_group,
     completedAt: row.completed_at,
@@ -102,10 +132,16 @@ function mapRunItem(row: TrainingSessionRunItemRow): PracticalTrainingExercise {
     modality: row.modality as PracticalTrainingExercise["modality"],
     notes: row.notes,
     order: row.item_order,
+    plannedWeightKg: row.planned_weight_kg,
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
     sets: row.sets,
+    setExecutions: sets
+      .filter((set) => set.plan_item_id === row.plan_item_id)
+      .sort((left, right) => left.set_number - right.set_number)
+      .map(mapRunSet),
+    startedAt: row.started_at,
   };
 }
 
@@ -201,7 +237,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         client
           .from("training_plan_items")
           .select(
-            "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
+            "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
           )
           .eq("version_id", activeVersionId)
           .order("item_order"),
@@ -252,15 +288,25 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       let activeRun = null;
 
       if (runRow) {
-        const { data: runItemsData, error: runItemsError } = await client
-          .from("training_session_run_items")
-          .select(
-            "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,completed_at",
-          )
-          .eq("run_id", runRow.run_id)
-          .order("item_order");
-        if (runItemsError) {
-          return failure(runItemsError);
+        const [runItemsResult, runSetsResult] = await Promise.all([
+          client
+            .from("training_session_run_items")
+            .select(
+              "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
+            )
+            .eq("run_id", runRow.run_id)
+            .order("item_order"),
+          client
+            .from("training_session_run_sets")
+            .select(
+              "set_execution_id,run_id,plan_item_id,user_id,set_number,planned_reps_min,planned_reps_max,actual_reps,planned_weight_kg,actual_weight_kg,planned_duration_seconds,actual_duration_seconds,planned_distance_meters,actual_distance_meters,completed_at",
+            )
+            .eq("run_id", runRow.run_id)
+            .order("set_number"),
+        ]);
+        const activeRunError = runItemsResult.error ?? runSetsResult.error;
+        if (activeRunError) {
+          return failure(activeRunError);
         }
         const planned = sessions.find(
           (session) => session.sessionId === runRow.planned_session_id,
@@ -272,8 +318,11 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
           runId: runRow.run_id,
           session: {
             ...planned,
-            items: (runItemsData ?? []).map((item) =>
-              mapRunItem(item as TrainingSessionRunItemRow),
+            items: (runItemsResult.data ?? []).map((item) =>
+              mapRunItem(
+                item as TrainingSessionRunItemRow,
+                (runSetsResult.data ?? []) as TrainingSessionRunSetRow[],
+              ),
             ),
           },
           startedAt: runRow.started_at,
@@ -301,6 +350,43 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
 
   return {
     load,
+    async completeSet(input) {
+      try {
+        const parsed = setCompletionInputSchema.parse(input);
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("complete_training_set", {
+          p_actual_distance_meters: parsed.actualDistanceMeters,
+          p_actual_duration_seconds: parsed.actualDurationSeconds,
+          p_actual_reps: parsed.actualReps,
+          p_actual_weight_kg: parsed.actualWeightKg,
+          p_operation_id: `training-set:${parsed.runId}:${parsed.itemId}:${parsed.setNumber}`,
+          p_plan_item_id: parsed.itemId,
+          p_run_id: parsed.runId,
+          p_set_number: parsed.setNumber,
+        });
+        const row = data?.[0] as SetCompletionRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: setCompletionSchema.parse({
+            completedAt: row.completed_at,
+            completedSetCount: row.completed_set_count,
+            exerciseCompleted: row.exercise_completed,
+            setExecutionId: row.set_execution_id,
+            setNumber: row.set_number,
+            totalSets: row.total_sets,
+            wasCreated: row.was_created,
+          }),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.name === "ZodError") {
+          return failure(error);
+        }
+        return { ok: false, reason: "configuration" };
+      }
+    },
     async cancel(runId) {
       try {
         const client = getWebSupabaseClient();
@@ -341,6 +427,34 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         }
         return { ok: true, value: state.value.activeRun };
       } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    },
+
+    async startExercise(runId, itemId) {
+      try {
+        const client = getWebSupabaseClient();
+        const { data, error } = await client.rpc("start_training_exercise", {
+          p_plan_item_id: itemId,
+          p_run_id: runId,
+        });
+        const row = data?.[0] as ExerciseStartRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: exerciseStartSchema.parse({
+            nextSetNumber: row.next_set_number,
+            startedAt: row.started_at,
+            totalSets: row.total_sets,
+            wasCreated: row.was_created,
+          }),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.name === "ZodError") {
+          return failure(error);
+        }
         return { ok: false, reason: "configuration" };
       }
     },

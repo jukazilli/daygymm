@@ -22,6 +22,12 @@ export const officialXlsxPlanItemSchema = z
     modality: trainingModalitySchema,
     notes: z.string().trim().max(500).nullable(),
     order: z.number().int().min(1).max(100),
+    plannedWeightKg: z
+      .number()
+      .min(0.25)
+      .max(2_000)
+      .multipleOf(0.01)
+      .nullable(),
     repsMax: z.number().int().min(1).max(1_000).nullable(),
     repsMin: z.number().int().min(1).max(1_000).nullable(),
     restSeconds: z.number().int().min(0).max(1_800),

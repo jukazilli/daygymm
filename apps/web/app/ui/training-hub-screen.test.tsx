@@ -16,10 +16,12 @@ function createTrainingGateway(
 ): TrainingSessionGateway {
   return {
     cancel: vi.fn(),
+    completeSet: vi.fn(),
     completeExercise: vi.fn(),
     finish: vi.fn(),
     load: vi.fn().mockResolvedValue(value),
     start: vi.fn(),
+    startExercise: vi.fn(),
   };
 }
 
@@ -85,10 +87,13 @@ describe("TrainingHubScreen", () => {
           modality: "strength" as const,
           notes: null,
           order: 1,
+          plannedWeightKg: null,
           repsMax: 12,
           repsMin: 8,
           restSeconds: 90,
           sets: 3,
+          setExecutions: [],
+          startedAt: null,
         },
       ],
       name: "Treino A",

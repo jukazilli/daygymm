@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   practicalTrainingStateSchema,
   practicalTrainingPlanSessionSchema,
+  setCompletionInputSchema,
 } from "./training-session.js";
 
 const session = {
@@ -18,10 +19,13 @@ const session = {
       modality: "strength",
       notes: null,
       order: 1,
+      plannedWeightKg: 40,
       repsMax: 12,
       repsMin: 8,
       restSeconds: 90,
       sets: 3,
+      setExecutions: [],
+      startedAt: null,
     },
   ],
   name: "Treino A",
@@ -79,5 +83,29 @@ describe("practical training contracts", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("requires a performed measure when completing a set", () => {
+    const base = {
+      actualDistanceMeters: null,
+      actualDurationSeconds: null,
+      actualReps: null,
+      actualWeightKg: 40,
+      itemId: "51000000-0000-4000-8000-000000000001",
+      runId: "53000000-0000-4000-8000-000000000003",
+      setNumber: 1,
+    };
+
+    expect(setCompletionInputSchema.safeParse(base).success).toBe(false);
+    expect(
+      setCompletionInputSchema.safeParse({ ...base, actualReps: 12 }).success,
+    ).toBe(true);
+    expect(
+      setCompletionInputSchema.safeParse({
+        ...base,
+        actualReps: 12,
+        actualWeightKg: 40.123,
+      }).success,
+    ).toBe(false);
   });
 });

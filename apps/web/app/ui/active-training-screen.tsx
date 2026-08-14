@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   PracticalTrainingExercise,
   PracticalTrainingState,
+  SetCompletionInput,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
@@ -43,18 +44,273 @@ function formatDuration(seconds: number) {
 
 function exerciseTarget(exercise: PracticalTrainingExercise) {
   const prefix = `${exercise.sets} ${exercise.sets === 1 ? "série" : "séries"}`;
-  if (exercise.modality === "strength" || exercise.modality === "circuit") {
-    const repetitions =
-      exercise.repsMin === exercise.repsMax
-        ? `${exercise.repsMin} repetições`
-        : `${exercise.repsMin}–${exercise.repsMax} repetições`;
-    return `${prefix} · ${repetitions}`;
-  }
   const targets = [
+    exercise.repsMin !== null && exercise.repsMax !== null
+      ? exercise.repsMin === exercise.repsMax
+        ? `${exercise.repsMin} repetições`
+        : `${exercise.repsMin}–${exercise.repsMax} repetições`
+      : null,
+    exercise.plannedWeightKg !== null ? `${exercise.plannedWeightKg} kg` : null,
     exercise.durationSeconds ? formatDuration(exercise.durationSeconds) : null,
     exercise.distanceMeters ? `${exercise.distanceMeters} m` : null,
   ].filter(Boolean);
-  return `${prefix} · ${targets.join(" · ")}`;
+  return targets.length > 0 ? `${prefix} · ${targets.join(" · ")}` : prefix;
+}
+
+function setResult(exercise: PracticalTrainingExercise, setIndex: number) {
+  const performed = exercise.setExecutions[setIndex];
+  if (!performed) {
+    return null;
+  }
+  return [
+    performed.actualWeightKg !== null ? `${performed.actualWeightKg} kg` : null,
+    performed.actualReps !== null ? `${performed.actualReps} repetições` : null,
+    performed.actualDurationSeconds !== null
+      ? formatDuration(performed.actualDurationSeconds)
+      : null,
+    performed.actualDistanceMeters !== null
+      ? `${performed.actualDistanceMeters} m`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" × ");
+}
+
+function parsedInteger(value: string) {
+  return /^\d+$/.test(value) ? Number.parseInt(value, 10) : null;
+}
+
+function parsedDecimal(value: string) {
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(value)) {
+    return null;
+  }
+  return Number(value.replace(",", "."));
+}
+
+type MissingMeasure = "duration" | "reps";
+
+function ExerciseExecution({
+  busy,
+  exercise,
+  onCompleteSet,
+  onStart,
+}: Readonly<{
+  busy: boolean;
+  exercise: PracticalTrainingExercise;
+  onCompleteSet: (input: Omit<SetCompletionInput, "itemId" | "runId">) => void;
+  onStart: () => void;
+}>) {
+  const lastSet = exercise.setExecutions.at(-1);
+  const [missingMeasure, setMissingMeasure] = useState<
+    MissingMeasure | undefined
+  >(
+    lastSet?.actualReps !== null && lastSet?.actualReps !== undefined
+      ? "reps"
+      : lastSet?.actualDurationSeconds !== null &&
+          lastSet?.actualDurationSeconds !== undefined
+        ? "duration"
+        : undefined,
+  );
+  const hasPlannedReps = exercise.repsMin !== null && exercise.repsMax !== null;
+  const needsReps = hasPlannedReps || missingMeasure === "reps";
+  const needsDuration =
+    exercise.durationSeconds !== null || missingMeasure === "duration";
+  const needsDistance = exercise.distanceMeters !== null;
+  const hasKnownMeasure = hasPlannedReps || needsDuration || needsDistance;
+  const [reps, setReps] = useState(
+    hasPlannedReps
+      ? String(exercise.repsMax)
+      : lastSet?.actualReps !== null && lastSet?.actualReps !== undefined
+        ? String(lastSet.actualReps)
+        : "",
+  );
+  const [weight, setWeight] = useState(
+    exercise.plannedWeightKg !== null
+      ? String(exercise.plannedWeightKg)
+      : lastSet?.actualWeightKg !== null &&
+          lastSet?.actualWeightKg !== undefined
+        ? String(lastSet.actualWeightKg)
+        : "",
+  );
+  const [duration, setDuration] = useState(
+    exercise.durationSeconds !== null
+      ? String(exercise.durationSeconds)
+      : lastSet?.actualDurationSeconds !== null &&
+          lastSet?.actualDurationSeconds !== undefined
+        ? String(lastSet.actualDurationSeconds)
+        : "",
+  );
+  const [distance, setDistance] = useState(
+    exercise.distanceMeters !== null ? String(exercise.distanceMeters) : "",
+  );
+  const nextSet = exercise.setExecutions.length + 1;
+  const actualReps = needsReps ? parsedInteger(reps) : null;
+  const actualWeightKg = weight ? parsedDecimal(weight) : null;
+  const actualDurationSeconds = needsDuration ? parsedInteger(duration) : null;
+  const actualDistanceMeters = needsDistance ? parsedInteger(distance) : null;
+  const canComplete =
+    nextSet <= exercise.sets &&
+    (!needsReps || actualReps !== null) &&
+    (!needsDuration || actualDurationSeconds !== null) &&
+    (!needsDistance || actualDistanceMeters !== null);
+
+  if (exercise.completedAt) {
+    return (
+      <div className="exercise-completed-summary">
+        <strong>Concluído</strong>
+        {exercise.setExecutions.length > 0 ? (
+          <ol>
+            {exercise.setExecutions.map((set, index) => (
+              <li key={set.setExecutionId}>
+                <span>Série {set.setNumber}</span>
+                <strong>{setResult(exercise, index)}</strong>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>{exerciseTarget(exercise)}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (!exercise.startedAt) {
+    return (
+      <button
+        aria-label={`Iniciar ${exercise.exerciseName}`}
+        className="exercise-play"
+        disabled={busy}
+        onClick={onStart}
+        type="button"
+      >
+        <span aria-hidden="true">▶</span>
+        <small>{busy ? "Iniciando…" : "Iniciar"}</small>
+      </button>
+    );
+  }
+
+  return (
+    <div className="set-execution">
+      <div className="set-heading">
+        <span>Agora</span>
+        <strong>
+          Série {nextSet} de {exercise.sets}
+        </strong>
+      </div>
+
+      {!hasKnownMeasure && !missingMeasure ? (
+        <fieldset className="measure-choice">
+          <legend>Como medir?</legend>
+          <button onClick={() => setMissingMeasure("reps")} type="button">
+            Repetições
+          </button>
+          <button onClick={() => setMissingMeasure("duration")} type="button">
+            Tempo
+          </button>
+        </fieldset>
+      ) : null}
+
+      {hasKnownMeasure || missingMeasure ? (
+        <div className="set-fields">
+          {exercise.modality === "strength" ? (
+            <label>
+              <span>
+                Carga <small>kg</small>
+              </span>
+              <input
+                inputMode="decimal"
+                min="0.25"
+                onChange={(event) => setWeight(event.target.value)}
+                placeholder="—"
+                step="0.25"
+                type="number"
+                value={weight}
+              />
+            </label>
+          ) : null}
+          {needsReps ? (
+            <label>
+              <span>Repetições</span>
+              <input
+                inputMode="numeric"
+                max="1000"
+                min="1"
+                onChange={(event) => setReps(event.target.value)}
+                type="number"
+                value={reps}
+              />
+            </label>
+          ) : null}
+          {needsDuration ? (
+            <label>
+              <span>
+                Tempo <small>segundos</small>
+              </span>
+              <input
+                inputMode="numeric"
+                max="7200"
+                min="1"
+                onChange={(event) => setDuration(event.target.value)}
+                type="number"
+                value={duration}
+              />
+            </label>
+          ) : null}
+          {needsDistance ? (
+            <label>
+              <span>
+                Distância <small>metros</small>
+              </span>
+              <input
+                inputMode="numeric"
+                max="100000"
+                min="1"
+                onChange={(event) => setDistance(event.target.value)}
+                type="number"
+                value={distance}
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+
+      {hasKnownMeasure || missingMeasure ? (
+        <button
+          className="button-primary complete-set-button"
+          disabled={busy || !canComplete}
+          onClick={() =>
+            onCompleteSet({
+              actualDistanceMeters,
+              actualDurationSeconds,
+              actualReps,
+              actualWeightKg,
+              setNumber: nextSet,
+            })
+          }
+          type="button"
+        >
+          {busy ? "Salvando…" : "Concluir série"}
+        </button>
+      ) : null}
+
+      {exercise.setExecutions.length > 0 ? (
+        <section
+          className="completed-sets"
+          aria-labelledby="completed-sets-title"
+        >
+          <h2 id="completed-sets-title">Realizado</h2>
+          <ol>
+            {exercise.setExecutions.map((set, index) => (
+              <li key={set.setExecutionId}>
+                <span>✓ Série {set.setNumber}</span>
+                <strong>{setResult(exercise, index)}</strong>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+    </div>
+  );
 }
 
 function sessionError(reason: string) {
@@ -183,15 +439,21 @@ export function ActiveTrainingScreen({
     setSelectedIndex(0);
   }
 
-  async function completeCurrentExercise() {
+  async function startCurrentExercise() {
     const run = state?.activeRun;
     const currentExercise = run?.session.items[selectedIndex];
-    if (!run || !currentExercise || currentExercise.completedAt || busy) {
+    if (
+      !run ||
+      !currentExercise ||
+      currentExercise.completedAt ||
+      currentExercise.startedAt ||
+      busy
+    ) {
       return;
     }
     setBusy(true);
     setError(undefined);
-    const result = await gateway().completeExercise(
+    const result = await gateway().startExercise(
       run.runId,
       currentExercise.itemId,
     );
@@ -204,13 +466,43 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
+    await refresh();
+    setBusy(false);
+  }
+
+  async function completeCurrentSet(
+    input: Omit<SetCompletionInput, "itemId" | "runId">,
+  ) {
+    const run = state?.activeRun;
+    const currentExercise = run?.session.items[selectedIndex];
+    if (!run || !currentExercise || currentExercise.completedAt || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    const result = await gateway().completeSet({
+      ...input,
+      itemId: currentExercise.itemId,
+      runId: run.runId,
+    });
+    if (!result.ok) {
+      setBusy(false);
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(result.reason));
+      return;
+    }
     const refreshed = await refresh();
     setBusy(false);
-    const firstPending = refreshed?.activeRun?.session.items.findIndex(
-      (item) => !item.completedAt,
-    );
-    if (firstPending !== undefined && firstPending >= 0) {
-      setSelectedIndex(firstPending);
+    if (result.value.exerciseCompleted) {
+      const firstPending = refreshed?.activeRun?.session.items.findIndex(
+        (item) => !item.completedAt,
+      );
+      if (firstPending !== undefined && firstPending >= 0) {
+        setSelectedIndex(firstPending);
+      }
     }
   }
 
@@ -343,7 +635,7 @@ export function ActiveTrainingScreen({
       <header className="session-topbar">
         <Link href="/treinos/">Sair</Link>
         <ElapsedTimer startedAt={run.startedAt} />
-        <span className="session-saved">Salvo</span>
+        <span className="session-saved">{busy ? "Salvando…" : "Salvo"}</span>
       </header>
 
       <section
@@ -381,12 +673,28 @@ export function ActiveTrainingScreen({
 
       {currentExercise ? (
         <section className="current-exercise">
-          <p className="eyebrow">
-            Exercício {selectedIndex + 1} de {run.session.items.length}
-          </p>
-          <h1>{currentExercise.exerciseName}</h1>
+          <div className="current-exercise-heading">
+            <div>
+              <p className="eyebrow">
+                Exercício {selectedIndex + 1} de {run.session.items.length}
+              </p>
+              <h1>{currentExercise.exerciseName}</h1>
+            </div>
+            <span>
+              {currentExercise.setExecutions.length}/{currentExercise.sets}
+            </span>
+          </div>
+          {!currentExercise.startedAt && !currentExercise.completedAt ? (
+            <ExerciseExecution
+              busy={busy}
+              exercise={currentExercise}
+              key={`${currentExercise.itemId}:pending`}
+              onCompleteSet={(input) => void completeCurrentSet(input)}
+              onStart={() => void startCurrentExercise()}
+            />
+          ) : null}
           <div className="exercise-target">
-            <span>Meta</span>
+            <span>Planejado</span>
             <strong>{exerciseTarget(currentExercise)}</strong>
           </div>
           {currentExercise.restSeconds > 0 ? (
@@ -397,18 +705,15 @@ export function ActiveTrainingScreen({
           {currentExercise.notes ? (
             <p className="exercise-notes">{currentExercise.notes}</p>
           ) : null}
-          <button
-            className="button-primary session-primary-action"
-            disabled={busy || Boolean(currentExercise.completedAt)}
-            onClick={completeCurrentExercise}
-            type="button"
-          >
-            {currentExercise.completedAt
-              ? "Exercício concluído"
-              : busy
-                ? "Salvando…"
-                : "Concluir exercício"}
-          </button>
+          {currentExercise.startedAt || currentExercise.completedAt ? (
+            <ExerciseExecution
+              busy={busy}
+              exercise={currentExercise}
+              key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "complete"}`}
+              onCompleteSet={(input) => void completeCurrentSet(input)}
+              onStart={() => void startCurrentExercise()}
+            />
+          ) : null}
         </section>
       ) : null}
 

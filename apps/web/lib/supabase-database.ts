@@ -71,6 +71,7 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
   item_order: number;
   modality: string;
   notes: string | null;
+  planned_weight_kg: number | null;
   reps_max: number | null;
   reps_min: number | null;
   rest_seconds: number;
@@ -101,11 +102,51 @@ export interface TrainingSessionRunItemRow extends Record<string, unknown> {
   modality: string;
   notes: string | null;
   plan_item_id: string;
+  planned_weight_kg: number | null;
   reps_max: number | null;
   reps_min: number | null;
   rest_seconds: number;
   run_id: string;
   sets: number;
+  started_at: string | null;
+  user_id: string;
+}
+
+export interface TrainingSessionRunSetRow extends Record<string, unknown> {
+  actual_distance_meters: number | null;
+  actual_duration_seconds: number | null;
+  actual_reps: number | null;
+  actual_weight_kg: number | null;
+  completed_at: string;
+  plan_item_id: string;
+  planned_distance_meters: number | null;
+  planned_duration_seconds: number | null;
+  planned_reps_max: number | null;
+  planned_reps_min: number | null;
+  planned_weight_kg: number | null;
+  run_id: string;
+  set_execution_id: string;
+  set_number: number;
+  user_id: string;
+}
+
+export interface TrainingSessionSetRow extends Record<string, unknown> {
+  actual_distance_meters: number | null;
+  actual_duration_seconds: number | null;
+  actual_reps: number | null;
+  actual_weight_kg: number | null;
+  completed_at: string;
+  exercise_name: string;
+  exercise_order: number;
+  plan_item_id: string;
+  planned_distance_meters: number | null;
+  planned_duration_seconds: number | null;
+  planned_reps_max: number | null;
+  planned_reps_min: number | null;
+  planned_weight_kg: number | null;
+  session_id: string;
+  set_execution_id: string;
+  set_number: number;
   user_id: string;
 }
 
@@ -132,6 +173,23 @@ export interface TrainingStartRpcRow extends Record<string, unknown> {
 export interface ExerciseCompletionRpcRow extends Record<string, unknown> {
   completed_count: number;
   total_count: number;
+  was_created: boolean;
+}
+
+export interface ExerciseStartRpcRow extends Record<string, unknown> {
+  next_set_number: number;
+  started_at: string;
+  total_sets: number;
+  was_created: boolean;
+}
+
+export interface SetCompletionRpcRow extends Record<string, unknown> {
+  completed_at: string;
+  completed_set_count: number;
+  exercise_completed: boolean;
+  set_execution_id: string;
+  set_number: number;
+  total_sets: number;
   was_created: boolean;
 }
 
@@ -182,7 +240,9 @@ export interface WebDatabase {
       training_plan_versions: TableDefinition<TrainingPlanVersionRow>;
       training_plans: TableDefinition<TrainingPlanRow>;
       training_session_run_items: TableDefinition<TrainingSessionRunItemRow>;
+      training_session_run_sets: TableDefinition<TrainingSessionRunSetRow>;
       training_session_runs: TableDefinition<TrainingSessionRunRow>;
+      training_session_sets: TableDefinition<TrainingSessionSetRow>;
       training_sessions: TableDefinition<CompletedTrainingSessionRow>;
     };
     Views: Record<string, never>;
@@ -194,6 +254,17 @@ export interface WebDatabase {
         Returns: TrainingCancelRpcRow[];
       };
       import_official_xlsx_plan: {
+        Args: {
+          p_operation_id: string;
+          p_plan_name: string;
+          p_sessions: unknown;
+          p_source_file_name: string;
+          p_source_sha256: string;
+          p_source_size_bytes: number;
+        };
+        Returns: TrainingPlanImportRpcRow[];
+      };
+      import_official_xlsx_plan_v2: {
         Args: {
           p_operation_id: string;
           p_plan_name: string;
@@ -217,6 +288,19 @@ export interface WebDatabase {
           p_run_id: string;
         };
         Returns: ExerciseCompletionRpcRow[];
+      };
+      complete_training_set: {
+        Args: {
+          p_actual_distance_meters: number | null;
+          p_actual_duration_seconds: number | null;
+          p_actual_reps: number | null;
+          p_actual_weight_kg: number | null;
+          p_operation_id: string;
+          p_plan_item_id: string;
+          p_run_id: string;
+          p_set_number: number;
+        };
+        Returns: SetCompletionRpcRow[];
       };
       finish_training_session: {
         Args: {
@@ -254,6 +338,13 @@ export interface WebDatabase {
           p_run_id: string;
         };
         Returns: TrainingStartRpcRow[];
+      };
+      start_training_exercise: {
+        Args: {
+          p_plan_item_id: string;
+          p_run_id: string;
+        };
+        Returns: ExerciseStartRpcRow[];
       };
     };
   };

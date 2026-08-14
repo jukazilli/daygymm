@@ -48,6 +48,7 @@ function rpcSessions(proposal: OfficialXlsxPlanProposal) {
       modality: item.modality,
       notes: item.notes,
       order: item.order,
+      planned_weight_kg: item.plannedWeightKg,
       reps_max: item.repsMax,
       reps_min: item.repsMin,
       rest_seconds: item.restSeconds,
@@ -90,14 +91,17 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
       try {
         const proposal = officialXlsxPlanProposalSchema.parse(input);
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("import_official_xlsx_plan", {
-          p_operation_id: proposal.operationId,
-          p_plan_name: proposal.planName,
-          p_sessions: rpcSessions(proposal),
-          p_source_file_name: proposal.sourceFileName,
-          p_source_sha256: proposal.sourceSha256,
-          p_source_size_bytes: proposal.sourceSizeBytes,
-        });
+        const { data, error } = await client.rpc(
+          "import_official_xlsx_plan_v2",
+          {
+            p_operation_id: proposal.operationId,
+            p_plan_name: proposal.planName,
+            p_sessions: rpcSessions(proposal),
+            p_source_file_name: proposal.sourceFileName,
+            p_source_sha256: proposal.sourceSha256,
+            p_source_size_bytes: proposal.sourceSizeBytes,
+          },
+        );
         const row = data?.[0];
         if (error || !row) {
           return failure(error);
