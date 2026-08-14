@@ -7,14 +7,18 @@ import type {
   PlanSource,
   PlanSourceGateway,
   PlanSourceState,
+  PracticalTrainingState,
+  TrainingSessionGateway,
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
+import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TodayScreenProps {
   readonly gateway?: PlanSourceGateway;
   readonly navigate?: (path: string) => void;
+  readonly trainingGateway?: TrainingSessionGateway;
 }
 
 const sourceLabels: Record<PlanSource, string> = {
@@ -27,8 +31,20 @@ function defaultNavigate(path: string) {
   window.location.assign(path);
 }
 
-function TodayHero({ state }: Readonly<{ state: PlanSourceState }>) {
-  if (!state.onboardingCompleted) {
+function completedToday(completedAt: string | null) {
+  return completedAt
+    ? new Date(completedAt).toDateString() === new Date().toDateString()
+    : false;
+}
+
+function TodayHero({
+  sourceState,
+  trainingState,
+}: Readonly<{
+  sourceState: PlanSourceState;
+  trainingState: PracticalTrainingState;
+}>) {
+  if (!sourceState.onboardingCompleted) {
     return (
       <section className="today-hero">
         <p className="eyebrow">Seu próximo passo</p>
@@ -41,7 +57,7 @@ function TodayHero({ state }: Readonly<{ state: PlanSourceState }>) {
     );
   }
 
-  if (!state.source) {
+  if (!sourceState.source) {
     return (
       <section className="today-hero">
         <p className="eyebrow">Seu próximo passo</p>
@@ -54,11 +70,58 @@ function TodayHero({ state }: Readonly<{ state: PlanSourceState }>) {
     );
   }
 
+  if (trainingState.activeRun) {
+    const completed = trainingState.activeRun.session.items.filter(
+      (item) => item.completedAt,
+    ).length;
+    return (
+      <section className="today-hero today-training-hero">
+        <p className="eyebrow">Treino em andamento</p>
+        <h1>{trainingState.activeRun.session.name}</h1>
+        <p>
+          {completed} de {trainingState.activeRun.session.items.length}{" "}
+          exercícios
+        </p>
+        <Link className="button-primary" href="/treinos/sessao/">
+          Continuar treino
+        </Link>
+      </section>
+    );
+  }
+
+  if (trainingState.plan && completedToday(trainingState.lastCompletedAt)) {
+    return (
+      <section className="today-hero today-training-hero">
+        <p className="eyebrow">Treino concluído</p>
+        <h1>Feito por hoje.</h1>
+        <p>{trainingState.plan.name}</p>
+        <Link className="button-secondary" href="/treinos/">
+          Ver próximos treinos
+        </Link>
+      </section>
+    );
+  }
+
+  if (trainingState.plan && trainingState.nextSession) {
+    return (
+      <section className="today-hero today-training-hero">
+        <p className="eyebrow">Treino de hoje</p>
+        <h1>{trainingState.nextSession.name}</h1>
+        <p>
+          {trainingState.nextSession.items.length} exercícios ·{" "}
+          {trainingState.plan.name}
+        </p>
+        <Link className="button-primary" href="/treinos/sessao/">
+          Abrir treino
+        </Link>
+      </section>
+    );
+  }
+
   return (
     <section className="today-hero">
-      <p className="eyebrow">Seu plano</p>
-      <h1>Seu treino começa aqui.</h1>
-      <p>{sourceLabels[state.source]}</p>
+      <p className="eyebrow">{sourceLabels[sourceState.source]}</p>
+      <h1>Conclua seu primeiro plano.</h1>
       <Link className="button-primary" href="/treinos/">
         Abrir Treinos
       </Link>
@@ -69,9 +132,14 @@ function TodayHero({ state }: Readonly<{ state: PlanSourceState }>) {
 export function TodayScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  trainingGateway: providedTrainingGateway,
 }: TodayScreenProps) {
   const gatewayRef = useRef<PlanSourceGateway | undefined>(providedGateway);
-  const [state, setState] = useState<PlanSourceState>();
+  const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
+    providedTrainingGateway,
+  );
+  const [sourceState, setSourceState] = useState<PlanSourceState>();
+  const [trainingState, setTrainingState] = useState<PracticalTrainingState>();
   const [failed, setFailed] = useState(false);
 
   function gateway() {
@@ -79,24 +147,33 @@ export function TodayScreen({
     return gatewayRef.current;
   }
 
+  function trainingGateway() {
+    trainingGatewayRef.current ??= createWebTrainingSessionGateway();
+    return trainingGatewayRef.current;
+  }
+
   useEffect(() => {
     let active = true;
-    void gateway()
-      .load()
-      .then((result) => {
+    void Promise.all([gateway().load(), trainingGateway().load()]).then(
+      ([sourceResult, trainingResult]) => {
         if (!active) {
           return;
         }
-        if (!result.ok) {
-          if (result.reason === "session") {
+        if (!sourceResult.ok || !trainingResult.ok) {
+          if (
+            (!sourceResult.ok && sourceResult.reason === "session") ||
+            (!trainingResult.ok && trainingResult.reason === "session")
+          ) {
             navigate("/entrar/");
             return;
           }
           setFailed(true);
           return;
         }
-        setState(result.value);
-      });
+        setSourceState(sourceResult.value);
+        setTrainingState(trainingResult.value);
+      },
+    );
     return () => {
       active = false;
     };
@@ -105,8 +182,10 @@ export function TodayScreen({
   return (
     <AppShell active="today">
       <div className="today-layout">
-        {state ? <TodayHero state={state} /> : null}
-        {!state && !failed ? (
+        {sourceState && trainingState ? (
+          <TodayHero sourceState={sourceState} trainingState={trainingState} />
+        ) : null}
+        {(!sourceState || !trainingState) && !failed ? (
           <AppLoadingSkeleton label="Carregando seu dia" />
         ) : null}
         {failed ? (

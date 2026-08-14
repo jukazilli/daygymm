@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  practicalTrainingStateSchema,
+  practicalTrainingPlanSessionSchema,
+} from "./training-session.js";
+
+const session = {
+  dayOrder: 1,
+  items: [
+    {
+      circuitGroup: null,
+      completedAt: null,
+      distanceMeters: null,
+      durationSeconds: null,
+      exerciseName: "Agachamento",
+      itemId: "51000000-0000-4000-8000-000000000001",
+      modality: "strength",
+      notes: null,
+      order: 1,
+      repsMax: 12,
+      repsMin: 8,
+      restSeconds: 90,
+      sets: 3,
+    },
+  ],
+  name: "Treino A",
+  sessionId: "52000000-0000-4000-8000-000000000002",
+} as const;
+
+describe("practical training contracts", () => {
+  it("accepts an executable imported plan session", () => {
+    expect(practicalTrainingPlanSessionSchema.parse(session)).toEqual(session);
+  });
+
+  it("rejects a session without exercises", () => {
+    expect(() =>
+      practicalTrainingPlanSessionSchema.parse({ ...session, items: [] }),
+    ).toThrow();
+  });
+
+  it("represents an active run without mutating the immutable plan", () => {
+    const state = practicalTrainingStateSchema.parse({
+      activeRun: {
+        runId: "53000000-0000-4000-8000-000000000003",
+        session,
+        startedAt: "2026-08-14T03:30:00.000Z",
+      },
+      lastCompletedAt: null,
+      nextSession: session,
+      plan: {
+        itemCount: 1,
+        name: "Meu plano",
+        planId: "54000000-0000-4000-8000-000000000004",
+        sessionCount: 1,
+        version: 1,
+        versionId: "55000000-0000-4000-8000-000000000005",
+        wasCreated: false,
+      },
+      sessions: [session],
+    });
+
+    expect(state.activeRun?.session.items[0]?.completedAt).toBeNull();
+    expect(state.plan?.version).toBe(1);
+  });
+});

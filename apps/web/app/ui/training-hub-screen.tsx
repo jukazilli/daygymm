@@ -4,21 +4,21 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type {
-  ImportedTrainingPlan,
   PlanSource,
   PlanSourceGateway,
   PlanSourceState,
-  TrainingPlanGateway,
+  PracticalTrainingState,
+  TrainingSessionGateway,
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
+import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TrainingHubScreenProps {
   readonly gateway?: PlanSourceGateway;
   readonly navigate?: (path: string) => void;
-  readonly trainingPlanGateway?: TrainingPlanGateway;
+  readonly trainingGateway?: TrainingSessionGateway;
 }
 
 const sourceContent: Record<PlanSource, { label: string; next: string }> = {
@@ -38,13 +38,13 @@ function defaultNavigate(path: string) {
 }
 
 function TrainingState({
-  activePlan,
-  state,
+  sourceState,
+  trainingState,
 }: Readonly<{
-  activePlan: ImportedTrainingPlan | null;
-  state: PlanSourceState;
+  sourceState: PlanSourceState;
+  trainingState: PracticalTrainingState;
 }>) {
-  if (!state.onboardingCompleted) {
+  if (!sourceState.onboardingCompleted) {
     return (
       <section className="app-state-card training-card">
         <p className="eyebrow">Treinos</p>
@@ -56,7 +56,7 @@ function TrainingState({
     );
   }
 
-  if (!state.source) {
+  if (!sourceState.source) {
     return (
       <section className="app-state-card training-card">
         <p className="eyebrow">Treinos</p>
@@ -68,20 +68,72 @@ function TrainingState({
     );
   }
 
-  if (activePlan) {
+  if (trainingState.plan && trainingState.nextSession) {
+    const activeRun = trainingState.activeRun;
+    const completedCount = activeRun
+      ? activeRun.session.items.filter((item) => item.completedAt).length
+      : 0;
     return (
-      <section className="app-state-card training-card">
-        <p className="eyebrow">Plano ativo · versão {activePlan.version}</p>
-        <h1>{activePlan.name}</h1>
-        <p>
-          {activePlan.sessionCount} sessões · {activePlan.itemCount} exercícios
-        </p>
-        <span className="construction-pill">Execução em construção</span>
-      </section>
+      <div className="training-plan-layout">
+        <section className="app-state-card training-card">
+          <p className="eyebrow">
+            Plano ativo · versão {trainingState.plan.version}
+          </p>
+          <h1>{trainingState.plan.name}</h1>
+          <p>
+            {trainingState.plan.sessionCount} sessões ·{" "}
+            {trainingState.plan.itemCount} exercícios
+          </p>
+        </section>
+
+        <section className="next-training-card">
+          <div>
+            <p className="eyebrow">
+              {activeRun ? "Em andamento" : "Próximo treino"}
+            </p>
+            <h2>{trainingState.nextSession.name}</h2>
+            <p>
+              {activeRun
+                ? `${completedCount} de ${activeRun.session.items.length} exercícios`
+                : `${trainingState.nextSession.items.length} exercícios`}
+            </p>
+          </div>
+          <Link className="button-primary" href="/treinos/sessao/">
+            {activeRun ? "Continuar treino" : "Abrir treino"}
+          </Link>
+        </section>
+
+        <section
+          className="plan-session-list"
+          aria-labelledby="plan-session-title"
+        >
+          <div className="section-heading">
+            <h2 id="plan-session-title">Plano</h2>
+          </div>
+          <ol>
+            {trainingState.sessions.map((session) => (
+              <li
+                data-next={
+                  session.sessionId === trainingState.nextSession?.sessionId
+                    ? "true"
+                    : undefined
+                }
+                key={session.sessionId}
+              >
+                <span>{session.dayOrder}</span>
+                <div>
+                  <strong>{session.name}</strong>
+                  <small>{session.items.length} exercícios</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
     );
   }
 
-  if (state.source === "official_xlsx") {
+  if (sourceState.source === "official_xlsx") {
     return (
       <section className="app-state-card training-card">
         <p className="eyebrow">Planilha oficial</p>
@@ -96,7 +148,7 @@ function TrainingState({
     );
   }
 
-  const content = sourceContent[state.source];
+  const content = sourceContent[sourceState.source];
   return (
     <section className="app-state-card training-card">
       <p className="eyebrow">{content.label}</p>
@@ -112,14 +164,14 @@ function TrainingState({
 export function TrainingHubScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
-  trainingPlanGateway: providedTrainingPlanGateway,
+  trainingGateway: providedTrainingGateway,
 }: TrainingHubScreenProps) {
   const gatewayRef = useRef<PlanSourceGateway | undefined>(providedGateway);
-  const trainingPlanGatewayRef = useRef<TrainingPlanGateway | undefined>(
-    providedTrainingPlanGateway,
+  const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
+    providedTrainingGateway,
   );
-  const [state, setState] = useState<PlanSourceState>();
-  const [activePlan, setActivePlan] = useState<ImportedTrainingPlan | null>();
+  const [sourceState, setSourceState] = useState<PlanSourceState>();
+  const [trainingState, setTrainingState] = useState<PracticalTrainingState>();
   const [failed, setFailed] = useState(false);
 
   function gateway() {
@@ -127,34 +179,33 @@ export function TrainingHubScreen({
     return gatewayRef.current;
   }
 
-  function trainingPlanGateway() {
-    trainingPlanGatewayRef.current ??= createWebTrainingPlanGateway();
-    return trainingPlanGatewayRef.current;
+  function trainingGateway() {
+    trainingGatewayRef.current ??= createWebTrainingSessionGateway();
+    return trainingGatewayRef.current;
   }
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      gateway().load(),
-      trainingPlanGateway().loadActive(),
-    ]).then(([sourceResult, planResult]) => {
-      if (!active) {
-        return;
-      }
-      if (!sourceResult.ok || !planResult.ok) {
-        if (
-          (!sourceResult.ok && sourceResult.reason === "session") ||
-          (!planResult.ok && planResult.reason === "session")
-        ) {
-          navigate("/entrar/");
+    void Promise.all([gateway().load(), trainingGateway().load()]).then(
+      ([sourceResult, trainingResult]) => {
+        if (!active) {
           return;
         }
-        setFailed(true);
-        return;
-      }
-      setState(sourceResult.value);
-      setActivePlan(planResult.value);
-    });
+        if (!sourceResult.ok || !trainingResult.ok) {
+          if (
+            (!sourceResult.ok && sourceResult.reason === "session") ||
+            (!trainingResult.ok && trainingResult.reason === "session")
+          ) {
+            navigate("/entrar/");
+            return;
+          }
+          setFailed(true);
+          return;
+        }
+        setSourceState(sourceResult.value);
+        setTrainingState(trainingResult.value);
+      },
+    );
     return () => {
       active = false;
     };
@@ -162,11 +213,14 @@ export function TrainingHubScreen({
 
   return (
     <AppShell active="workouts">
-      {(!state || activePlan === undefined) && !failed ? (
+      {(!sourceState || !trainingState) && !failed ? (
         <AppLoadingSkeleton label="Carregando Treinos" />
       ) : null}
-      {state && activePlan !== undefined ? (
-        <TrainingState activePlan={activePlan} state={state} />
+      {sourceState && trainingState ? (
+        <TrainingState
+          sourceState={sourceState}
+          trainingState={trainingState}
+        />
       ) : null}
       {failed ? (
         <section className="app-state-card" role="alert">

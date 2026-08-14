@@ -34,7 +34,7 @@ export interface TrainingPlanRow extends Record<string, unknown> {
   user_id: string;
 }
 
-interface TrainingPlanVersionRow extends Record<string, unknown> {
+export interface TrainingPlanVersionRow extends Record<string, unknown> {
   operation_id: string;
   plan_id: string;
   source_file_name: string;
@@ -45,7 +45,7 @@ interface TrainingPlanVersionRow extends Record<string, unknown> {
   version_number: number;
 }
 
-interface TrainingPlanSessionRow extends Record<string, unknown> {
+export interface TrainingPlanSessionRow extends Record<string, unknown> {
   day_order: number;
   name: string;
   session_id: string;
@@ -53,7 +53,7 @@ interface TrainingPlanSessionRow extends Record<string, unknown> {
   version_id: string;
 }
 
-interface TrainingPlanItemRow extends Record<string, unknown> {
+export interface TrainingPlanItemRow extends Record<string, unknown> {
   circuit_group: string | null;
   distance_meters: number | null;
   duration_seconds: number | null;
@@ -69,6 +69,68 @@ interface TrainingPlanItemRow extends Record<string, unknown> {
   sets: number;
   user_id: string;
   version_id: string;
+}
+
+export interface TrainingSessionRunRow extends Record<string, unknown> {
+  operation_id: string;
+  plan_id: string;
+  plan_version_id: string;
+  planned_session_id: string;
+  run_id: string;
+  started_at: string;
+  updated_at: string;
+  user_id: string;
+}
+
+export interface TrainingSessionRunItemRow extends Record<string, unknown> {
+  circuit_group: string | null;
+  completed_at: string | null;
+  distance_meters: number | null;
+  duration_seconds: number | null;
+  exercise_name: string;
+  item_order: number;
+  modality: string;
+  notes: string | null;
+  plan_item_id: string;
+  reps_max: number | null;
+  reps_min: number | null;
+  rest_seconds: number;
+  run_id: string;
+  sets: number;
+  user_id: string;
+}
+
+export interface CompletedTrainingSessionRow extends Record<string, unknown> {
+  completed_at: string;
+  completed_exercise_count: number | null;
+  duration_seconds: number | null;
+  exercise_count: number | null;
+  plan_id: string | null;
+  plan_version_id: string | null;
+  planned_session_id: string | null;
+  session_id: string;
+  started_at: string | null;
+  user_id: string;
+}
+
+export interface TrainingStartRpcRow extends Record<string, unknown> {
+  planned_session_id: string;
+  run_id: string;
+  started_at: string;
+  was_created: boolean;
+}
+
+export interface ExerciseCompletionRpcRow extends Record<string, unknown> {
+  completed_count: number;
+  total_count: number;
+  was_created: boolean;
+}
+
+export interface TrainingFinishRpcRow extends Record<string, unknown> {
+  completed_at: string;
+  duration_seconds: number;
+  session_id: string;
+  was_created: boolean;
 }
 
 export interface TrainingPlanImportRpcRow extends Record<string, unknown> {
@@ -98,6 +160,9 @@ export interface WebDatabase {
       training_plan_sessions: TableDefinition<TrainingPlanSessionRow>;
       training_plan_versions: TableDefinition<TrainingPlanVersionRow>;
       training_plans: TableDefinition<TrainingPlanRow>;
+      training_session_run_items: TableDefinition<TrainingSessionRunItemRow>;
+      training_session_runs: TableDefinition<TrainingSessionRunRow>;
+      training_sessions: TableDefinition<CompletedTrainingSessionRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -111,6 +176,23 @@ export interface WebDatabase {
           p_source_size_bytes: number;
         };
         Returns: TrainingPlanImportRpcRow[];
+      };
+      complete_training_exercise: {
+        Args: {
+          p_plan_item_id: string;
+          p_run_id: string;
+        };
+        Returns: ExerciseCompletionRpcRow[];
+      };
+      finish_training_session: {
+        Args: {
+          p_correlation_id: string;
+          p_event_id: string;
+          p_operation_id: string;
+          p_run_id: string;
+          p_session_id: string;
+        };
+        Returns: TrainingFinishRpcRow[];
       };
       select_plan_source: {
         Args: {
@@ -130,6 +212,14 @@ export interface WebDatabase {
           p_weekly_days: number | null;
         };
         Returns: OnboardingContextRow;
+      };
+      start_training_session: {
+        Args: {
+          p_operation_id: string;
+          p_planned_session_id: string;
+          p_run_id: string;
+        };
+        Returns: TrainingStartRpcRow[];
       };
     };
   };

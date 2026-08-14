@@ -19,6 +19,10 @@ body {
   min-height: 100vh;
 }
 
+body:has(.session-active) {
+  background: var(--color-card);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -687,6 +691,302 @@ input:focus-visible {
   gap: var(--space-8);
 }
 
+.training-plan-layout {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.next-training-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border: 1px solid var(--color-action);
+  border-radius: var(--radius-card);
+  background: var(--color-action-soft);
+}
+
+.next-training-card h2,
+.plan-session-list h2 {
+  margin: var(--space-1) 0;
+}
+
+.next-training-card p:not(.eyebrow) {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.plan-session-list > ol,
+.session-exercise-preview {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  list-style: none;
+  overflow: hidden;
+}
+
+.plan-session-list li,
+.session-exercise-preview li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.plan-session-list li:last-child,
+.session-exercise-preview li:last-child {
+  border-bottom: 0;
+}
+
+.plan-session-list li[data-next] {
+  background: var(--color-action-soft);
+}
+
+.plan-session-list li > span,
+.session-exercise-preview li > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-canvas);
+  color: var(--color-text-secondary);
+  font-weight: 800;
+}
+
+.plan-session-list li > div,
+.session-exercise-preview li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-session-list small,
+.session-exercise-preview small {
+  color: var(--color-text-secondary);
+}
+
+.session-shell {
+  width: min(100%, 48rem);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: max(var(--space-5), env(safe-area-inset-top)) var(--space-5)
+    max(var(--space-8), env(safe-area-inset-bottom));
+  background: var(--color-card);
+}
+
+.session-shell h1 {
+  margin: var(--space-2) 0;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.session-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  margin-bottom: var(--space-6);
+}
+
+.session-topbar a {
+  width: fit-content;
+  text-decoration: none;
+}
+
+.session-topbar > span:last-child {
+  justify-self: end;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.session-topbar time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.session-saved::before {
+  margin-right: 5px;
+  color: var(--color-success);
+  content: "●";
+}
+
+.session-intro {
+  margin-bottom: var(--space-6);
+}
+
+.session-intro > p:last-child,
+.session-finished > p:not(.eyebrow) {
+  color: var(--color-text-secondary);
+}
+
+.session-primary-action {
+  width: 100%;
+  margin-top: var(--space-6);
+}
+
+.session-progress {
+  display: grid;
+  grid-template-columns: 1fr minmax(7rem, 0.45fr);
+  align-items: end;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.session-progress > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.session-progress progress {
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-action-soft);
+}
+
+.session-progress progress::-webkit-progress-bar {
+  background: var(--color-action-soft);
+}
+
+.session-progress progress::-webkit-progress-value,
+.session-progress progress::-moz-progress-bar {
+  background: var(--color-action);
+}
+
+.exercise-stepper {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-5)) var(--space-8);
+  padding: var(--space-1) var(--space-5) var(--space-3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.exercise-stepper::-webkit-scrollbar {
+  display: none;
+}
+
+.exercise-stepper button {
+  display: grid;
+  grid-template-columns: 32px minmax(5.5rem, 8rem);
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  text-align: left;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.exercise-stepper button > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-canvas);
+  font-weight: 800;
+}
+
+.exercise-stepper button > small {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: 700;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.exercise-stepper button[data-selected] {
+  border-color: var(--color-action);
+  color: var(--color-text);
+}
+
+.exercise-stepper button[data-selected] > span {
+  background: var(--color-action);
+  color: var(--color-action-contrast);
+}
+
+.exercise-stepper button[data-completed] {
+  border-color: var(--color-success);
+}
+
+.current-exercise {
+  padding: clamp(var(--space-5), 6vw, var(--space-8));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.exercise-target {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+}
+
+.exercise-target > span {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.exercise-target > strong {
+  font-size: clamp(1.2rem, 5vw, 1.55rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-rest,
+.exercise-notes {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.finish-training {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding: var(--space-6);
+  border-radius: var(--radius-card);
+  background: var(--color-action-soft);
+}
+
+.finish-training h2 {
+  margin: 0;
+}
+
+.session-finished,
+.session-empty {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+}
+
+.session-finished .button-primary,
+.session-empty .button-secondary {
+  margin-top: var(--space-5);
+}
+
 .today-hero,
 .app-state-card {
   overflow: hidden;
@@ -1247,6 +1547,15 @@ input:focus-visible {
   }
 
   .home-module-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .next-training-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .session-progress {
     grid-template-columns: 1fr;
   }
 }

@@ -2,7 +2,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PlanSourceGateway, PlanSourceState } from "@daygym/contracts";
+import type {
+  PlanSourceGateway,
+  PlanSourceState,
+  TrainingSessionGateway,
+} from "@daygym/contracts";
 
 import { TodayScreen } from "./today-screen";
 
@@ -10,6 +14,24 @@ function createGateway(state: PlanSourceState): PlanSourceGateway {
   return {
     load: vi.fn().mockResolvedValue({ ok: true, value: state }),
     select: vi.fn(),
+  };
+}
+
+function createTrainingGateway(): TrainingSessionGateway {
+  return {
+    completeExercise: vi.fn(),
+    finish: vi.fn(),
+    load: vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        activeRun: null,
+        lastCompletedAt: null,
+        nextSession: null,
+        plan: null,
+        sessions: [],
+      },
+    }),
+    start: vi.fn(),
   };
 }
 
@@ -24,6 +46,7 @@ describe("TodayScreen", () => {
           selectedAt: null,
           source: null,
         }),
+        trainingGateway: createTrainingGateway(),
       }),
     );
 
@@ -45,6 +68,7 @@ describe("TodayScreen", () => {
           selectedAt: "2026-08-13T17:00:00.000Z",
           source: "official_xlsx",
         }),
+        trainingGateway: createTrainingGateway(),
       }),
     );
 
@@ -64,7 +88,13 @@ describe("TodayScreen", () => {
       select: vi.fn(),
     };
 
-    render(createElement(TodayScreen, { gateway, navigate }));
+    render(
+      createElement(TodayScreen, {
+        gateway,
+        navigate,
+        trainingGateway: createTrainingGateway(),
+      }),
+    );
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/entrar/"));
     expect(screen.queryByText("Seu treino começa aqui.")).toBeNull();
