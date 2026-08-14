@@ -1,4 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +27,10 @@ function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
       ok: true,
       value: undefined,
     }),
+    resendSignUpConfirmation: vi.fn().mockResolvedValue({
+      ok: true,
+      value: undefined,
+    }),
     signIn: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
     signOut: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
     signUp: vi.fn().mockResolvedValue({ ok: true, value: "check-email" }),
@@ -37,6 +48,7 @@ function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   window.history.replaceState({}, "", "/");
 });
 
@@ -123,6 +135,82 @@ describe("AuthScreen", () => {
     );
     expect((await screen.findByRole("status")).textContent).toContain(
       "Se o endereço puder ser usado, você receberá um link para continuar.",
+    );
+  });
+
+  it("offers a resend only after the 80-second signup cooldown", async () => {
+    vi.useFakeTimers();
+    const gateway = createGateway();
+
+    render(createElement(AuthScreen, { gateway, mode: "sign-up" }));
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "pessoa@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.click(
+      screen.getByLabelText("Confirmo que tenho 18 anos ou mais."),
+    );
+    fireEvent.click(screen.getByLabelText("Li e aceito os Termos de teste."));
+    fireEvent.click(screen.getByLabelText("Li o Aviso de privacidade."));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    });
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Reenviar em 01:20",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+
+    for (let second = 0; second < 80; second += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reenviar link" }));
+    });
+
+    expect(gateway.resendSignUpConfirmation).toHaveBeenCalledWith(
+      "pessoa@example.com",
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Enviamos um novo link.",
+    );
+  });
+
+  it("turns an ambiguous first failure into a recoverable pending state", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway({
+      signUp: vi.fn().mockResolvedValue({
+        ok: false,
+        reason: "unexpected",
+      }),
+    });
+
+    render(createElement(AuthScreen, { gateway, mode: "sign-up" }));
+    await user.type(screen.getByLabelText("E-mail"), "pessoa@example.com");
+    await user.type(screen.getByLabelText("Senha"), "senha-segura");
+    await user.type(screen.getByLabelText("Confirmar senha"), "senha-segura");
+    await user.click(
+      screen.getByLabelText("Confirmo que tenho 18 anos ou mais."),
+    );
+    await user.click(screen.getByLabelText("Li e aceito os Termos de teste."));
+    await user.click(screen.getByLabelText("Li o Aviso de privacidade."));
+    await user.click(screen.getByRole("button", { name: "Criar conta" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "O envio está demorando.",
+    );
+    expect(document.body.textContent).not.toContain(
+      "Não foi possível concluir agora.",
     );
   });
 

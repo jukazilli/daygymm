@@ -26,6 +26,7 @@ export type AuthEmailLinkPurpose = "confirmation" | "recovery";
 export interface AuthGateway {
   signIn(email: string, password: string): Promise<AuthResult>;
   signUp(input: SignUpInput): Promise<AuthResult<"check-email">>;
+  resendSignUpConfirmation(email: string): Promise<AuthResult>;
   requestPasswordReset(email: string): Promise<AuthResult>;
   exchangeAuthCode(code: string): Promise<AuthResult>;
   verifyEmailToken(

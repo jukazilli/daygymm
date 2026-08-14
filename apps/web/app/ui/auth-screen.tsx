@@ -33,6 +33,8 @@ type FieldName =
 
 type FieldErrors = Partial<Record<FieldName, string>>;
 
+const SIGN_UP_RESEND_COOLDOWN_SECONDS = 80;
+
 const copyByFailure: Record<AuthFailure, string> = {
   "account-incomplete":
     "Não foi possível concluir o acesso desta conta. Tente criar a conta novamente.",
@@ -182,6 +184,12 @@ function validatePassword(value: string): string | undefined {
   return value.length >= 8 ? undefined : "Use pelo menos 8 caracteres.";
 }
 
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export function AuthScreen({
   gateway: providedGateway,
   mode,
@@ -196,6 +204,10 @@ export function AuthScreen({
   );
   const [pendingAuthLink, setPendingAuthLink] = useState<PendingAuthLink>();
   const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [resendSucceeded, setResendSucceeded] = useState(false);
+  const [signUpDeliveryUncertain, setSignUpDeliveryUncertain] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [sessionState, setSessionState] = useState<
     "checking" | "ready" | "unavailable"
   >(mode === "account" ? "checking" : "ready");
@@ -252,6 +264,17 @@ export function AuthScreen({
         });
     }
   }, [mode, navigate]);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setResendSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   async function handleAuthLink() {
     if (!pendingAuthLink) {
@@ -339,6 +362,16 @@ export function AuthScreen({
     setIsLoading(false);
 
     if (!result.ok) {
+      if (
+        mode === "sign-up" &&
+        (result.reason === "rate-limited" || result.reason === "unexpected")
+      ) {
+        setSubmittedEmail(email);
+        setSignUpDeliveryUncertain(true);
+        setRecoveryRequested(true);
+        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+        return;
+      }
       setFeedback(copyByFailure[result.reason]);
       return;
     }
@@ -346,10 +379,37 @@ export function AuthScreen({
     if (mode === "sign-in") {
       navigate("/hoje/");
     } else if (mode === "sign-up" || mode === "recover") {
+      if (mode === "sign-up") {
+        setSubmittedEmail(email);
+        setSignUpDeliveryUncertain(false);
+        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+      }
       setRecoveryRequested(true);
     } else {
       navigate("/entrar/?senha=alterada");
     }
+  }
+
+  async function handleSignUpResend() {
+    if (!submittedEmail || resendSeconds > 0) {
+      return;
+    }
+
+    setFeedback(undefined);
+    setResendSucceeded(false);
+    setIsLoading(true);
+    const result = await gateway().resendSignUpConfirmation(submittedEmail);
+    setIsLoading(false);
+    setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+
+    if (!result.ok) {
+      setSignUpDeliveryUncertain(true);
+      setFeedback(copyByFailure[result.reason]);
+      return;
+    }
+
+    setSignUpDeliveryUncertain(false);
+    setResendSucceeded(true);
   }
 
   async function handleSignOut() {
@@ -468,12 +528,47 @@ export function AuthScreen({
             ) : null}
           </>
         ) : recoveryRequested ? (
-          <div className="status-message status-success" role="status">
-            <strong>Confira seu e-mail.</strong>
-            <span>
-              Se o endereço puder ser usado, você receberá um link para
-              continuar.
-            </span>
+          <div
+            className={`status-message ${
+              signUpDeliveryUncertain ? "status-pending" : "status-success"
+            }`}
+          >
+            <div className="auth-status-copy" role="status">
+              <strong>
+                {signUpDeliveryUncertain
+                  ? "O envio está demorando."
+                  : resendSucceeded
+                    ? "Enviamos um novo link."
+                    : "Confira seu e-mail."}
+              </strong>
+              <span>
+                {signUpDeliveryUncertain
+                  ? "Aguarde um pouco antes de tentar novamente."
+                  : "Se o endereço puder ser usado, você receberá um link para continuar."}
+              </span>
+            </div>
+            {mode === "sign-up" ? (
+              <div className="auth-resend">
+                <span>Não recebeu o link?</span>
+                <button
+                  className="button-primary"
+                  disabled={isLoading || resendSeconds > 0}
+                  onClick={() => void handleSignUpResend()}
+                  type="button"
+                >
+                  {isLoading
+                    ? "Reenviando…"
+                    : resendSeconds > 0
+                      ? `Reenviar em ${formatCountdown(resendSeconds)}`
+                      : "Reenviar link"}
+                </button>
+              </div>
+            ) : null}
+            {feedback ? (
+              <span className="field-error" role="alert">
+                {feedback}
+              </span>
+            ) : null}
           </div>
         ) : (
           <form className="auth-form" noValidate onSubmit={handleSubmit}>

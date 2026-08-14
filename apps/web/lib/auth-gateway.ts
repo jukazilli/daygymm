@@ -65,6 +65,16 @@ function exactCallback(siteUrl: string, path: string): string {
   return callback.toString();
 }
 
+function isNonEnumerableEmailState(error: unknown): boolean {
+  const code = getErrorProperty(error, "code");
+  return (
+    code === "email_exists" ||
+    code === "email_not_confirmed" ||
+    code === "user_already_exists" ||
+    code === "user_not_found"
+  );
+}
+
 export function createWebAuthGateway(): AuthGateway {
   type WebSupabaseClient = ReturnType<typeof getWebSupabaseClient>;
 
@@ -192,6 +202,36 @@ export function createWebAuthGateway(): AuthGateway {
         return reason === "configuration"
           ? { ok: false, reason }
           : { ok: true, value: undefined };
+      }
+    },
+
+    async resendSignUpConfirmation(email) {
+      try {
+        const currentClient = configuredClient();
+        if (!siteUrl) {
+          throw new AuthConfigurationError();
+        }
+
+        const { error } = await currentClient.auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: exactCallback(siteUrl, "/confirmar-email/"),
+          },
+        });
+        if (!error || isNonEnumerableEmailState(error)) {
+          return { ok: true, value: undefined };
+        }
+
+        return {
+          ok: false,
+          reason: failureFromError(error, "unexpected"),
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: failureFromError(error, "unexpected"),
+        };
       }
     },
 

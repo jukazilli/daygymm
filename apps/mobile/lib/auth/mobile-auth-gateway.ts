@@ -94,6 +94,16 @@ function exactMobileCallback(
   return callback.toString();
 }
 
+function isNonEnumerableEmailState(error: unknown): boolean {
+  const code = getErrorProperty(error, "code");
+  return (
+    code === "email_exists" ||
+    code === "email_not_confirmed" ||
+    code === "user_already_exists" ||
+    code === "user_not_found"
+  );
+}
+
 async function isEligible(client: MobileAuthClient): Promise<boolean> {
   const [profile, consents] = await Promise.all([
     client.from("profiles").select("user_id").limit(1).maybeSingle(),
@@ -210,6 +220,26 @@ export function createMobileAuthGateway(
         return reason === "configuration"
           ? { ok: false, reason }
           : { ok: true, value: undefined };
+      }
+    },
+
+    async resendSignUpConfirmation(email) {
+      try {
+        const { error } = await configuredClient().auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: exactMobileCallback("entrar", createRedirect),
+          },
+        });
+        return error && !isNonEnumerableEmailState(error)
+          ? { ok: false, reason: failureFromError(error, "unexpected") }
+          : { ok: true, value: undefined };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: failureFromError(error, "unexpected"),
+        };
       }
     },
 
