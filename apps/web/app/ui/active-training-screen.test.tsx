@@ -268,7 +268,7 @@ describe("ActiveTrainingScreen", () => {
 
     await user.click(await screen.findByRole("button", { name: "Pausar" }));
     expect(
-      screen.getByRole("dialog", { name: "Pausar ou recomeçar?" }),
+      screen.getByRole("dialog", { name: "O que fazer com este treino?" }),
     ).toBeTruthy();
     expect(gateway.cancel).not.toHaveBeenCalled();
     expect(gateway.pause).not.toHaveBeenCalled();
@@ -322,6 +322,45 @@ describe("ActiveTrainingScreen", () => {
     );
     expect(screen.getByRole("button", { name: "Pausar" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("cancels the active execution without starting a replacement", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: plannedSession,
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
+    };
+    const cancel = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { runId: activeRun.runId, wasCancelled: true },
+    });
+    const start = vi.fn();
+    const pause = vi.fn();
+    const gateway: TrainingSessionGateway = {
+      cancel,
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause,
+      resume: vi.fn(),
+      start,
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway, navigate }));
+
+    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    await user.click(screen.getByRole("button", { name: "Cancelar treino" }));
+
+    expect(cancel).toHaveBeenCalledWith(activeRun.runId);
+    expect(start).not.toHaveBeenCalled();
+    expect(pause).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/treinos/");
   });
 
   it("uses duration for a circuit exercise without rendering null repetitions", async () => {

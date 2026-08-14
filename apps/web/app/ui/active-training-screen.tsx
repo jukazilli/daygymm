@@ -361,14 +361,16 @@ function ElapsedTimer({
 
 function PauseTrainingDialog({
   onClose,
+  onCancel,
   onConfirm,
   onRestart,
   pendingAction,
 }: Readonly<{
   onClose: () => void;
+  onCancel: () => void;
   onConfirm: () => void;
   onRestart: () => void;
-  pendingAction?: "pause" | "restart";
+  pendingAction?: "cancel" | "pause" | "restart";
 }>) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const busy = pendingAction !== undefined;
@@ -400,9 +402,10 @@ function PauseTrainingDialog({
         className="session-dialog"
         role="dialog"
       >
-        <h2 id="pause-training-title">Pausar ou recomeçar?</h2>
+        <h2 id="pause-training-title">O que fazer com este treino?</h2>
         <p>
-          Pause para continuar depois. Recomeçar apaga as séries desta execução.
+          Pausar mantém seu progresso. Recomeçar apaga as séries e inicia este
+          treino do zero. Cancelar apaga esta execução sem salvar no histórico.
         </p>
         <div className="session-dialog-actions">
           <button
@@ -415,7 +418,7 @@ function PauseTrainingDialog({
             {pendingAction === "pause" ? "Pausando…" : "Pausar treino"}
           </button>
           <button
-            className="button-danger"
+            className="button-secondary"
             disabled={busy}
             onClick={onRestart}
             type="button"
@@ -423,7 +426,15 @@ function PauseTrainingDialog({
             {pendingAction === "restart" ? "Recomeçando…" : "Recomeçar do zero"}
           </button>
           <button
-            className="button-secondary"
+            className="button-danger"
+            disabled={busy}
+            onClick={onCancel}
+            type="button"
+          >
+            {pendingAction === "cancel" ? "Cancelando…" : "Cancelar treino"}
+          </button>
+          <button
+            className="button-text"
             disabled={busy}
             onClick={onClose}
             type="button"
@@ -447,7 +458,9 @@ export function ActiveTrainingScreen({
   const [state, setState] = useState<PracticalTrainingState>();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"pause" | "restart">();
+  const [dialogAction, setDialogAction] = useState<
+    "cancel" | "pause" | "restart"
+  >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
@@ -698,6 +711,31 @@ export function ActiveTrainingScreen({
     setSelectedIndex(0);
   }
 
+  async function cancelTraining() {
+    const run = state?.activeRun;
+    if (!run || run.pausedAt || busy) {
+      return;
+    }
+    setBusy(true);
+    setDialogAction("cancel");
+    setError(undefined);
+
+    const result = await gateway().cancel(run.runId);
+    setBusy(false);
+    setDialogAction(undefined);
+    setPauseDialogOpen(false);
+    if (!result.ok) {
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(result.reason));
+      return;
+    }
+
+    navigate("/treinos/");
+  }
+
   async function resumeTraining() {
     const run = state?.activeRun;
     if (!run?.pausedAt || busy) {
@@ -938,6 +976,7 @@ export function ActiveTrainingScreen({
       {pauseDialogOpen ? (
         <PauseTrainingDialog
           onClose={() => setPauseDialogOpen(false)}
+          onCancel={() => void cancelTraining()}
           onConfirm={() => void pauseTraining()}
           onRestart={() => void restartTraining()}
           pendingAction={dialogAction}
