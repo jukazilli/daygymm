@@ -17,6 +17,7 @@ function createClient(overrides: Record<string, unknown> = {}) {
       error: null,
     }),
     resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
+    resend: vi.fn().mockResolvedValue({ error: null }),
     signInWithPassword: vi.fn().mockResolvedValue({
       data: { session: { access_token: "synthetic" } },
       error: null,
@@ -24,6 +25,7 @@ function createClient(overrides: Record<string, unknown> = {}) {
     signOut: vi.fn().mockResolvedValue({ error: null }),
     signUp: vi.fn().mockResolvedValue({ error: null }),
     updateUser: vi.fn().mockResolvedValue({ error: null }),
+    verifyOtp: vi.fn().mockResolvedValue({ error: null }),
     ...overrides,
   };
   const from = vi.fn((table: string) => {
@@ -163,6 +165,36 @@ describe("createMobileAuthGateway", () => {
 
     await expect(
       gateway.requestPasswordReset("ausente@example.com"),
+    ).resolves.toEqual({ ok: true, value: undefined });
+  });
+
+  it("resends a signup confirmation through the approved callback", async () => {
+    const client = createClient();
+    const gateway = createMobileAuthGateway({
+      client: client as never,
+      createRedirect: (path) => `daygym-preview://${path}`,
+    });
+
+    await expect(
+      gateway.resendSignUpConfirmation("pessoa@example.com"),
+    ).resolves.toEqual({ ok: true, value: undefined });
+    expect(client.auth.resend).toHaveBeenCalledWith({
+      type: "signup",
+      email: "pessoa@example.com",
+      options: { emailRedirectTo: "daygym-preview://entrar" },
+    });
+  });
+
+  it("keeps a resend result non-enumerable when the address is absent", async () => {
+    const client = createClient({
+      resend: vi.fn().mockResolvedValue({
+        error: { code: "user_not_found", status: 400 },
+      }),
+    });
+    const gateway = createMobileAuthGateway({ client: client as never });
+
+    await expect(
+      gateway.resendSignUpConfirmation("ausente@example.com"),
     ).resolves.toEqual({ ok: true, value: undefined });
   });
 });

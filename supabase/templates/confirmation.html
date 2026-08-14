@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <body
+    style="
+      margin: 0;
+      background: #fff7f2;
+      color: #241a15;
+      font-family: Nunito, Arial, sans-serif;
+    "
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellspacing="0"
+      cellpadding="0"
+      style="background: #fff7f2; padding: 32px 16px"
+    >
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            style="
+              max-width: 560px;
+              background: #ffffff;
+              border: 1px solid #ffd8c2;
+              border-radius: 24px;
+              padding: 32px;
+            "
+          >
+            <tr>
+              <td style="color: #ff6200; font-size: 24px; font-weight: 800">
+                DayGym
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding-top: 24px;
+                  font-size: 28px;
+                  font-weight: 800;
+                  line-height: 1.2;
+                "
+              >
+                Confirme seu e-mail
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top: 12px; font-size: 16px; line-height: 1.6">
+                Use o botão para concluir a criação da sua conta. Apenas abrir a
+                página não fará a confirmação.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top: 28px">
+                <a
+                  href="{{ .SiteURL }}/confirmar-email/#token_hash={{ .TokenHash }}&amp;type=email"
+                  style="
+                    display: inline-block;
+                    background: #ff6200;
+                    color: #ffffff;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 800;
+                    border-radius: 14px;
+                    padding: 14px 22px;
+                  "
+                  >Abrir confirmação</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding-top: 24px;
+                  color: #6e5a50;
+                  font-size: 14px;
+                  line-height: 1.5;
+                "
+              >
+                Se você não criou uma conta no DayGym, ignore este e-mail.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -15,7 +15,12 @@ import {
 } from "../../lib/auth-gateway";
 
 export type AuthMode =
-  "account" | "recover" | "reset-password" | "sign-in" | "sign-up";
+  | "account"
+  | "confirm-email"
+  | "recover"
+  | "reset-password"
+  | "sign-in"
+  | "sign-up";
 
 interface AuthScreenProps {
   readonly gateway?: AuthGateway;
@@ -27,6 +32,8 @@ type FieldName =
   "adult" | "email" | "password" | "passwordConfirmation" | "privacy" | "terms";
 
 type FieldErrors = Partial<Record<FieldName, string>>;
+
+const SIGN_UP_RESEND_COOLDOWN_SECONDS = 80;
 
 const copyByFailure: Record<AuthFailure, string> = {
   "account-incomplete":
@@ -42,6 +49,12 @@ const copyByFailure: Record<AuthFailure, string> = {
 };
 
 const modeCopy = {
+  "confirm-email": {
+    eyebrow: "Confirmar e-mail",
+    title: "Só falta confirmar.",
+    support:
+      "Toque no botão abaixo para concluir. Abrir esta página não confirma sua conta.",
+  },
   recover: {
     eyebrow: "Recuperar acesso",
     title: "Vamos enviar um link.",
@@ -63,6 +76,24 @@ const modeCopy = {
     support: "Seu plano, seus registros e sua evolução em um só lugar.",
   },
 } as const;
+
+type PendingAuthLink =
+  | { readonly kind: "pkce"; readonly value: string }
+  | { readonly kind: "token-hash"; readonly value: string };
+
+function captureAuthLink(mode: AuthMode): PendingAuthLink | undefined {
+  const url = new URL(window.location.href);
+  const fragment = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const expectedType = mode === "confirm-email" ? "email" : "recovery";
+  const tokenHash = fragment.get("token_hash");
+  const code = url.searchParams.get("code");
+
+  if (tokenHash && fragment.get("type") === expectedType) {
+    return { kind: "token-hash", value: tokenHash };
+  }
+
+  return code ? { kind: "pkce", value: code } : undefined;
+}
 
 function defaultNavigate(path: string) {
   window.location.assign(path);
@@ -153,6 +184,12 @@ function validatePassword(value: string): string | undefined {
   return value.length >= 8 ? undefined : "Use pelo menos 8 caracteres.";
 }
 
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export function AuthScreen({
   gateway: providedGateway,
   mode,
@@ -165,7 +202,12 @@ export function AuthScreen({
   const [isRecoveryReady, setIsRecoveryReady] = useState(
     mode !== "reset-password",
   );
+  const [pendingAuthLink, setPendingAuthLink] = useState<PendingAuthLink>();
   const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [resendSucceeded, setResendSucceeded] = useState(false);
+  const [signUpDeliveryUncertain, setSignUpDeliveryUncertain] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [sessionState, setSessionState] = useState<
     "checking" | "ready" | "unavailable"
   >(mode === "account" ? "checking" : "ready");
@@ -178,22 +220,18 @@ export function AuthScreen({
   useEffect(() => {
     const code = new URL(window.location.href).searchParams.get("code");
 
-    if (mode === "reset-password") {
-      if (!code) {
+    if (mode === "confirm-email" || mode === "reset-password") {
+      const link = captureAuthLink(mode);
+      window.history.replaceState(
+        {},
+        "",
+        mode === "confirm-email" ? "/confirmar-email/" : "/redefinir-senha/",
+      );
+      setPendingAuthLink(link);
+      if (!link) {
         setFeedback(copyByFailure["link-invalid"]);
-        return;
       }
-
-      void gateway()
-        .exchangeAuthCode(code)
-        .then((result) => {
-          window.history.replaceState({}, "", "/redefinir-senha/");
-          if (result.ok) {
-            setIsRecoveryReady(true);
-          } else {
-            setFeedback(copyByFailure[result.reason]);
-          }
-        });
+      return;
     }
 
     if (mode === "sign-in" && code) {
@@ -226,6 +264,47 @@ export function AuthScreen({
         });
     }
   }, [mode, navigate]);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setResendSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
+
+  async function handleAuthLink() {
+    if (!pendingAuthLink) {
+      return;
+    }
+
+    setFeedback(undefined);
+    setIsLoading(true);
+    const result =
+      pendingAuthLink.kind === "token-hash"
+        ? await gateway().verifyEmailToken(
+            pendingAuthLink.value,
+            mode === "confirm-email" ? "confirmation" : "recovery",
+          )
+        : await gateway().exchangeAuthCode(pendingAuthLink.value);
+    setIsLoading(false);
+
+    if (!result.ok) {
+      setPendingAuthLink(undefined);
+      setFeedback(copyByFailure[result.reason]);
+      return;
+    }
+
+    setPendingAuthLink(undefined);
+    if (mode === "confirm-email") {
+      navigate("/hoje/");
+    } else {
+      setIsRecoveryReady(true);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -283,6 +362,16 @@ export function AuthScreen({
     setIsLoading(false);
 
     if (!result.ok) {
+      if (
+        mode === "sign-up" &&
+        (result.reason === "rate-limited" || result.reason === "unexpected")
+      ) {
+        setSubmittedEmail(email);
+        setSignUpDeliveryUncertain(true);
+        setRecoveryRequested(true);
+        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+        return;
+      }
       setFeedback(copyByFailure[result.reason]);
       return;
     }
@@ -290,10 +379,37 @@ export function AuthScreen({
     if (mode === "sign-in") {
       navigate("/hoje/");
     } else if (mode === "sign-up" || mode === "recover") {
+      if (mode === "sign-up") {
+        setSubmittedEmail(email);
+        setSignUpDeliveryUncertain(false);
+        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+      }
       setRecoveryRequested(true);
     } else {
       navigate("/entrar/?senha=alterada");
     }
+  }
+
+  async function handleSignUpResend() {
+    if (!submittedEmail || resendSeconds > 0) {
+      return;
+    }
+
+    setFeedback(undefined);
+    setResendSucceeded(false);
+    setIsLoading(true);
+    const result = await gateway().resendSignUpConfirmation(submittedEmail);
+    setIsLoading(false);
+    setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+
+    if (!result.ok) {
+      setSignUpDeliveryUncertain(true);
+      setFeedback(copyByFailure[result.reason]);
+      return;
+    }
+
+    setSignUpDeliveryUncertain(false);
+    setResendSucceeded(true);
   }
 
   async function handleSignOut() {
@@ -342,6 +458,42 @@ export function AuthScreen({
     );
   }
 
+  if (mode === "confirm-email") {
+    const pageCopy = modeCopy[mode];
+
+    return (
+      <AuthLayout>
+        <div className="auth-card">
+          <p className="eyebrow">{pageCopy.eyebrow}</p>
+          <h1>{pageCopy.title}</h1>
+          <p className="support">{pageCopy.support}</p>
+          {feedback ? (
+            <div className="status-message status-error" role="alert">
+              <strong>E-mail já confirmado ou link expirado.</strong>
+              <span>
+                Tente entrar na sua conta. Se ainda precisar confirmar, crie a
+                conta novamente para receber um novo link.
+              </span>
+            </div>
+          ) : null}
+          {pendingAuthLink ? (
+            <button
+              className="button-primary"
+              disabled={isLoading}
+              onClick={() => void handleAuthLink()}
+              type="button"
+            >
+              {isLoading ? "Confirmando…" : "Confirmar meu e-mail"}
+            </button>
+          ) : null}
+          <nav className="auth-links" aria-label="Outras opções de acesso">
+            <a href="/entrar/">Ir para entrar</a>
+          </nav>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   const pageCopy = modeCopy[mode];
   const buttonLabel = {
     recover: isLoading ? "Enviando…" : "Enviar link",
@@ -357,13 +509,66 @@ export function AuthScreen({
         <h1>{pageCopy.title}</h1>
         <p className="support">{pageCopy.support}</p>
 
-        {recoveryRequested ? (
-          <div className="status-message status-success" role="status">
-            <strong>Confira seu e-mail.</strong>
-            <span>
-              Se o endereço puder ser usado, você receberá um link para
-              continuar.
-            </span>
+        {mode === "reset-password" && !isRecoveryReady ? (
+          <>
+            {feedback ? (
+              <p className="status-message status-error" role="alert">
+                {feedback}
+              </p>
+            ) : null}
+            {pendingAuthLink ? (
+              <button
+                className="button-primary"
+                disabled={isLoading}
+                onClick={() => void handleAuthLink()}
+                type="button"
+              >
+                {isLoading ? "Verificando…" : "Continuar com segurança"}
+              </button>
+            ) : null}
+          </>
+        ) : recoveryRequested ? (
+          <div
+            className={`status-message ${
+              signUpDeliveryUncertain ? "status-pending" : "status-success"
+            }`}
+          >
+            <div className="auth-status-copy" role="status">
+              <strong>
+                {signUpDeliveryUncertain
+                  ? "O envio está demorando."
+                  : resendSucceeded
+                    ? "Enviamos um novo link."
+                    : "Confira seu e-mail."}
+              </strong>
+              <span>
+                {signUpDeliveryUncertain
+                  ? "Aguarde um pouco antes de tentar novamente."
+                  : "Se o endereço puder ser usado, você receberá um link para continuar."}
+              </span>
+            </div>
+            {mode === "sign-up" ? (
+              <div className="auth-resend">
+                <span>Não recebeu o link?</span>
+                <button
+                  className="button-primary"
+                  disabled={isLoading || resendSeconds > 0}
+                  onClick={() => void handleSignUpResend()}
+                  type="button"
+                >
+                  {isLoading
+                    ? "Reenviando…"
+                    : resendSeconds > 0
+                      ? `Reenviar em ${formatCountdown(resendSeconds)}`
+                      : "Reenviar link"}
+                </button>
+              </div>
+            ) : null}
+            {feedback ? (
+              <span className="field-error" role="alert">
+                {feedback}
+              </span>
+            ) : null}
           </div>
         ) : (
           <form className="auth-form" noValidate onSubmit={handleSubmit}>

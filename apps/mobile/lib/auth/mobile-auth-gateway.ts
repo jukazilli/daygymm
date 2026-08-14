@@ -39,11 +39,15 @@ function failureFromError(error: unknown, fallback: AuthFailure): AuthFailure {
   if (error instanceof AuthConfigurationError) {
     return "configuration";
   }
-  if (getErrorProperty(error, "status") === 429) {
+  const code = getErrorProperty(error, "code");
+  if (
+    getErrorProperty(error, "status") === 429 ||
+    code === "over_email_send_rate_limit" ||
+    code === "email_rate_limit_exceeded"
+  ) {
     return "rate-limited";
   }
 
-  const code = getErrorProperty(error, "code");
   if (
     code === "invalid_credentials" ||
     code === "email_not_confirmed" ||
@@ -88,6 +92,16 @@ function exactMobileCallback(
   }
 
   return callback.toString();
+}
+
+function isNonEnumerableEmailState(error: unknown): boolean {
+  const code = getErrorProperty(error, "code");
+  return (
+    code === "email_exists" ||
+    code === "email_not_confirmed" ||
+    code === "user_already_exists" ||
+    code === "user_not_found"
+  );
 }
 
 async function isEligible(client: MobileAuthClient): Promise<boolean> {
@@ -209,10 +223,47 @@ export function createMobileAuthGateway(
       }
     },
 
+    async resendSignUpConfirmation(email) {
+      try {
+        const { error } = await configuredClient().auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: exactMobileCallback("entrar", createRedirect),
+          },
+        });
+        return error && !isNonEnumerableEmailState(error)
+          ? { ok: false, reason: failureFromError(error, "unexpected") }
+          : { ok: true, value: undefined };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: failureFromError(error, "unexpected"),
+        };
+      }
+    },
+
     async exchangeAuthCode(code) {
       try {
         const { error } =
           await configuredClient().auth.exchangeCodeForSession(code);
+        return error
+          ? { ok: false, reason: "link-invalid" }
+          : { ok: true, value: undefined };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: failureFromError(error, "link-invalid"),
+        };
+      }
+    },
+
+    async verifyEmailToken(tokenHash, purpose) {
+      try {
+        const { error } = await configuredClient().auth.verifyOtp({
+          token_hash: tokenHash,
+          type: purpose === "confirmation" ? "email" : "recovery",
+        });
         return error
           ? { ok: false, reason: "link-invalid" }
           : { ok: true, value: undefined };
