@@ -77,10 +77,36 @@ pnpm db:deploy:staging
 Ele aplica as migrations pendentes e lista o histórico remoto. Não há reset,
 seed de dados reais, Docker ou acesso a projetos fora do staging.
 
+## Templates do Supabase Auth
+
+Os e-mails de confirmação e recuperação ficam versionados em
+`supabase/templates`. A sincronização hospedada altera somente esses dois
+templates e seus assuntos; ela não envia e-mails, não muda SMTP e não toca no
+banco.
+
+1. Cadastre o project ref público em
+   `SUPABASE_PROJECT_REF_STAGING` como variável do environment `staging`.
+2. Cadastre um Personal Access Token do Supabase em
+   `SUPABASE_ACCESS_TOKEN` como secret do mesmo environment. O token não deve
+   ser informado em chat, arquivo local ou log.
+3. Execute manualmente o workflow `Sync Supabase Auth staging` no SHA já
+   validado em staging.
+4. O workflow faz `PATCH` apenas nos campos de confirmação e recuperação e
+   confirma por `GET` que o conteúdo hospedado ficou idêntico ao versionado.
+
+Para uma execução local autorizada, use as mesmas duas variáveis somente na
+sessão atual e execute:
+
+```powershell
+pnpm supabase:auth:sync
+```
+
 ## Segredos
 
 - `SUPABASE_DB_URL_STAGING` é um Secret do GitHub e pode existir em um `.env`
   local ignorado apenas para executar uma migration manual autorizada.
+- `SUPABASE_ACCESS_TOKEN` existe somente no environment `staging` e é usado
+  exclusivamente pelo workflow manual de configuração hospedada do Auth.
 - URLs de banco e secrets de serviço entram no Secret Manager por fluxo seguro;
   nunca entram em commits, variáveis públicas, outputs do Terraform ou logs.
 - `daygym-database-url` contém exclusivamente a conexão da role
