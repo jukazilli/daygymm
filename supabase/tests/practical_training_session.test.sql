@@ -390,6 +390,7 @@ select is(
   2,
   'the canonical session records the completed exercise count'
 );
+reset role;
 select is(
   (
     select count(*)
@@ -400,6 +401,12 @@ select is(
   ),
   1::bigint,
   'finishing emits one canonical domain event'
+);
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '81000000-0000-4000-8000-000000000001',
+  true
 );
 select is(
   (
@@ -424,6 +431,7 @@ select is(
   1::bigint,
   'finish replay does not duplicate canonical state'
 );
+reset role;
 select is(
   (
     select count(*)
@@ -436,6 +444,7 @@ select is(
   'finish replay does not duplicate the event'
 );
 
+set local role authenticated;
 select set_config(
   'request.jwt.claim.sub',
   '82000000-0000-4000-8000-000000000002',
