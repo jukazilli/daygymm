@@ -360,15 +360,18 @@ function ElapsedTimer({
 }
 
 function PauseTrainingDialog({
-  busy,
   onClose,
   onConfirm,
+  onRestart,
+  pendingAction,
 }: Readonly<{
-  busy: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onRestart: () => void;
+  pendingAction?: "pause" | "restart";
 }>) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const busy = pendingAction !== undefined;
 
   useEffect(() => {
     confirmRef.current?.focus();
@@ -397,8 +400,10 @@ function PauseTrainingDialog({
         className="session-dialog"
         role="dialog"
       >
-        <h2 id="pause-training-title">Pausar treino?</h2>
-        <p>Seu progresso está salvo. Você pode continuar depois.</p>
+        <h2 id="pause-training-title">Pausar ou recomeçar?</h2>
+        <p>
+          Pause para continuar depois. Recomeçar apaga as séries desta execução.
+        </p>
         <div className="session-dialog-actions">
           <button
             className="button-primary"
@@ -407,7 +412,15 @@ function PauseTrainingDialog({
             ref={confirmRef}
             type="button"
           >
-            {busy ? "Pausando…" : "Pausar treino"}
+            {pendingAction === "pause" ? "Pausando…" : "Pausar treino"}
+          </button>
+          <button
+            className="button-danger"
+            disabled={busy}
+            onClick={onRestart}
+            type="button"
+          >
+            {pendingAction === "restart" ? "Recomeçando…" : "Recomeçar do zero"}
           </button>
           <button
             className="button-secondary"
@@ -434,6 +447,7 @@ export function ActiveTrainingScreen({
   const [state, setState] = useState<PracticalTrainingState>();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"pause" | "restart">();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
@@ -443,8 +457,8 @@ export function ActiveTrainingScreen({
     return gatewayRef.current;
   }
 
-  async function refresh() {
-    const result = await gateway().load();
+  async function refresh(preferredSessionId?: string) {
+    const result = await gateway().load(preferredSessionId);
     if (!result.ok) {
       if (result.reason === "session") {
         navigate("/entrar/");
@@ -618,9 +632,11 @@ export function ActiveTrainingScreen({
       return;
     }
     setBusy(true);
+    setDialogAction("pause");
     setError(undefined);
     const result = await gateway().pause(run.runId);
     setBusy(false);
+    setDialogAction(undefined);
     if (!result.ok) {
       if (result.reason === "session") {
         navigate("/entrar/");
@@ -631,6 +647,55 @@ export function ActiveTrainingScreen({
       return;
     }
     navigate("/treinos/");
+  }
+
+  async function restartTraining() {
+    const run = state?.activeRun;
+    if (!run || run.pausedAt || busy) {
+      return;
+    }
+    const plannedSessionId = run.session.sessionId;
+    setBusy(true);
+    setDialogAction("restart");
+    setError(undefined);
+
+    const cancelled = await gateway().cancel(run.runId);
+    if (!cancelled.ok) {
+      setBusy(false);
+      setDialogAction(undefined);
+      setPauseDialogOpen(false);
+      if (cancelled.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(cancelled.reason));
+      return;
+    }
+
+    const restarted = await gateway().start(plannedSessionId);
+    setBusy(false);
+    setDialogAction(undefined);
+    setPauseDialogOpen(false);
+    if (!restarted.ok) {
+      await refresh(plannedSessionId);
+      if (restarted.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(restarted.reason));
+      return;
+    }
+
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            activeRun: restarted.value,
+            nextSession: restarted.value.session,
+          }
+        : current,
+    );
+    setSelectedIndex(0);
   }
 
   async function resumeTraining() {
@@ -872,9 +937,10 @@ export function ActiveTrainingScreen({
 
       {pauseDialogOpen ? (
         <PauseTrainingDialog
-          busy={busy}
           onClose={() => setPauseDialogOpen(false)}
           onConfirm={() => void pauseTraining()}
+          onRestart={() => void restartTraining()}
+          pendingAction={dialogAction}
         />
       ) : null}
     </main>

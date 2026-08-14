@@ -267,7 +267,9 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway, navigate }));
 
     await user.click(await screen.findByRole("button", { name: "Pausar" }));
-    expect(screen.getByRole("dialog", { name: "Pausar treino?" })).toBeTruthy();
+    expect(
+      screen.getByRole("dialog", { name: "Pausar ou recomeçar?" }),
+    ).toBeTruthy();
     expect(gateway.cancel).not.toHaveBeenCalled();
     expect(gateway.pause).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Pausar treino" }));
@@ -275,6 +277,51 @@ describe("ActiveTrainingScreen", () => {
     expect(gateway.pause).toHaveBeenCalledWith(activeRun.runId);
     expect(gateway.cancel).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("/treinos/");
+  });
+
+  it("discards the active execution and immediately restarts the same training", async () => {
+    const user = userEvent.setup();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: plannedSession,
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
+    };
+    const restartedRun: ActiveTrainingRun = {
+      ...activeRun,
+      runId: "78000000-0000-4000-8000-000000000008",
+      startedAt: "2026-08-14T03:40:00.000+00:00",
+    };
+    const cancel = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { runId: activeRun.runId, wasCancelled: true },
+    });
+    const start = vi.fn().mockResolvedValue({ ok: true, value: restartedRun });
+    const gateway: TrainingSessionGateway = {
+      cancel,
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      start,
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    await user.click(screen.getByRole("button", { name: "Recomeçar do zero" }));
+
+    expect(cancel).toHaveBeenCalledWith(activeRun.runId);
+    expect(start).toHaveBeenCalledWith(plannedSession.sessionId);
+    expect(cancel.mock.invocationCallOrder[0]!).toBeLessThan(
+      start.mock.invocationCallOrder[0]!,
+    );
+    expect(screen.getByRole("button", { name: "Pausar" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("uses duration for a circuit exercise without rendering null repetitions", async () => {
