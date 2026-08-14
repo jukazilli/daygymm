@@ -229,7 +229,9 @@ values (
 );
 
 select is(
-  (select count(*) from api.training_plan_schedule_entries),
+  (select count(*)
+   from api.training_plan_schedule_entries
+   where version_id = 'a4000000-0000-4000-8000-000000000004'),
   3::bigint,
   'every imported session receives a schedule entry'
 );
