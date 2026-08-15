@@ -10,7 +10,11 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { AppLoadingSkeleton } from "./app-shell";
+import {
+  AppLoadingSkeleton,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 
 interface PlanSourceScreenProps {
   readonly gateway?: PlanSourceGateway;
@@ -117,13 +121,8 @@ export function PlanSourceScreen({
   }
 
   return (
-    <main className="onboarding-shell">
-      <header className="product-header">
-        <Link className="brand" href="/hoje/" aria-label="DayGym — Hoje">
-          DayGym
-        </Link>
-        <Link href="/hoje/">Hoje</Link>
-      </header>
+    <main className="onboarding-shell onboarding-shell-focused">
+      <FocusedBackAction href="/hoje/" />
       <section className="onboarding-card plan-source-panel">
         <p className="eyebrow">Seu plano</p>
         <h1>Como você quer começar?</h1>
@@ -178,13 +177,14 @@ export function PlanSourceScreen({
             {feedback}
           </p>
         ) : null}
-
-        {state?.source ? (
-          <Link className="button-primary plan-source-continue" href="/hoje/">
+      </section>
+      {state?.source ? (
+        <FixedActionBar>
+          <Link className="button-primary" href="/hoje/">
             Continuar para Hoje
           </Link>
-        ) : null}
-      </section>
+        </FixedActionBar>
+      ) : null}
     </main>
   );
 }

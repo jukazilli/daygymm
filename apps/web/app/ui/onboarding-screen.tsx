@@ -14,7 +14,11 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebOnboardingGateway } from "../../lib/onboarding-gateway";
-import { AppLoadingSkeleton } from "./app-shell";
+import {
+  AppLoadingSkeleton,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 
 type AnswerValue =
   | OnboardingEquipmentContext
@@ -312,6 +316,24 @@ export function OnboardingScreen({
     setActiveStep(step);
   }
 
+  function returnToPreviousLevel() {
+    setFeedback(undefined);
+    if (editingFromReview) {
+      setEditingFromReview(false);
+      setActiveStep(6);
+      return;
+    }
+    if (activeStep === 6) {
+      setActiveStep(stepDefinitions.length - 1);
+      return;
+    }
+    if (activeStep > 0) {
+      setActiveStep(activeStep - 1);
+      return;
+    }
+    navigate("/conta/");
+  }
+
   if (!context) {
     return (
       <main className="onboarding-shell">
@@ -328,13 +350,8 @@ export function OnboardingScreen({
 
   if (activeStep === 6) {
     return (
-      <main className="onboarding-shell">
-        <header className="product-header">
-          <a className="brand" href="/comecar/" aria-label="DayGym — início">
-            DayGym
-          </a>
-          <a href="/conta/">Minha conta</a>
-        </header>
+      <main className="onboarding-shell onboarding-shell-focused">
+        <FocusedBackAction onClick={returnToPreviousLevel} />
         <section className="onboarding-card">
           <p className="eyebrow">Revisão</p>
           <h1>Confira suas respostas.</h1>
@@ -364,6 +381,8 @@ export function OnboardingScreen({
               {feedback}
             </p>
           ) : null}
+        </section>
+        <FixedActionBar>
           <button
             className="button-primary"
             disabled={isSaving || !completeDraft(context)}
@@ -372,7 +391,7 @@ export function OnboardingScreen({
           >
             {isSaving ? "Confirmando…" : "Confirmar respostas"}
           </button>
-        </section>
+        </FixedActionBar>
       </main>
     );
   }
@@ -390,13 +409,8 @@ export function OnboardingScreen({
   const selectedAnswer = answerForStep(context, activeStep);
 
   return (
-    <main className="onboarding-shell">
-      <header className="product-header">
-        <a className="brand" href="/comecar/" aria-label="DayGym — início">
-          DayGym
-        </a>
-        <a href="/conta/">Minha conta</a>
-      </header>
+    <main className="onboarding-shell onboarding-shell-focused">
+      <FocusedBackAction onClick={returnToPreviousLevel} />
       <section className="onboarding-card">
         <div className="onboarding-progress">
           <span>
@@ -447,39 +461,21 @@ export function OnboardingScreen({
             {feedback}
           </p>
         ) : null}
-        <div className="onboarding-actions">
-          {activeStep > 0 || editingFromReview ? (
-            <button
-              className="button-secondary"
-              disabled={isSaving}
-              onClick={() => {
-                setFeedback(undefined);
-                if (editingFromReview) {
-                  setEditingFromReview(false);
-                  setActiveStep(6);
-                } else {
-                  setActiveStep(activeStep - 1);
-                }
-              }}
-              type="button"
-            >
-              Voltar
-            </button>
-          ) : null}
-          <button
-            className="button-primary"
-            disabled={isSaving || selectedAnswer === null}
-            onClick={() => void saveStep()}
-            type="button"
-          >
-            {isSaving
-              ? "Salvando…"
-              : editingFromReview
-                ? "Salvar alteração"
-                : "Continuar"}
-          </button>
-        </div>
       </section>
+      <FixedActionBar>
+        <button
+          className="button-primary"
+          disabled={isSaving || selectedAnswer === null}
+          onClick={() => void saveStep()}
+          type="button"
+        >
+          {isSaving
+            ? "Salvando…"
+            : editingFromReview
+              ? "Salvar alteração"
+              : "Continuar"}
+        </button>
+      </FixedActionBar>
     </main>
   );
 }

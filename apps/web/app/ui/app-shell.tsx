@@ -9,6 +9,8 @@ export type AppDestination =
 interface AppShellProps {
   readonly active: AppDestination;
   readonly children: ReactNode;
+  readonly hasFixedAction?: boolean;
+  readonly variant?: "focused" | "standard";
 }
 
 interface NavigationItem {
@@ -17,6 +19,10 @@ interface NavigationItem {
   readonly icon: AppIconName;
   readonly label: string;
 }
+
+type FocusedBackActionProps =
+  | { readonly href: string; readonly onClick?: never }
+  | { readonly href?: never; readonly onClick: () => void };
 
 const navigationItems: readonly NavigationItem[] = [
   { destination: "today", href: "/hoje/", icon: "home", label: "Hoje" },
@@ -56,35 +62,83 @@ export function AppLoadingSkeleton({
   );
 }
 
-export function AppShell({ active, children }: AppShellProps) {
+export function FocusedBackAction({ href, onClick }: FocusedBackActionProps) {
+  const content = (
+    <>
+      <AppIcon name="back" size={30} />
+      <span className="sr-only">Voltar</span>
+    </>
+  );
+
+  return href ? (
+    <Link
+      aria-label="Voltar"
+      className="focused-back-action"
+      href={href}
+      title="Voltar"
+    >
+      {content}
+    </Link>
+  ) : (
+    <button
+      aria-label="Voltar"
+      className="focused-back-action"
+      onClick={onClick}
+      title="Voltar"
+      type="button"
+    >
+      {content}
+    </button>
+  );
+}
+
+export function FixedActionBar({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  return <div className="fixed-action-bar">{children}</div>;
+}
+
+export function AppShell({
+  active,
+  children,
+  hasFixedAction = false,
+  variant = "standard",
+}: AppShellProps) {
+  const focused = variant === "focused";
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <Link className="brand" href="/hoje/" aria-label="DayGym — Hoje">
-          DayGym
-        </Link>
-        <span className="preview-badge">Prévia</span>
-      </header>
+    <div
+      className={`app-shell${focused ? " app-shell-focused" : ""}${focused && hasFixedAction ? " app-shell-focused-action" : ""}`}
+    >
+      {!focused ? (
+        <header className="app-header">
+          <Link className="brand" href="/hoje/" aria-label="DayGym — Hoje">
+            DayGym
+          </Link>
+          <span className="preview-badge">Prévia</span>
+        </header>
+      ) : null}
 
       <main className="app-content">{children}</main>
 
-      <nav className="app-navigation" aria-label="Navegação principal">
-        {navigationItems.map((item) => {
-          const selected = active === item.destination;
-          return (
-            <Link
-              aria-current={selected ? "page" : undefined}
-              className="app-navigation-item"
-              data-selected={selected || undefined}
-              href={item.href}
-              key={item.href}
-            >
-              <AppIcon name={item.icon} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {!focused ? (
+        <nav className="app-navigation" aria-label="Navegação principal">
+          {navigationItems.map((item) => {
+            const selected = active === item.destination;
+            return (
+              <Link
+                aria-current={selected ? "page" : undefined}
+                className="app-navigation-item"
+                data-selected={selected || undefined}
+                href={item.href}
+                key={item.href}
+              >
+                <AppIcon name={item.icon} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
     </div>
   );
 }

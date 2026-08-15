@@ -29,4 +29,19 @@ describe("AppShell", () => {
       screen.getByRole("link", { name: "Feed" }).getAttribute("href"),
     ).toBe("/feed");
   });
+
+  it("removes institutional chrome from a focused task", () => {
+    render(
+      createElement(AppShell, {
+        active: "workouts",
+        children: createElement("h1", null, "Montar plano"),
+        variant: "focused",
+      }),
+    );
+
+    expect(screen.queryByRole("link", { name: /DayGym/ })).toBeNull();
+    expect(screen.queryByText("Prévia")).toBeNull();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Montar plano" })).toBeTruthy();
+  });
 });

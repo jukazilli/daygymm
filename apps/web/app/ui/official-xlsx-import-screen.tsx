@@ -19,7 +19,12 @@ import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
 import { formatTrainingDuration } from "../../lib/training-duration";
 import { trainingWeekdayName } from "../../lib/training-weekdays";
 import { AppIcon } from "./app-icon";
-import { AppLoadingSkeleton, AppShell } from "./app-shell";
+import {
+  AppLoadingSkeleton,
+  AppShell,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 
 interface OfficialXlsxImportScreenProps {
   readonly navigate?: (path: string) => void;
@@ -164,7 +169,12 @@ export function OfficialXlsxImportScreen({
   }
 
   return (
-    <AppShell active="workouts">
+    <AppShell
+      active="workouts"
+      hasFixedAction={Boolean(accessReady && (parsed || result))}
+      variant="focused"
+    >
+      <FocusedBackAction href="/treinos/" />
       {!accessReady ? (
         <AppLoadingSkeleton label="Preparando importação" />
       ) : null}
@@ -184,9 +194,6 @@ export function OfficialXlsxImportScreen({
               Esta planilha já estava salva.
             </p>
           ) : null}
-          <Link className="button-primary" href="/treinos/">
-            Abrir plano
-          </Link>
         </section>
       ) : null}
       {accessReady && !result ? (
@@ -311,14 +318,6 @@ export function OfficialXlsxImportScreen({
                   {feedback}
                 </p>
               ) : null}
-              <button
-                className="button-primary import-confirm-button"
-                disabled={!canConfirm || phase === "saving"}
-                onClick={() => void confirmImport()}
-                type="button"
-              >
-                {phase === "saving" ? "Importando…" : "Confirmar importação"}
-              </button>
             </section>
           ) : null}
 
@@ -342,6 +341,25 @@ export function OfficialXlsxImportScreen({
             </p>
           </section>
         </div>
+      ) : null}
+      {accessReady && result ? (
+        <FixedActionBar>
+          <Link className="button-primary" href="/treinos/">
+            Abrir plano
+          </Link>
+        </FixedActionBar>
+      ) : null}
+      {accessReady && parsed && !result ? (
+        <FixedActionBar>
+          <button
+            className="button-primary"
+            disabled={!canConfirm || phase !== "idle"}
+            onClick={() => void confirmImport()}
+            type="button"
+          >
+            {phase === "saving" ? "Importando…" : "Confirmar importação"}
+          </button>
+        </FixedActionBar>
       ) : null}
     </AppShell>
   );

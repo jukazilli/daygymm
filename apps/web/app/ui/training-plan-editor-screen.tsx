@@ -25,7 +25,12 @@ import {
 } from "../../lib/training-duration";
 import { trainingWeekdayName } from "../../lib/training-weekdays";
 import { AppIcon } from "./app-icon";
-import { AppLoadingSkeleton, AppShell } from "./app-shell";
+import {
+  AppLoadingSkeleton,
+  AppShell,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 import { DurationInput } from "./duration-input";
 
 interface TrainingPlanEditorScreenProps {
@@ -47,6 +52,7 @@ const modalityLabels: Record<TrainingModality, string> = {
   time: "Tempo",
 };
 const loadGuidePreferenceKey = "daygym:load-guide:v1";
+const editGuidePreferenceKey = "daygym:edit-list-guide:v1";
 
 function defaultNavigate(path: string) {
   window.location.assign(path);
@@ -129,20 +135,19 @@ function EditorEntityList({
       className={`editor-entity-list editor-${variant}-list`}
     >
       {options.map((option) => (
-        <li className="editor-entity-row" key={option.id}>
-          <span className="editor-entity-index">{option.index}</span>
-          <span className="editor-entity-copy">
-            <strong>{option.primary}</strong>
-            <small>{option.secondary}</small>
-          </span>
+        <li key={option.id}>
           <button
             aria-label={actionLabel?.(option) ?? `Editar ${option.primary}`}
-            className="icon-button"
+            className="editor-entity-row"
             onClick={() => onSelect(option.id)}
             title={actionLabel?.(option) ?? `Editar ${option.primary}`}
             type="button"
           >
-            <AppIcon name="edit" />
+            <span className="editor-entity-index">{option.index}</span>
+            <span className="editor-entity-copy">
+              <strong>{option.primary}</strong>
+              <small>{option.secondary}</small>
+            </span>
           </button>
         </li>
       ))}
@@ -608,7 +613,12 @@ function LoadGuideDialog({
         className="session-dialog load-guide-dialog"
         role="dialog"
       >
-        <h2 id="load-guide-title">Carga, progressão e passo</h2>
+        <div className="guide-dialog-heading">
+          <span className="guide-dialog-icon">
+            <AppIcon name="tip" />
+          </span>
+          <h2 id="load-guide-title">Carga, progressão e passo</h2>
+        </div>
         <dl className="load-guide-list">
           <div>
             <dt>Carga inicial</dt>
@@ -623,7 +633,59 @@ function LoadGuideDialog({
             <dd>Orienta a sugestão de carga dos próximos treinos.</dd>
           </div>
         </dl>
-        <p>As cargas são sugestões: você pode ajustá-las durante o treino.</p>
+        <p>
+          Toque em um exercício para configurar. As cargas são sugestões: você
+          pode ajustá-las durante o treino.
+        </p>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            onClick={onClose}
+            ref={confirmRef}
+            type="button"
+          >
+            OK
+          </button>
+          <button className="button-secondary" onClick={onHide} type="button">
+            Não mostrar novamente
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function EditListGuideDialog({
+  onClose,
+  onHide,
+}: Readonly<{
+  onClose: () => void;
+  onHide: () => void;
+}>) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    confirmRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="session-dialog-backdrop" role="presentation">
+      <section
+        aria-describedby="edit-list-guide-copy"
+        aria-labelledby="edit-list-guide-title"
+        aria-modal="true"
+        className="session-dialog"
+        role="dialog"
+      >
+        <div className="guide-dialog-heading">
+          <span className="guide-dialog-icon">
+            <AppIcon name="tip" />
+          </span>
+          <h2 id="edit-list-guide-title">Edite com um toque</h2>
+        </div>
+        <p id="edit-list-guide-copy">
+          Toque em um treino ou exercício para abrir a edição.
+        </p>
         <div className="session-dialog-actions">
           <button
             className="button-primary"
@@ -664,6 +726,8 @@ export function TrainingPlanEditorScreen({
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archivedPlanId, setArchivedPlanId] = useState<string>();
   const [loadGuideOpen, setLoadGuideOpen] = useState(false);
+  const [editGuideOpen, setEditGuideOpen] = useState(false);
+  const hasDraft = Boolean(draft);
 
   function gateway() {
     gatewayRef.current ??= createWebTrainingPlanEditorGateway();
@@ -714,6 +778,16 @@ export function TrainingPlanEditorScreen({
       setLoadGuideOpen(true);
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (
+      mode === "full" &&
+      hasDraft &&
+      window.localStorage.getItem(editGuidePreferenceKey) !== "hidden"
+    ) {
+      setEditGuideOpen(true);
+    }
+  }, [hasDraft, mode]);
 
   function updateSession(
     sessionId: string,
@@ -869,7 +943,8 @@ export function TrainingPlanEditorScreen({
 
   if (failed) {
     return (
-      <AppShell active="workouts">
+      <AppShell active="workouts" variant="focused">
+        <FocusedBackAction href="/treinos/" />
         <section className="app-state-card" role="alert">
           <h1>Não foi possível carregar o plano.</h1>
           <Link className="button-secondary" href="/treinos/">
@@ -882,7 +957,8 @@ export function TrainingPlanEditorScreen({
 
   if (noPlan) {
     return (
-      <AppShell active="workouts">
+      <AppShell active="workouts" variant="focused">
+        <FocusedBackAction href="/treinos/" />
         <section className="app-state-card plan-archived-state">
           <p className="eyebrow">Cargas do plano</p>
           <h1>Crie ou importe um plano primeiro.</h1>
@@ -896,7 +972,8 @@ export function TrainingPlanEditorScreen({
 
   if (!draft) {
     return (
-      <AppShell active="workouts">
+      <AppShell active="workouts" variant="focused">
+        <FocusedBackAction href="/treinos/" />
         <AppLoadingSkeleton label="Carregando plano" />
       </AppShell>
     );
@@ -904,7 +981,8 @@ export function TrainingPlanEditorScreen({
 
   if (archivedPlanId) {
     return (
-      <AppShell active="workouts">
+      <AppShell active="workouts" variant="focused">
+        <FocusedBackAction href="/treinos/" />
         <section className="app-state-card plan-archived-state">
           <p className="eyebrow">Plano arquivado</p>
           <h1>O histórico foi preservado.</h1>
@@ -966,33 +1044,14 @@ export function TrainingPlanEditorScreen({
   }
 
   return (
-    <AppShell active="workouts">
+    <AppShell
+      active="workouts"
+      hasFixedAction={mode === "full" || Boolean(selectedLoad)}
+      variant="focused"
+    >
+      <FocusedBackAction onClick={returnToPreviousLevel} />
       <div className="plan-editor-page">
         <header className="plan-editor-header">
-          <div className="plan-editor-toolbar">
-            <button
-              aria-label="Voltar"
-              className="icon-button plan-editor-back"
-              onClick={returnToPreviousLevel}
-              title="Voltar"
-              type="button"
-            >
-              <AppIcon name="back" />
-            </button>
-            {mode === "full" || selectedLoad ? (
-              <button
-                aria-busy={busy}
-                aria-label={busy ? "Salvando" : saveLabel}
-                className="icon-button icon-button-primary plan-editor-save"
-                disabled={busy}
-                form="training-plan-form"
-                title={busy ? "Salvando" : saveLabel}
-                type="submit"
-              >
-                <AppIcon name="check" />
-              </button>
-            ) : null}
-          </div>
           <div className="plan-editor-title">
             <p className="eyebrow">
               {selectedLoad
@@ -1330,6 +1389,19 @@ export function TrainingPlanEditorScreen({
           ) : null}
         </form>
       </div>
+      {mode === "full" || selectedLoad ? (
+        <FixedActionBar>
+          <button
+            aria-busy={busy}
+            className="button-primary"
+            disabled={busy}
+            form="training-plan-form"
+            type="submit"
+          >
+            {busy ? "Salvando…" : saveLabel}
+          </button>
+        </FixedActionBar>
+      ) : null}
       {archiveOpen ? (
         <ArchiveDialog
           busy={busy}
@@ -1343,6 +1415,15 @@ export function TrainingPlanEditorScreen({
           onHide={() => {
             window.localStorage.setItem(loadGuidePreferenceKey, "hidden");
             setLoadGuideOpen(false);
+          }}
+        />
+      ) : null}
+      {editGuideOpen ? (
+        <EditListGuideDialog
+          onClose={() => setEditGuideOpen(false)}
+          onHide={() => {
+            window.localStorage.setItem(editGuidePreferenceKey, "hidden");
+            setEditGuideOpen(false);
           }}
         />
       ) : null}

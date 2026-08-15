@@ -15,7 +15,7 @@ import {
   trainingWeekdayName,
 } from "../../lib/training-weekdays";
 import { AppIcon } from "./app-icon";
-import { AppLoadingSkeleton, AppShell } from "./app-shell";
+import { AppLoadingSkeleton, AppShell, FocusedBackAction } from "./app-shell";
 
 interface MyTrainingsScreenProps {
   readonly gateway?: TrainingSessionGateway;
@@ -66,17 +66,14 @@ export function MyTrainingsScreen({
   }, [navigate]);
 
   return (
-    <AppShell active="workouts">
+    <AppShell active="workouts" variant="focused">
+      <FocusedBackAction href="/treinos/" />
       {!state && !failed ? (
         <AppLoadingSkeleton label="Carregando seus treinos" />
       ) : null}
       {state?.plan ? (
         <div className="my-trainings-page">
           <header className="plan-editor-header">
-            <Link className="button-text plan-editor-back" href="/treinos/">
-              <AppIcon name="back" size={20} />
-              <span>Voltar</span>
-            </Link>
             <div>
               <p className="eyebrow">{state.plan.name}</p>
               <h1>Meus treinos</h1>

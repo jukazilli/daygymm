@@ -359,19 +359,9 @@ input:focus-visible {
   background: var(--color-canvas);
 }
 
-.product-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 58rem);
-  margin: 0 auto;
-  padding: var(--space-2) 0 var(--space-8);
-}
-
-.product-header > a:last-child {
-  color: var(--color-text-secondary);
-  font-size: 0.9375rem;
-  text-decoration: none;
+.onboarding-shell-focused {
+  padding-top: calc(76px + env(safe-area-inset-top));
+  padding-bottom: calc(116px + env(safe-area-inset-bottom));
 }
 
 .onboarding-card {
@@ -466,17 +456,6 @@ input:focus-visible {
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   line-height: 1.4;
-}
-
-.onboarding-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-}
-
-.onboarding-actions .button-primary {
-  min-width: 9rem;
 }
 
 .answer-review {
@@ -604,11 +583,6 @@ input:focus-visible {
   min-height: 18rem;
 }
 
-.plan-source-continue {
-  width: 100%;
-  margin-top: var(--space-6);
-}
-
 .app-shell {
   min-height: 100vh;
   padding: 0 var(--space-5) calc(104px + env(safe-area-inset-bottom));
@@ -619,6 +593,54 @@ input:focus-visible {
       transparent 24rem
     ),
     var(--color-canvas);
+}
+
+.app-shell-focused {
+  padding-top: calc(76px + env(safe-area-inset-top));
+  padding-bottom: var(--space-10);
+  background: var(--color-canvas);
+}
+
+.app-shell-focused-action {
+  padding-bottom: calc(116px + env(safe-area-inset-bottom));
+}
+
+.focused-back-action {
+  position: fixed;
+  z-index: 40;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: max(var(--space-5), calc((100vw - 58rem) / 2));
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.focused-back-action:hover {
+  color: var(--color-action-pressed);
+}
+
+.fixed-action-bar {
+  position: fixed;
+  z-index: 35;
+  right: max(var(--space-5), calc((100vw - 58rem) / 2));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  left: max(var(--space-5), calc((100vw - 58rem) / 2));
+}
+
+.fixed-action-bar > .button-primary,
+.fixed-action-bar > button,
+.fixed-action-bar > a {
+  width: 100%;
+  min-height: 58px;
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgb(16 24 40 / 18%);
 }
 
 .app-header {
@@ -878,13 +900,6 @@ input:focus-visible {
 .plan-editor-header {
   display: grid;
   gap: var(--space-4);
-}
-
-.plan-editor-toolbar {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .plan-editor-title {
@@ -2109,10 +2124,6 @@ input:focus-visible {
   font-size: 0.875rem;
 }
 
-.import-confirm-button {
-  width: 100%;
-}
-
 .import-example-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -2248,14 +2259,30 @@ input:focus-visible {
 
 .editor-entity-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 48px;
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
+  width: 100%;
   min-height: 76px;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-card);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.editor-entity-row:hover {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.editor-entity-row:focus-visible {
+  border-color: var(--color-action);
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 2px;
 }
 
 .editor-entity-index {
@@ -2313,6 +2340,23 @@ input:focus-visible {
   margin: 0;
   color: var(--color-text-secondary);
   line-height: 1.4;
+}
+
+.guide-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.guide-dialog-icon {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-action-soft);
+  color: var(--color-action-pressed);
 }
 
 .training-hub-layout,
@@ -2483,6 +2527,15 @@ input:focus-visible {
     padding-left: var(--space-4);
   }
 
+  .focused-back-action {
+    left: var(--space-3);
+  }
+
+  .fixed-action-bar {
+    right: var(--space-4);
+    left: var(--space-4);
+  }
+
   .app-header {
     padding-top: var(--space-4);
   }
@@ -2561,10 +2614,6 @@ input:focus-visible {
     padding: var(--space-5);
   }
 
-  .onboarding-actions {
-    display: grid;
-  }
-
   .plan-source-option {
     grid-template-columns: 1fr;
   }
@@ -2577,6 +2626,11 @@ input:focus-visible {
   .app-shell {
     padding-right: var(--space-3);
     padding-left: var(--space-3);
+  }
+
+  .fixed-action-bar {
+    right: var(--space-3);
+    left: var(--space-3);
   }
 
   .import-template-actions {

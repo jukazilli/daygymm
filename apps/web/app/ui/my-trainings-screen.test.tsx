@@ -57,5 +57,8 @@ describe("MyTrainingsScreen", () => {
         .getByRole("link", { name: /Peito e tríceps/ })
         .getAttribute("href"),
     ).toBe("/treinos/sessao?sessao=62000000-0000-4000-8000-000000000002");
+    expect(screen.getByRole("link", { name: "Voltar" })).toBeTruthy();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByText("Prévia")).toBeNull();
   });
 });

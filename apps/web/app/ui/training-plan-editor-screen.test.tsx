@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   TrainingPlanDraft,
@@ -125,7 +125,43 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
+beforeEach(() => {
+  window.localStorage.setItem("daygym:edit-list-guide:v1", "hidden");
+});
+
 describe("TrainingPlanEditorScreen", () => {
+  it("teaches once that the whole row opens editing", async () => {
+    window.localStorage.removeItem("daygym:edit-list-guide:v1");
+    const user = userEvent.setup();
+    const gateway = createGateway(existingDraft);
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        navigate: vi.fn(),
+      }),
+    );
+
+    const guide = await screen.findByRole("dialog", {
+      name: "Edite com um toque",
+    });
+    expect(
+      within(guide).getByText(
+        "Toque em um treino ou exercício para abrir a edição.",
+      ),
+    ).toBeTruthy();
+    await user.click(
+      within(guide).getByRole("button", { name: "Não mostrar novamente" }),
+    );
+
+    const row = screen.getByRole("button", { name: "Editar Treino A" });
+    expect(row.querySelector("svg")).toBeNull();
+    await user.click(row);
+    expect(
+      screen.getByRole("combobox", { name: "Dia da semana" }),
+    ).toBeTruthy();
+  });
+
   it("creates the first manual plan with a version summary", async () => {
     const user = userEvent.setup();
     const gateway = createGateway(null);
