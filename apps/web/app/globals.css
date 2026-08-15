@@ -995,85 +995,6 @@ input:focus-visible {
   font-weight: 800;
 }
 
-.plan-editor-carousel {
-  display: flex;
-  gap: var(--space-3);
-  margin-inline: calc(-1 * var(--space-2));
-  padding: var(--space-1) var(--space-2) var(--space-3);
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scroll-padding-inline: var(--space-2);
-  scroll-snap-type: inline mandatory;
-  scrollbar-width: thin;
-  touch-action: pan-x pan-y;
-}
-
-.plan-editor-carousel-option {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-  flex: 0 0 min(78%, 20rem);
-  min-height: 68px;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-card);
-  color: var(--color-text-secondary);
-  text-align: left;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  cursor: pointer;
-}
-
-.plan-editor-exercise-carousel .plan-editor-carousel-option {
-  flex-basis: min(68%, 15rem);
-  min-height: 60px;
-}
-
-.plan-editor-carousel-option > span:first-child {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-canvas);
-  font-weight: 900;
-}
-
-.plan-editor-carousel-option > span:last-child {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.plan-editor-carousel-option strong,
-.plan-editor-carousel-option small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-editor-carousel-option small {
-  font-weight: 700;
-}
-
-.plan-editor-carousel-option[data-selected] {
-  border-color: var(--color-action);
-  background: var(--color-action-soft);
-  color: var(--color-text);
-}
-
-.plan-editor-carousel-option[data-selected] > span:first-child {
-  background: var(--color-action);
-  color: var(--color-action-contrast);
-}
-
-.plan-editor-carousel-option:focus-visible {
-  outline: 3px solid var(--color-action-soft);
-  outline-offset: 2px;
-}
-
 .plan-exercise-editor {
   padding: var(--space-5);
   background: var(--color-canvas);
@@ -1122,7 +1043,6 @@ input:focus-visible {
   margin: var(--space-8) auto 0;
 }
 
-.plan-session-list > ol,
 .session-exercise-preview {
   display: grid;
   gap: 0;
@@ -1135,7 +1055,6 @@ input:focus-visible {
   overflow: hidden;
 }
 
-.plan-session-list li,
 .session-exercise-preview li {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
@@ -1145,16 +1064,10 @@ input:focus-visible {
   border-bottom: 1px solid var(--color-border);
 }
 
-.plan-session-list li:last-child,
 .session-exercise-preview li:last-child {
   border-bottom: 0;
 }
 
-.plan-session-list li[data-next] {
-  background: var(--color-action-soft);
-}
-
-.plan-session-list li > span,
 .session-exercise-preview li > span {
   display: grid;
   width: 32px;
@@ -1166,14 +1079,12 @@ input:focus-visible {
   font-weight: 800;
 }
 
-.plan-session-list li > div,
 .session-exercise-preview li > div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.plan-session-list small,
 .session-exercise-preview small {
   color: var(--color-text-secondary);
 }
@@ -1529,6 +1440,45 @@ input:focus-visible {
 .completed-sets h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.plan-editor-form input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-select-control {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.plan-select-control select {
+  appearance: none;
+  padding-right: 3rem;
+}
+
+.plan-select-control > svg {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.plan-session-editor,
+.plan-exercise-editor {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.plan-remove-action {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-2);
+  min-height: 44px;
 }
 
 .completed-sets ol,
@@ -2266,7 +2216,15 @@ input:focus-visible {
   min-width: 0;
 }
 
-.editor-entity-copy strong,
+.editor-entity-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .editor-entity-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2288,9 +2246,31 @@ input:focus-visible {
   font-size: clamp(1.75rem, 5vw, 2.75rem);
 }
 
+.training-hub-highlight-copy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.training-hub-highlight-icon {
+  display: grid;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-action-pressed);
+}
+
+.training-hub-highlight-copy > div {
+  min-width: 0;
+}
+
 .training-quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -2456,7 +2436,6 @@ input:focus-visible {
   }
 
   .weekly-training-schedule .section-heading,
-  .plan-editor-card-heading,
   .plan-editor-actions {
     align-items: stretch;
     flex-direction: column;
@@ -2488,15 +2467,6 @@ input:focus-visible {
 
   .plan-field-grid-two {
     grid-template-columns: 1fr;
-  }
-
-  .plan-editor-carousel {
-    margin-inline: calc(-1 * var(--space-4));
-    padding-inline: var(--space-4);
-  }
-
-  .plan-editor-session-carousel .plan-editor-carousel-option {
-    flex-basis: 86%;
   }
 
   .plan-editor-actions > button,

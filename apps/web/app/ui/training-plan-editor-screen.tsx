@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+} from "react";
 
 import {
   publishTrainingPlanInputSchema,
@@ -136,6 +141,18 @@ function EditorEntityList({
   );
 }
 
+function PlanSelect({
+  children,
+  ...properties
+}: Readonly<ComponentPropsWithoutRef<"select">>) {
+  return (
+    <span className="plan-select-control">
+      <select {...properties}>{children}</select>
+      <AppIcon name="select" size={20} />
+    </span>
+  );
+}
+
 function modalityItem(
   item: TrainingPlanDraftItem,
   modality: TrainingModality,
@@ -200,7 +217,7 @@ function LoadConfiguration({
       <legend>Carga</legend>
       <label>
         <span>Como você treina?</span>
-        <select
+        <PlanSelect
           onChange={(event) =>
             changeMode(event.target.value as TrainingLoadMode)
           }
@@ -209,7 +226,7 @@ function LoadConfiguration({
           <option value="unconfigured">Configurar depois</option>
           <option value="external">Usa carga externa</option>
           <option value="none">Sem carga externa</option>
-        </select>
+        </PlanSelect>
       </label>
       {item.loadMode === "external" ? (
         <>
@@ -299,7 +316,7 @@ function ExerciseEditor({
         </label>
         <label>
           <span>Tipo</span>
-          <select
+          <PlanSelect
             onChange={(event) =>
               onChange(
                 modalityItem(item, event.target.value as TrainingModality),
@@ -312,7 +329,7 @@ function ExerciseEditor({
                 {label}
               </option>
             ))}
-          </select>
+          </PlanSelect>
         </label>
         <label>
           <span>Séries</span>
@@ -908,32 +925,18 @@ export function TrainingPlanEditorScreen({
                         <div className="plan-editor-card-heading">
                           <div>
                             <small className="plan-editor-position">
-                              Treino {sessionIndex + 1} de{" "}
-                              {draft.sessions.length}
+                              {session.items.length}{" "}
+                              {session.items.length === 1
+                                ? "exercício"
+                                : "exercícios"}
                             </small>
-                            <h2>{session.name}</h2>
+                            <h2>Treino {sessionIndex + 1}</h2>
                           </div>
-                          <button
-                            className="button-text button-danger-text"
-                            disabled={draft.sessions.length === 1}
-                            onClick={() => {
-                              const remaining = draft.sessions.filter(
-                                (current) =>
-                                  current.sessionId !== session.sessionId,
-                              );
-                              setDraft({ ...draft, sessions: remaining });
-                              setSelectedSessionId("");
-                              setSelectedItemId("");
-                            }}
-                            type="button"
-                          >
-                            Remover treino
-                          </button>
                         </div>
                         <div className="plan-field-grid plan-field-grid-two">
                           <label>
                             <span>Dia da semana</span>
-                            <select
+                            <PlanSelect
                               onChange={(event) =>
                                 updateSession(session.sessionId, (current) => ({
                                   ...current,
@@ -950,7 +953,7 @@ export function TrainingPlanEditorScreen({
                                   {trainingSlotLabel(slot)}
                                 </option>
                               ))}
-                            </select>
+                            </PlanSelect>
                           </label>
                           <label>
                             <span>Nome do treino</span>
@@ -967,6 +970,23 @@ export function TrainingPlanEditorScreen({
                             />
                           </label>
                         </div>
+                        <button
+                          className="button-text button-danger-text plan-remove-action"
+                          disabled={draft.sessions.length === 1}
+                          onClick={() => {
+                            const remaining = draft.sessions.filter(
+                              (current) =>
+                                current.sessionId !== session.sessionId,
+                            );
+                            setDraft({ ...draft, sessions: remaining });
+                            setSelectedSessionId("");
+                            setSelectedItemId("");
+                          }}
+                          type="button"
+                        >
+                          <AppIcon name="trash" size={18} />
+                          <span>Remover treino</span>
+                        </button>
                         <EditorEntityList
                           ariaLabel={`Exercícios de ${session.name}`}
                           onSelect={setSelectedItemId}

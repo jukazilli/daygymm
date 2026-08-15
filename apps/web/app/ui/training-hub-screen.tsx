@@ -13,7 +13,6 @@ import type {
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
-import { trainingSessionHref } from "../../lib/training-weekdays";
 import { AppIcon, type AppIconName } from "./app-icon";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
@@ -96,53 +95,34 @@ function TrainingState({
   }
 
   if (trainingState.plan) {
-    const activeRun = trainingState.activeRun;
-    const completedCount = activeRun
-      ? activeRun.session.items.filter((item) => item.completedAt).length
-      : 0;
     return (
       <div className="training-plan-layout training-hub-layout">
-        {trainingState.nextSession ? (
-          <section className="next-training-card training-hub-primary">
-            <div>
-              <p className="eyebrow">
-                {activeRun ? "Em andamento" : "Treino de hoje"}
-              </p>
-              <h1>{trainingState.nextSession.name}</h1>
-              <p>
-                {activeRun
-                  ? `${completedCount} de ${activeRun.session.items.length} exercícios`
-                  : `${trainingState.nextSession.items.length} exercícios`}
-              </p>
-            </div>
-            <Link
-              className="button-primary"
-              href={trainingSessionHref(trainingState.nextSession.sessionId)}
-            >
-              <AppIcon name={activeRun ? "play" : "workouts"} size={20} />
-              <span>{activeRun ? "Continuar treino" : "Abrir treino"}</span>
-            </Link>
-          </section>
-        ) : (
-          <section className="next-training-card training-rest-card training-hub-primary">
-            <div>
-              <p className="eyebrow">Hoje</p>
-              <h1>Dia de descanso.</h1>
-              <p>Se quiser treinar, escolha uma sessão do seu plano.</p>
-            </div>
-            <Link className="button-primary" href="/treinos/meus/">
-              Escolher treino
-            </Link>
-          </section>
-        )}
-
-        <section aria-labelledby="training-quick-access-title">
-          <div className="section-heading">
+        <section className="next-training-card training-hub-primary">
+          <div className="training-hub-highlight-copy">
+            <span className="training-hub-highlight-icon">
+              <AppIcon name="calendar" size={28} />
+            </span>
             <div>
               <p className="eyebrow">
                 {trainingState.plan.name} · versão {trainingState.plan.version}
               </p>
-              <h2 id="training-quick-access-title">Acessos rápidos</h2>
+              <h1>Meus treinos</h1>
+              <p>
+                {trainingState.plan.sessionCount}{" "}
+                {trainingState.plan.sessionCount === 1 ? "treino" : "treinos"}
+              </p>
+            </div>
+          </div>
+          <Link className="button-primary" href="/treinos/meus/">
+            <AppIcon name="calendar" size={20} />
+            <span>Abrir meus treinos</span>
+          </Link>
+        </section>
+
+        <section aria-labelledby="training-quick-access-title">
+          <div className="section-heading">
+            <div>
+              <h2 id="training-quick-access-title">Ações do plano</h2>
             </div>
           </div>
           <div className="training-quick-actions">
@@ -151,12 +131,6 @@ function TrainingState({
               href="/treinos/plano/"
               icon="plan"
               title="Criar treino"
-            />
-            <QuickAccess
-              description="Veja a agenda e escolha uma sessão"
-              href="/treinos/meus/"
-              icon="calendar"
-              title="Meus treinos"
             />
             <QuickAccess
               description="Defina carga inicial e passo"

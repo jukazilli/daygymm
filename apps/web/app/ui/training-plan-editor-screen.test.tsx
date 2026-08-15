@@ -163,6 +163,14 @@ describe("TrainingPlanEditorScreen", () => {
     await user.click(
       await screen.findByRole("button", { name: "Editar Treino A" }),
     );
+    expect(
+      screen
+        .getByRole("combobox", { name: "Dia da semana" })
+        .closest(".plan-select-control"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Supino reto").closest(".editor-entity-copy"),
+    ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Editar Esteira" }));
     const exerciseField = screen.getByRole("textbox", { name: "Exercício" });
     expect((exerciseField as HTMLInputElement).value).toBe("Esteira");

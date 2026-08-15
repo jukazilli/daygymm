@@ -90,7 +90,7 @@ describe("TrainingHubScreen", () => {
     ).toBe("/treinos/plano");
   });
 
-  it("keeps one primary workout action and exposes compact navigation", async () => {
+  it("makes My trainings the only highlighted action in the training hub", async () => {
     const plannedSession = {
       dayOrder: 1,
       items: [
@@ -143,22 +143,23 @@ describe("TrainingHubScreen", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Treino A" }),
+      await screen.findByRole("heading", { name: "Meus treinos" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: /Abrir treino/ }).getAttribute("href"),
-    ).toBe("/treinos/sessao?sessao=62000000-0000-4000-8000-000000000002");
+      screen
+        .getByRole("link", { name: /Abrir meus treinos/ })
+        .getAttribute("href"),
+    ).toBe("/treinos/meus");
     expect(screen.getAllByRole("link", { name: /Criar treino/ })).toHaveLength(
       1,
     );
-    expect(
-      screen.getByRole("link", { name: /Meus treinos/ }).getAttribute("href"),
-    ).toBe("/treinos/meus");
     expect(
       screen
         .getByRole("link", { name: /Configurar cargas/ })
         .getAttribute("href"),
     ).toBe("/treinos/cargas");
+    expect(screen.queryByText("Treino de hoje")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Abrir treino$/ })).toBeNull();
     expect(screen.queryByText("Agenda semanal")).toBeNull();
   });
 });
