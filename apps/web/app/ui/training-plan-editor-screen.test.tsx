@@ -171,6 +171,8 @@ describe("TrainingPlanEditorScreen", () => {
     await user.keyboard("{ArrowRight}");
     expect((exerciseField as HTMLInputElement).value).toBe("Remada baixa");
 
+    const secondTraining = screen.getByRole("tab", { name: /Treino B/ });
+    await waitFor(() => expect(document.activeElement).toBe(secondTraining));
     await user.keyboard("{ArrowLeft}");
     await user.click(screen.getByRole("tab", { name: /Caminhada inclinada/ }));
     expect((exerciseField as HTMLInputElement).value).toBe(
