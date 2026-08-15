@@ -389,13 +389,6 @@ select is(
   'repeated resume is idempotent'
 );
 
-reset role;
-update api.training_session_runs
-set started_at = statement_timestamp() - interval '120 seconds',
-  paused_duration_seconds = 60
-where run_id = 'b8000000-0000-4000-8000-000000000008';
-set local role authenticated;
-
 select is(
   (select was_created from api.start_training_exercise(
     'b8000000-0000-4000-8000-000000000008',
@@ -699,6 +692,17 @@ select is(
   true,
   'the final time set automatically completes its exercise'
 );
+
+-- Anchor elapsed time immediately before finishing. Keeping this setup beside
+-- the assertion prevents the duration check from depending on how long the
+-- preceding remote pgTAP statements take to execute.
+reset role;
+update api.training_session_runs
+set started_at = statement_timestamp() - interval '120 seconds',
+  paused_duration_seconds = 60
+where run_id = 'b8000000-0000-4000-8000-000000000008';
+set local role authenticated;
+
 select is(
   (select was_created from api.finish_training_session(
     'b8000000-0000-4000-8000-000000000008',
