@@ -136,8 +136,10 @@ export interface TrainingSessionRunSetRow extends Record<string, unknown> {
   planned_reps_min: number | null;
   planned_weight_kg: number | null;
   run_id: string;
+  revision: number;
   set_execution_id: string;
   set_number: number;
+  updated_at: string;
   user_id: string;
 }
 
@@ -155,10 +157,26 @@ export interface TrainingSessionSetRow extends Record<string, unknown> {
   planned_reps_max: number | null;
   planned_reps_min: number | null;
   planned_weight_kg: number | null;
+  revision: number;
   session_id: string;
   set_execution_id: string;
   set_number: number;
+  updated_at: string;
   user_id: string;
+}
+
+export interface PreviousTrainingSetReferenceRpcRow extends Record<
+  string,
+  unknown
+> {
+  actual_distance_meters: number | null;
+  actual_duration_seconds: number | null;
+  actual_reps: number | null;
+  actual_weight_kg: number | null;
+  completed_at: string;
+  plan_item_id: string;
+  set_number: number;
+  source_session_id: string;
 }
 
 export interface CompletedTrainingSessionRow extends Record<string, unknown> {
@@ -202,6 +220,18 @@ export interface SetCompletionRpcRow extends Record<string, unknown> {
   set_number: number;
   total_sets: number;
   was_created: boolean;
+}
+
+export interface SetRevisionRpcRow extends Record<string, unknown> {
+  action: "correct" | "undo";
+  changed_at: string;
+  completed_set_count: number;
+  exercise_completed: boolean;
+  revision: number | null;
+  set_execution_id: string;
+  set_number: number;
+  total_sets: number;
+  was_changed: boolean;
 }
 
 export interface TrainingFinishRpcRow extends Record<string, unknown> {
@@ -376,6 +406,28 @@ export interface WebDatabase {
           p_set_number: number;
         };
         Returns: SetCompletionRpcRow[];
+      };
+      get_previous_training_set_references: {
+        Args: {
+          p_run_id: string;
+        };
+        Returns: PreviousTrainingSetReferenceRpcRow[];
+      };
+      revise_training_set: {
+        Args: {
+          p_action: "correct" | "undo";
+          p_actual_distance_meters: number | null;
+          p_actual_duration_seconds: number | null;
+          p_actual_reps: number | null;
+          p_actual_weight_kg: number | null;
+          p_expected_revision: number;
+          p_operation_id: string;
+          p_plan_item_id: string;
+          p_run_id: string;
+          p_set_execution_id: string;
+          p_set_number: number;
+        };
+        Returns: SetRevisionRpcRow[];
       };
       finish_training_session: {
         Args: {

@@ -31,8 +31,22 @@ export const practicalTrainingSetSchema = z
     plannedRepsMax: z.number().int().min(1).max(1_000).nullable(),
     plannedRepsMin: z.number().int().min(1).max(1_000).nullable(),
     plannedWeightKg: optionalWeightSchema,
+    revision: z.number().int().min(1).max(1_000),
     setExecutionId: uuidSchema,
     setNumber: z.number().int().min(1).max(20),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export const previousTrainingSetReferenceSchema = z
+  .object({
+    actualDistanceMeters: z.number().int().min(1).max(100_000).nullable(),
+    actualDurationSeconds: z.number().int().min(1).max(7_200).nullable(),
+    actualReps: z.number().int().min(1).max(1_000).nullable(),
+    actualWeightKg: optionalWeightSchema,
+    completedAt: z.string().datetime({ offset: true }),
+    setNumber: z.number().int().min(1).max(20),
+    sourceSessionId: uuidSchema,
   })
   .strict();
 
@@ -49,6 +63,7 @@ export const practicalTrainingExerciseSchema = z
     notes: z.string().max(500).nullable(),
     order: z.number().int().min(1).max(100),
     plannedWeightKg: optionalWeightSchema,
+    previousSetReferences: z.array(previousTrainingSetReferenceSchema).max(20),
     repsMax: z.number().int().min(1).max(1_000).nullable(),
     repsMin: z.number().int().min(1).max(1_000).nullable(),
     restSeconds: z.number().int().min(0).max(1_800),
@@ -136,6 +151,54 @@ export const setCompletionSchema = z
   })
   .strict();
 
+const setRevisionIdentitySchema = z.object({
+  expectedRevision: z.number().int().min(1).max(1_000),
+  itemId: uuidSchema,
+  runId: uuidSchema,
+  setExecutionId: uuidSchema,
+  setNumber: z.number().int().min(1).max(20),
+});
+
+export const setRevisionInputSchema = z
+  .discriminatedUnion("action", [
+    setRevisionIdentitySchema
+      .extend({
+        action: z.literal("correct"),
+        actualDistanceMeters: z.number().int().min(1).max(100_000).nullable(),
+        actualDurationSeconds: z.number().int().min(1).max(7_200).nullable(),
+        actualReps: z.number().int().min(1).max(1_000).nullable(),
+        actualWeightKg: optionalWeightSchema,
+      })
+      .strict(),
+    setRevisionIdentitySchema
+      .extend({
+        action: z.literal("undo"),
+      })
+      .strict(),
+  ])
+  .refine(
+    (input) =>
+      input.action === "undo" ||
+      input.actualReps !== null ||
+      input.actualDurationSeconds !== null ||
+      input.actualDistanceMeters !== null,
+    { message: "A corrected set requires one performed measure." },
+  );
+
+export const setRevisionSchema = z
+  .object({
+    action: z.enum(["correct", "undo"]),
+    changedAt: z.string().datetime({ offset: true }),
+    completedSetCount: z.number().int().min(0).max(20),
+    exerciseCompleted: z.boolean(),
+    revision: z.number().int().min(1).max(1_000).nullable(),
+    setExecutionId: uuidSchema,
+    setNumber: z.number().int().min(1).max(20),
+    totalSets: z.number().int().min(1).max(20),
+    wasChanged: z.boolean(),
+  })
+  .strict();
+
 export const completedTrainingSessionSchema = z
   .object({
     completedAt: z.string().datetime({ offset: true }),
@@ -149,6 +212,9 @@ export type PracticalTrainingExercise = z.infer<
   typeof practicalTrainingExerciseSchema
 >;
 export type PracticalTrainingSet = z.infer<typeof practicalTrainingSetSchema>;
+export type PreviousTrainingSetReference = z.infer<
+  typeof previousTrainingSetReferenceSchema
+>;
 export type PracticalTrainingPlanSession = z.infer<
   typeof practicalTrainingPlanSessionSchema
 >;
@@ -160,6 +226,8 @@ export type ExerciseCompletion = z.infer<typeof exerciseCompletionSchema>;
 export type ExerciseStart = z.infer<typeof exerciseStartSchema>;
 export type SetCompletionInput = z.infer<typeof setCompletionInputSchema>;
 export type SetCompletion = z.infer<typeof setCompletionSchema>;
+export type SetRevisionInput = z.infer<typeof setRevisionInputSchema>;
+export type SetRevision = z.infer<typeof setRevisionSchema>;
 export type CompletedTrainingSession = z.infer<
   typeof completedTrainingSessionSchema
 >;
@@ -200,6 +268,9 @@ export interface TrainingSessionGateway {
   ): Promise<TrainingSessionResult<PracticalTrainingState>>;
   pause(runId: string): Promise<TrainingSessionResult<TrainingPauseState>>;
   resume(runId: string): Promise<TrainingSessionResult<TrainingPauseState>>;
+  reviseSet(
+    input: SetRevisionInput,
+  ): Promise<TrainingSessionResult<SetRevision>>;
   start(
     plannedSessionId: string,
   ): Promise<TrainingSessionResult<ActiveTrainingRun>>;

@@ -6,6 +6,8 @@ import {
   practicalTrainingStateSchema,
   setCompletionInputSchema,
   setCompletionSchema,
+  setRevisionInputSchema,
+  setRevisionSchema,
   type PracticalTrainingExercise,
   type PracticalTrainingSet,
   type PracticalTrainingPlanSession,
@@ -19,7 +21,9 @@ import type {
   CompletedTrainingSessionRow,
   ExerciseCompletionRpcRow,
   ExerciseStartRpcRow,
+  PreviousTrainingSetReferenceRpcRow,
   SetCompletionRpcRow,
+  SetRevisionRpcRow,
   TrainingCancelRpcRow,
   TrainingFinishRpcRow,
   TrainingPauseRpcRow,
@@ -45,7 +49,7 @@ function failureFromError(error: unknown): TrainingSessionFailure {
     ) {
       return "session";
     }
-    if (code === "23505" || code === "23514") {
+    if (code === "23505" || code === "23514" || code === "40001") {
       return "conflict";
     }
     if (code === "22023") {
@@ -61,6 +65,28 @@ function failure<T>(error: unknown): TrainingSessionResult<T> {
 
 function randomUuid() {
   return globalThis.crypto.randomUUID();
+}
+
+function revisionOperationId(
+  action: "correct" | "undo",
+  setExecutionId: string,
+  revision: number,
+  values: {
+    actualDistanceMeters: number | null;
+    actualDurationSeconds: number | null;
+    actualReps: number | null;
+    actualWeightKg: number | null;
+  },
+) {
+  const encodedValues = [
+    values.actualReps,
+    values.actualWeightKg,
+    values.actualDurationSeconds,
+    values.actualDistanceMeters,
+  ]
+    .map((value) => value ?? "n")
+    .join(":");
+  return `training-set-${action}:${setExecutionId}:${revision}:${encodedValues}`;
 }
 
 function mapPlan(row: TrainingPlanRow) {
@@ -93,6 +119,7 @@ function mapPlanItem(
     notes: row.notes,
     order: row.item_order,
     plannedWeightKg: row.planned_weight_kg,
+    previousSetReferences: [],
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
@@ -115,14 +142,17 @@ function mapRunSet(row: TrainingSessionRunSetRow): PracticalTrainingSet {
     plannedRepsMax: row.planned_reps_max,
     plannedRepsMin: row.planned_reps_min,
     plannedWeightKg: row.planned_weight_kg,
+    revision: row.revision,
     setExecutionId: row.set_execution_id,
     setNumber: row.set_number,
+    updatedAt: row.updated_at,
   };
 }
 
 function mapRunItem(
   row: TrainingSessionRunItemRow,
   sets: TrainingSessionRunSetRow[],
+  references: PreviousTrainingSetReferenceRpcRow[],
 ): PracticalTrainingExercise {
   return {
     circuitGroup: row.circuit_group,
@@ -135,6 +165,18 @@ function mapRunItem(
     notes: row.notes,
     order: row.item_order,
     plannedWeightKg: row.planned_weight_kg,
+    previousSetReferences: references
+      .filter((reference) => reference.plan_item_id === row.plan_item_id)
+      .sort((left, right) => left.set_number - right.set_number)
+      .map((reference) => ({
+        actualDistanceMeters: reference.actual_distance_meters,
+        actualDurationSeconds: reference.actual_duration_seconds,
+        actualReps: reference.actual_reps,
+        actualWeightKg: reference.actual_weight_kg,
+        completedAt: reference.completed_at,
+        setNumber: reference.set_number,
+        sourceSessionId: reference.source_session_id,
+      })),
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
@@ -290,23 +332,28 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       let activeRun = null;
 
       if (runRow) {
-        const [runItemsResult, runSetsResult] = await Promise.all([
-          client
-            .from("training_session_run_items")
-            .select(
-              "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
-            )
-            .eq("run_id", runRow.run_id)
-            .order("item_order"),
-          client
-            .from("training_session_run_sets")
-            .select(
-              "set_execution_id,run_id,plan_item_id,user_id,set_number,planned_reps_min,planned_reps_max,actual_reps,planned_weight_kg,actual_weight_kg,planned_duration_seconds,actual_duration_seconds,planned_distance_meters,actual_distance_meters,completed_at",
-            )
-            .eq("run_id", runRow.run_id)
-            .order("set_number"),
-        ]);
-        const activeRunError = runItemsResult.error ?? runSetsResult.error;
+        const [runItemsResult, runSetsResult, referencesResult] =
+          await Promise.all([
+            client
+              .from("training_session_run_items")
+              .select(
+                "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
+              )
+              .eq("run_id", runRow.run_id)
+              .order("item_order"),
+            client
+              .from("training_session_run_sets")
+              .select(
+                "set_execution_id,run_id,plan_item_id,user_id,set_number,planned_reps_min,planned_reps_max,actual_reps,planned_weight_kg,actual_weight_kg,planned_duration_seconds,actual_duration_seconds,planned_distance_meters,actual_distance_meters,completed_at,revision,updated_at",
+              )
+              .eq("run_id", runRow.run_id)
+              .order("set_number"),
+            client.rpc("get_previous_training_set_references", {
+              p_run_id: runRow.run_id,
+            }),
+          ]);
+        const activeRunError =
+          runItemsResult.error ?? runSetsResult.error ?? referencesResult.error;
         if (activeRunError) {
           return failure(activeRunError);
         }
@@ -326,6 +373,8 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
               mapRunItem(
                 item as TrainingSessionRunItemRow,
                 (runSetsResult.data ?? []) as TrainingSessionRunSetRow[],
+                (referencesResult.data ??
+                  []) as PreviousTrainingSetReferenceRpcRow[],
               ),
             ),
           },
@@ -452,6 +501,62 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
           },
         };
       } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    },
+    async reviseSet(input) {
+      try {
+        const parsed = setRevisionInputSchema.parse(input);
+        const client = getWebSupabaseClient();
+        const actualValues =
+          parsed.action === "correct"
+            ? parsed
+            : {
+                actualDistanceMeters: null,
+                actualDurationSeconds: null,
+                actualReps: null,
+                actualWeightKg: null,
+              };
+        const { data, error } = await client.rpc("revise_training_set", {
+          p_action: parsed.action,
+          p_actual_distance_meters: actualValues.actualDistanceMeters,
+          p_actual_duration_seconds: actualValues.actualDurationSeconds,
+          p_actual_reps: actualValues.actualReps,
+          p_actual_weight_kg: actualValues.actualWeightKg,
+          p_expected_revision: parsed.expectedRevision,
+          p_operation_id: revisionOperationId(
+            parsed.action,
+            parsed.setExecutionId,
+            parsed.expectedRevision,
+            actualValues,
+          ),
+          p_plan_item_id: parsed.itemId,
+          p_run_id: parsed.runId,
+          p_set_execution_id: parsed.setExecutionId,
+          p_set_number: parsed.setNumber,
+        });
+        const row = data?.[0] as SetRevisionRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: setRevisionSchema.parse({
+            action: row.action,
+            changedAt: row.changed_at,
+            completedSetCount: row.completed_set_count,
+            exerciseCompleted: row.exercise_completed,
+            revision: row.revision,
+            setExecutionId: row.set_execution_id,
+            setNumber: row.set_number,
+            totalSets: row.total_sets,
+            wasChanged: row.was_changed,
+          }),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.name === "ZodError") {
+          return failure(error);
+        }
         return { ok: false, reason: "configuration" };
       }
     },

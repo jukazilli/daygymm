@@ -336,6 +336,8 @@ em cascade depois da cópia atômica para o histórico canônico.
 | medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo da série          | Conteúdo de treino         | Mesmo ciclo da execução           | Não                        |
 | medidas realizadas | ao menos repetição, duração ou distância        | Registrar o que foi realizado      | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
 | `completed_at`     | timestamptz do servidor                         | Confirmar persistência imediata    | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| `revision`         | inteiro, 1–1.000                                | Impedir sobrescrita concorrente    | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| `updated_at`       | timestamptz do servidor                         | Registrar a última correção        | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
 
 ### `api.training_session_sets`
 
@@ -353,6 +355,45 @@ O cliente possui apenas leitura das próprias linhas.
 | medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo histórico            | Conteúdo de treino         | Mesmo ciclo da sessão concluída | Não                          |
 | medidas realizadas | repetição, carga, duração e distância opcionais | Preservar o resultado histórico       | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
 | `completed_at`     | timestamptz do servidor                         | Registrar quando a série terminou     | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+| `revision`         | inteiro, 1–1.000                                | Preservar a versão final da série     | Metadado operacional       | Mesmo ciclo da sessão concluída | Não                          |
+| `updated_at`       | timestamptz do servidor                         | Preservar quando ocorreu a correção   | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+
+### `api.training_session_run_set_adjustments`
+
+Owner: comando `private.revise_training_set()`.
+
+Finalidade: auditar correções e desfazimentos enquanto a execução permanece
+ativa. A linha registra valores anteriores e posteriores, revisão esperada,
+resultado do comando e chave idempotente. O vínculo com a execução usa cascade:
+cancelar não preserva dados e finalizar copia somente correções de séries que
+permanecem no histórico canônico.
+
+| Campo             | Tipo/restrição                       | Finalidade                            | Classificação              | Retenção atual                    | Índice                     |
+| ----------------- | ------------------------------------ | ------------------------------------- | -------------------------- | --------------------------------- | -------------------------- |
+| `adjustment_id`   | UUID, PK                             | Identificar a alteração               | Identificador técnico      | Até finalizar/cancelar a execução | PK                         |
+| referências       | execução, série, item e titular      | Fixar escopo e isolamento             | Identificador pessoal      | Mesmo ciclo da execução           | Índices por execução/série |
+| `operation_id`    | texto técnico, unique por usuário    | Deduplicar repetição do comando       | Identificador técnico      | Mesmo ciclo da execução           | Unique composto            |
+| ação e revisões   | `correct`/`undo`, inteiros limitados | Aplicar concorrência otimista         | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| antes/depois      | JSONB validado                       | Preservar a mudança auditável         | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| estado resultante | contagens e conclusão                | Repetir resposta sem reaplicar a ação | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| `changed_at`      | timestamptz do servidor              | Ordenar alterações                    | Dado de atividade sensível | Mesmo ciclo da execução           | Índice composto            |
+
+### `api.training_session_set_adjustments`
+
+Owner: trigger `private.copy_training_set_adjustments()` durante a finalização.
+
+Finalidade: preservar a trilha de correções das séries que efetivamente compõem
+uma sessão concluída. Desfazimentos não são copiados porque a respectiva série
+não faz parte do resultado; cancelamentos removem toda a execução sem histórico.
+
+| Campo           | Tipo/restrição                    | Finalidade                          | Classificação              | Retenção atual                  | Índice                  |
+| --------------- | --------------------------------- | ----------------------------------- | -------------------------- | ------------------------------- | ----------------------- |
+| `adjustment_id` | UUID, PK                          | Preservar a identidade da alteração | Identificador técnico      | Mesmo ciclo da sessão concluída | PK                      |
+| referências     | sessão, série, item e titular     | Fixar proveniência e isolamento     | Identificador pessoal      | Mesmo ciclo da sessão concluída | Índice por sessão/série |
+| `operation_id`  | texto técnico, unique por usuário | Preservar a deduplicação original   | Identificador técnico      | Mesmo ciclo da sessão concluída | Unique composto         |
+| revisões        | inteiros, 1–1.000                 | Explicar a evolução da série        | Metadado operacional       | Mesmo ciclo da sessão concluída | Não                     |
+| antes/depois    | JSONB validado                    | Auditar os valores corrigidos       | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                     |
+| `changed_at`    | timestamptz do servidor           | Ordenar alterações                  | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Índice composto         |
 
 ### `platform.domain_event_receipts`
 
@@ -379,42 +420,46 @@ canônicas críticas continuam server-owned; o contexto progressivo, pertencente
 ao próprio titular, usa grants de coluna, constraints e RLS. O schema `private`
 não é exposto ao cliente.
 
-| Recurso                              | Papel                  |  SELECT |  INSERT |  UPDATE | DELETE | Política/controle                                                                                                                    | Teste negativo                  |
-| ------------------------------------ | ---------------------- | ------: | ------: | ------: | -----: | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| `api.profiles`                       | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.profiles`                       | `authenticated`        | Próprio |     Não |     Não |    Não | `profiles_select_own`; grants mínimos                                                                                                | `RLS-N02`, `RLS-N05`            |
-| `api.profiles`                       | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
-| `api.consents`                       | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.consents`                       | `authenticated`        | Próprio |     Não |     Não |    Não | `consents_select_own`; grants mínimos                                                                                                | `RLS-N03`, `RLS-N06`            |
-| `api.consents`                       | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
-| `private.legal_document_versions`    | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; grants revogados                                                                                                     | `RLS-N04`                       |
-| `private.legal_document_versions`    | administração          |     Sim |     Sim |     Sim |    Sim | migration/operação privilegiada                                                                                                      | fora do cliente                 |
-| `platform.job_outbox`                | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N07`                       |
-| `platform.job_outbox`                | funções internas       |     Sim |     Sim |     Sim |    Não | definer boundary e fila privada                                                                                                      | testes do outbox                |
-| `platform.job_outbox`                | worker runtime         |     Não |     Não |     Não |    Não | apenas wrappers privados bounded                                                                                                     | `RLS-N08`                       |
-| `api.training_sessions`              | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.training_sessions`              | `authenticated`        | Próprio |     Não |     Não |    Não | `training_sessions_select_own`; grants mínimos                                                                                       | `RLS-N09`                       |
-| `api.training_sessions`              | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando               |
-| `api.onboarding_contexts`            | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.onboarding_contexts`            | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12`, `RLS-N13` |
-| `api.training_plans`                 | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; publicação, arquivamento e restauração somente por comandos limitados                                   | `RLS-N14`, `RLS-N21`, `RLS-N25` |
-| `api.training_plan_versions`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_versions_select_own`; versões imutáveis                                                                               | `RLS-N15`                       |
-| `api.training_plan_sessions`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_sessions_select_own`; isolamento redundante por titular                                                               | `RLS-N16`                       |
-| `api.training_plan_items`            | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_items_select_own`; proposta revalidada pelo servidor                                                                  | `RLS-N17`                       |
-| `api.training_plan_schedule_entries` | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_schedule_entries_select_own`; projeção escrita somente pelo trigger                                                   | `RLS-N20`                       |
-| `api.training_session_runs`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_runs_select_own`; mutação somente por comandos                                                                     | `RLS-N18`, `RLS-N22`            |
-| `api.training_session_run_items`     | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_items_select_own`; mutação somente por comandos                                                                | `RLS-N19`                       |
-| `api.training_session_run_sets`      | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_sets_select_own`; cada série é gravada somente pelo comando idempotente                                        | `RLS-N23`                       |
-| `api.training_session_sets`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_sets_select_own`; histórico escrito somente durante a finalização                                                  | `RLS-N24`                       |
-| `platform.domain_event_receipts`     | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`                       |
-| `platform.domain_event_receipts`     | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`                       |
-| `platform.domain_event_receipts`     | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler               |
+| Recurso                                    | Papel                  |  SELECT |  INSERT |  UPDATE | DELETE | Política/controle                                                                                                                    | Teste negativo                  |
+| ------------------------------------------ | ---------------------- | ------: | ------: | ------: | -----: | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| `api.profiles`                             | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.profiles`                             | `authenticated`        | Próprio |     Não |     Não |    Não | `profiles_select_own`; grants mínimos                                                                                                | `RLS-N02`, `RLS-N05`            |
+| `api.profiles`                             | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
+| `api.consents`                             | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.consents`                             | `authenticated`        | Próprio |     Não |     Não |    Não | `consents_select_own`; grants mínimos                                                                                                | `RLS-N03`, `RLS-N06`            |
+| `api.consents`                             | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
+| `private.legal_document_versions`          | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; grants revogados                                                                                                     | `RLS-N04`                       |
+| `private.legal_document_versions`          | administração          |     Sim |     Sim |     Sim |    Sim | migration/operação privilegiada                                                                                                      | fora do cliente                 |
+| `platform.job_outbox`                      | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N07`                       |
+| `platform.job_outbox`                      | funções internas       |     Sim |     Sim |     Sim |    Não | definer boundary e fila privada                                                                                                      | testes do outbox                |
+| `platform.job_outbox`                      | worker runtime         |     Não |     Não |     Não |    Não | apenas wrappers privados bounded                                                                                                     | `RLS-N08`                       |
+| `api.training_sessions`                    | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.training_sessions`                    | `authenticated`        | Próprio |     Não |     Não |    Não | `training_sessions_select_own`; grants mínimos                                                                                       | `RLS-N09`                       |
+| `api.training_sessions`                    | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando               |
+| `api.onboarding_contexts`                  | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.onboarding_contexts`                  | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12`, `RLS-N13` |
+| `api.training_plans`                       | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; publicação, arquivamento e restauração somente por comandos limitados                                   | `RLS-N14`, `RLS-N21`, `RLS-N25` |
+| `api.training_plan_versions`               | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_versions_select_own`; versões imutáveis                                                                               | `RLS-N15`                       |
+| `api.training_plan_sessions`               | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_sessions_select_own`; isolamento redundante por titular                                                               | `RLS-N16`                       |
+| `api.training_plan_items`                  | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_items_select_own`; proposta revalidada pelo servidor                                                                  | `RLS-N17`                       |
+| `api.training_plan_schedule_entries`       | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_schedule_entries_select_own`; projeção escrita somente pelo trigger                                                   | `RLS-N20`                       |
+| `api.training_session_runs`                | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_runs_select_own`; mutação somente por comandos                                                                     | `RLS-N18`, `RLS-N22`            |
+| `api.training_session_run_items`           | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_items_select_own`; mutação somente por comandos                                                                | `RLS-N19`                       |
+| `api.training_session_run_sets`            | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_sets_select_own`; cada série é gravada somente pelo comando idempotente                                        | `RLS-N23`                       |
+| `api.training_session_sets`                | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_sets_select_own`; histórico escrito somente durante a finalização                                                  | `RLS-N24`                       |
+| `api.training_session_run_set_adjustments` | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_set_adjustments_select_own`; escrita somente pelo comando transacional                                         | `RLS-N26`                       |
+| `api.training_session_set_adjustments`     | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_set_adjustments_select_own`; cópia somente durante a finalização                                                   | `RLS-N27`                       |
+| `platform.domain_event_receipts`           | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`                       |
+| `platform.domain_event_receipts`           | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`                       |
+| `platform.domain_event_receipts`           | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler               |
 
 As policies temporárias de inserção da fundação foram removidas pela migration
 seguinte. As policies ativas são `profiles_select_own`, `consents_select_own`,
 `training_sessions_select_own`, `training_session_runs_select_own`,
 `training_session_run_items_select_own`, `training_session_run_sets_select_own`,
-`training_session_sets_select_own`, `onboarding_contexts_select_own`,
+`training_session_sets_select_own`,
+`training_session_run_set_adjustments_select_own`,
+`training_session_set_adjustments_select_own`, `onboarding_contexts_select_own`,
 `onboarding_contexts_insert_own`, `onboarding_contexts_update_own` e
 `training_plan_schedule_entries_select_own`. Os controles
 negativos estáveis são:
@@ -447,6 +492,8 @@ negativos estáveis são:
 - `RLS-N24`: isola o histórico canônico de séries entre titulares.
 - `RLS-N25`: bloqueia publicação, arquivamento e restauração de plano por outro
   titular; uma execução ativa também bloqueia a troca da versão futura.
+- `RLS-N26`: isola a auditoria ativa de correções e desfazimentos entre titulares.
+- `RLS-N27`: isola a auditoria canônica de correções entre titulares.
 
 ## Pendências deliberadas para `FND-029`
 

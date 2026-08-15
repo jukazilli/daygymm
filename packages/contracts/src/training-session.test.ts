@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   practicalTrainingStateSchema,
   practicalTrainingPlanSessionSchema,
+  setRevisionInputSchema,
   setCompletionInputSchema,
 } from "./training-session.js";
 
@@ -21,6 +22,7 @@ const session = {
       notes: null,
       order: 1,
       plannedWeightKg: 40,
+      previousSetReferences: [],
       repsMax: 12,
       repsMin: 8,
       restSeconds: 90,
@@ -110,6 +112,40 @@ describe("practical training contracts", () => {
         ...base,
         actualReps: 12,
         actualWeightKg: 40.123,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("separates correction values from a set undo command", () => {
+    const identity = {
+      expectedRevision: 2,
+      itemId: "51000000-0000-4000-8000-000000000001",
+      runId: "53000000-0000-4000-8000-000000000003",
+      setExecutionId: "56000000-0000-4000-8000-000000000006",
+      setNumber: 1,
+    };
+
+    expect(
+      setRevisionInputSchema.safeParse({
+        ...identity,
+        action: "correct",
+        actualDistanceMeters: null,
+        actualDurationSeconds: null,
+        actualReps: 10,
+        actualWeightKg: 42.5,
+      }).success,
+    ).toBe(true);
+    expect(
+      setRevisionInputSchema.safeParse({ ...identity, action: "undo" }).success,
+    ).toBe(true);
+    expect(
+      setRevisionInputSchema.safeParse({
+        ...identity,
+        action: "correct",
+        actualDistanceMeters: null,
+        actualDurationSeconds: null,
+        actualReps: null,
+        actualWeightKg: 42.5,
       }).success,
     ).toBe(false);
   });

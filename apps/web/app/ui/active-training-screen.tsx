@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import type {
   PracticalTrainingExercise,
+  PracticalTrainingSet,
   PracticalTrainingState,
   SetCompletionInput,
+  SetRevisionInput,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
@@ -88,7 +90,9 @@ function setResult(exercise: PracticalTrainingExercise, setIndex: number) {
     return null;
   }
   return [
-    performed.actualWeightKg !== null ? `${performed.actualWeightKg} kg` : null,
+    performed.actualWeightKg !== null
+      ? `${formatWeight(performed.actualWeightKg)} kg`
+      : null,
     performed.actualReps !== null ? `${performed.actualReps} repetições` : null,
     performed.actualDurationSeconds !== null
       ? formatTrainingDuration(performed.actualDurationSeconds)
@@ -99,6 +103,41 @@ function setResult(exercise: PracticalTrainingExercise, setIndex: number) {
   ]
     .filter(Boolean)
     .join(" × ");
+}
+
+function referenceResult(
+  exercise: PracticalTrainingExercise,
+  setNumber: number,
+) {
+  const reference = exercise.previousSetReferences.find(
+    (candidate) => candidate.setNumber === setNumber,
+  );
+  if (!reference) {
+    return null;
+  }
+  const result = [
+    reference.actualWeightKg !== null
+      ? `${formatWeight(reference.actualWeightKg)} kg`
+      : null,
+    reference.actualReps !== null ? `${reference.actualReps} repetições` : null,
+    reference.actualDurationSeconds !== null
+      ? formatTrainingDuration(reference.actualDurationSeconds)
+      : null,
+    reference.actualDistanceMeters !== null
+      ? `${reference.actualDistanceMeters} m`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" × ");
+  return result
+    ? {
+        completedAt: new Intl.DateTimeFormat("pt-BR", {
+          day: "2-digit",
+          month: "short",
+        }).format(new Date(reference.completedAt)),
+        result,
+      }
+    : null;
 }
 
 function parsedInteger(value: string) {
@@ -114,17 +153,224 @@ function parsedDecimal(value: string) {
 
 type MissingMeasure = "duration" | "reps";
 
+type SetRevisionRequest =
+  | {
+      readonly action: "correct";
+      readonly actualDistanceMeters: number | null;
+      readonly actualDurationSeconds: number | null;
+      readonly actualReps: number | null;
+      readonly actualWeightKg: number | null;
+      readonly set: PracticalTrainingSet;
+    }
+  | { readonly action: "undo"; readonly set: PracticalTrainingSet };
+
+function SetRevisionDialog({
+  busy,
+  exercise,
+  isLatest,
+  onClose,
+  onRevise,
+  set,
+}: Readonly<{
+  busy: boolean;
+  exercise: PracticalTrainingExercise;
+  isLatest: boolean;
+  onClose: () => void;
+  onRevise: (request: SetRevisionRequest) => Promise<boolean>;
+  set: PracticalTrainingSet;
+}>) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const [reps, setReps] = useState(
+    set.actualReps === null ? "" : String(set.actualReps),
+  );
+  const [weight, setWeight] = useState(
+    set.actualWeightKg === null ? "" : String(set.actualWeightKg),
+  );
+  const [durationSeconds, setDurationSeconds] = useState(
+    set.actualDurationSeconds,
+  );
+  const [distance, setDistance] = useState(
+    set.actualDistanceMeters === null ? "" : String(set.actualDistanceMeters),
+  );
+  const actualReps = set.actualReps === null ? null : parsedInteger(reps);
+  const actualWeightKg = weight ? parsedDecimal(weight) : null;
+  const actualDurationSeconds =
+    set.actualDurationSeconds === null ? null : durationSeconds;
+  const actualDistanceMeters =
+    set.actualDistanceMeters === null ? null : parsedInteger(distance);
+  const isValid =
+    (set.actualReps === null || actualReps !== null) &&
+    (set.actualDurationSeconds === null || actualDurationSeconds !== null) &&
+    (set.actualDistanceMeters === null || actualDistanceMeters !== null);
+  const isChanged =
+    actualReps !== set.actualReps ||
+    actualWeightKg !== set.actualWeightKg ||
+    actualDurationSeconds !== set.actualDurationSeconds ||
+    actualDistanceMeters !== set.actualDistanceMeters;
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  async function saveCorrection() {
+    if (!isValid || !isChanged) {
+      return;
+    }
+    const succeeded = await onRevise({
+      action: "correct",
+      actualDistanceMeters,
+      actualDurationSeconds,
+      actualReps,
+      actualWeightKg,
+      set,
+    });
+    if (succeeded) {
+      onClose();
+    }
+  }
+
+  async function undoSet() {
+    const succeeded = await onRevise({ action: "undo", set });
+    if (succeeded) {
+      onClose();
+    }
+  }
+
+  return (
+    <div
+      className="session-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="set-revision-title"
+        aria-modal="true"
+        className="session-dialog set-revision-dialog"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <div>
+          <p className="eyebrow">{exercise.exerciseName}</p>
+          <h2 id="set-revision-title">Série {set.setNumber}</h2>
+        </div>
+        <p>Corrija somente o que você realizou nesta série.</p>
+        <div className="set-fields">
+          {exercise.modality === "strength" ? (
+            <label>
+              <span>
+                Carga <small>kg</small>
+              </span>
+              <input
+                inputMode="decimal"
+                min="0.25"
+                onChange={(event) => setWeight(event.target.value)}
+                placeholder="—"
+                step="0.01"
+                type="number"
+                value={weight}
+              />
+            </label>
+          ) : null}
+          {set.actualReps !== null ? (
+            <label>
+              <span>Repetições</span>
+              <input
+                inputMode="numeric"
+                max="1000"
+                min="1"
+                onChange={(event) => setReps(event.target.value)}
+                type="number"
+                value={reps}
+              />
+            </label>
+          ) : null}
+          {set.actualDurationSeconds !== null ? (
+            <label>
+              <span>Tempo</span>
+              <DurationInput
+                maximum={maximumExerciseDurationSeconds}
+                minimum={1}
+                onChange={setDurationSeconds}
+                required
+                seconds={durationSeconds}
+              />
+            </label>
+          ) : null}
+          {set.actualDistanceMeters !== null ? (
+            <label>
+              <span>
+                Distância <small>metros</small>
+              </span>
+              <input
+                inputMode="numeric"
+                max="100000"
+                min="1"
+                onChange={(event) => setDistance(event.target.value)}
+                type="number"
+                value={distance}
+              />
+            </label>
+          ) : null}
+        </div>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            disabled={busy || !isValid || !isChanged}
+            onClick={() => void saveCorrection()}
+            type="button"
+          >
+            {busy ? "Salvando…" : "Salvar correção"}
+          </button>
+          {isLatest ? (
+            <button
+              className="button-danger"
+              disabled={busy}
+              onClick={() => void undoSet()}
+              type="button"
+            >
+              Desfazer série
+            </button>
+          ) : null}
+          <button
+            className="button-text"
+            disabled={busy}
+            onClick={onClose}
+            type="button"
+          >
+            Voltar ao treino
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ExerciseExecution({
   busy,
   exercise,
   onCompleteSet,
+  onReviseSet,
   onStart,
 }: Readonly<{
   busy: boolean;
   exercise: PracticalTrainingExercise;
   onCompleteSet: (input: Omit<SetCompletionInput, "itemId" | "runId">) => void;
+  onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
   onStart: () => void;
 }>) {
+  const [selectedSet, setSelectedSet] = useState<PracticalTrainingSet>();
   const lastSet = exercise.setExecutions.at(-1);
   const [missingMeasure, setMissingMeasure] = useState<
     MissingMeasure | undefined
@@ -144,6 +390,7 @@ function ExerciseExecution({
   const hasKnownMeasure = hasPlannedReps || needsDuration || needsDistance;
   const nextSet = exercise.setExecutions.length + 1;
   const suggestedWeight = suggestedSetWeight(exercise, nextSet);
+  const previousResult = referenceResult(exercise, nextSet);
   const [reps, setReps] = useState(
     hasPlannedReps
       ? String(exercise.repsMax)
@@ -188,21 +435,43 @@ function ExerciseExecution({
 
   if (exercise.completedAt) {
     return (
-      <div className="exercise-completed-summary">
-        <strong>Concluído</strong>
-        {exercise.setExecutions.length > 0 ? (
-          <ol>
-            {exercise.setExecutions.map((set, index) => (
-              <li key={set.setExecutionId}>
-                <span>Série {set.setNumber}</span>
-                <strong>{setResult(exercise, index)}</strong>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p>{exerciseTarget(exercise)}</p>
-        )}
-      </div>
+      <>
+        <div className="exercise-completed-summary">
+          <strong>Concluído</strong>
+          {exercise.setExecutions.length > 0 ? (
+            <ol>
+              {exercise.setExecutions.map((set, index) => (
+                <li key={set.setExecutionId}>
+                  <button
+                    aria-label={`Corrigir série ${set.setNumber}`}
+                    className="completed-set-action"
+                    onClick={() => setSelectedSet(set)}
+                    type="button"
+                  >
+                    <span>Série {set.setNumber}</span>
+                    <strong>{setResult(exercise, index)}</strong>
+                    <AppIcon name="forward" size={18} />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>{exerciseTarget(exercise)}</p>
+          )}
+        </div>
+        {selectedSet ? (
+          <SetRevisionDialog
+            busy={busy}
+            exercise={exercise}
+            isLatest={
+              selectedSet.setNumber === exercise.setExecutions.at(-1)?.setNumber
+            }
+            onClose={() => setSelectedSet(undefined)}
+            onRevise={onReviseSet}
+            set={selectedSet}
+          />
+        ) : null}
+      </>
     );
   }
 
@@ -229,6 +498,13 @@ function ExerciseExecution({
           Série {nextSet} de {exercise.sets}
         </strong>
       </div>
+
+      {previousResult ? (
+        <div className="previous-set-reference">
+          <span>Última vez · {previousResult.completedAt}</span>
+          <strong>{previousResult.result}</strong>
+        </div>
+      ) : null}
 
       {!hasKnownMeasure && !missingMeasure ? (
         <fieldset className="measure-choice">
@@ -350,14 +626,34 @@ function ExerciseExecution({
           <ol>
             {exercise.setExecutions.map((set, index) => (
               <li key={set.setExecutionId}>
-                <span className="completed-set-label">
-                  <AppIcon name="check" size={18} /> Série {set.setNumber}
-                </span>
-                <strong>{setResult(exercise, index)}</strong>
+                <button
+                  aria-label={`Corrigir série ${set.setNumber}`}
+                  className="completed-set-action"
+                  onClick={() => setSelectedSet(set)}
+                  type="button"
+                >
+                  <span className="completed-set-label">
+                    <AppIcon name="check" size={18} /> Série {set.setNumber}
+                  </span>
+                  <strong>{setResult(exercise, index)}</strong>
+                  <AppIcon name="forward" size={18} />
+                </button>
               </li>
             ))}
           </ol>
         </section>
+      ) : null}
+      {selectedSet ? (
+        <SetRevisionDialog
+          busy={busy}
+          exercise={exercise}
+          isLatest={
+            selectedSet.setNumber === exercise.setExecutions.at(-1)?.setNumber
+          }
+          onClose={() => setSelectedSet(undefined)}
+          onRevise={onReviseSet}
+          set={selectedSet}
+        />
       ) : null}
     </div>
   );
@@ -667,6 +963,50 @@ export function ActiveTrainingScreen({
         setSelectedIndex(firstPending);
       }
     }
+  }
+
+  async function reviseCurrentSet(request: SetRevisionRequest) {
+    const run = state?.activeRun;
+    const currentExercise = run?.session.items[selectedIndex];
+    if (!run || run.pausedAt || !currentExercise || busy) {
+      return false;
+    }
+
+    const identity = {
+      expectedRevision: request.set.revision,
+      itemId: currentExercise.itemId,
+      runId: run.runId,
+      setExecutionId: request.set.setExecutionId,
+      setNumber: request.set.setNumber,
+    };
+    const input: SetRevisionInput =
+      request.action === "correct"
+        ? {
+            ...identity,
+            action: "correct",
+            actualDistanceMeters: request.actualDistanceMeters,
+            actualDurationSeconds: request.actualDurationSeconds,
+            actualReps: request.actualReps,
+            actualWeightKg: request.actualWeightKg,
+          }
+        : { ...identity, action: "undo" };
+
+    setBusy(true);
+    setError(undefined);
+    const result = await gateway().reviseSet(input);
+    if (!result.ok) {
+      setBusy(false);
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return false;
+      }
+      setError(sessionError(result.reason));
+      return false;
+    }
+
+    const refreshed = await refresh();
+    setBusy(false);
+    return refreshed !== null;
   }
 
   async function finishTraining() {
@@ -1000,6 +1340,7 @@ export function ActiveTrainingScreen({
             exercise={currentExercise}
             key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "pending"}`}
             onCompleteSet={(input) => void completeCurrentSet(input)}
+            onReviseSet={reviseCurrentSet}
             onStart={() => void startCurrentExercise()}
           />
           <div className="exercise-target">

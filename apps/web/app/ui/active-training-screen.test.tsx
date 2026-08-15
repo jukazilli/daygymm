@@ -1,4 +1,10 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +31,17 @@ const plannedSession = {
       notes: "Movimento controlado",
       order: 1,
       plannedWeightKg: 40,
+      previousSetReferences: [
+        {
+          actualDistanceMeters: null,
+          actualDurationSeconds: null,
+          actualReps: 10,
+          actualWeightKg: 37.5,
+          completedAt: "2026-08-11T03:32:00.000+00:00",
+          setNumber: 1,
+          sourceSessionId: "70000000-0000-4000-8000-000000000009",
+        },
+      ],
       repsMax: 12,
       repsMin: 8,
       restSeconds: 90,
@@ -102,8 +119,10 @@ describe("ActiveTrainingScreen", () => {
                 plannedRepsMax: 12,
                 plannedRepsMin: 8,
                 plannedWeightKg: 40,
+                revision: 1,
                 setExecutionId: "76000000-0000-4000-8000-000000000006",
                 setNumber: 1,
+                updatedAt: "2026-08-14T03:32:00.000+00:00",
               },
             ],
           },
@@ -180,6 +199,7 @@ describe("ActiveTrainingScreen", () => {
         .mockResolvedValueOnce({ ok: true, value: state(completedRun) }),
       start: vi.fn().mockResolvedValue({ ok: true, value: activeRun }),
       pause: vi.fn(),
+      reviseSet: vi.fn(),
       resume: vi.fn(),
       startExercise: vi.fn().mockResolvedValue({
         ok: true,
@@ -208,6 +228,8 @@ describe("ActiveTrainingScreen", () => {
     await user.click(
       screen.getByRole("button", { name: "Iniciar Agachamento" }),
     );
+    expect(await screen.findByText(/Última vez/)).toBeTruthy();
+    expect(screen.getByText("37,5 kg × 10 repetições")).toBeTruthy();
     expect(
       (
         await screen.findByRole("spinbutton", { name: "Repetições" })
@@ -254,6 +276,158 @@ describe("ActiveTrainingScreen", () => {
     expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
   });
 
+  it("corrects and undoes the latest persisted set from its focused dialog", async () => {
+    const user = userEvent.setup();
+    const performedSet = {
+      actualDistanceMeters: null,
+      actualDurationSeconds: null,
+      actualReps: 10,
+      actualWeightKg: 40,
+      completedAt: "2026-08-14T03:32:00.000+00:00",
+      plannedDistanceMeters: null,
+      plannedDurationSeconds: null,
+      plannedRepsMax: 12,
+      plannedRepsMin: 8,
+      plannedWeightKg: 40,
+      revision: 1,
+      setExecutionId: "76000000-0000-4000-8000-000000000006",
+      setNumber: 1,
+      updatedAt: "2026-08-14T03:32:00.000+00:00",
+    };
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            setExecutions: [performedSet],
+            startedAt: "2026-08-14T03:31:00.000+00:00",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const correctedRun: ActiveTrainingRun = {
+      ...activeRun,
+      session: {
+        ...activeRun.session,
+        items: [
+          {
+            ...activeRun.session.items[0]!,
+            setExecutions: [
+              {
+                ...performedSet,
+                actualWeightKg: 42,
+                revision: 2,
+                updatedAt: "2026-08-14T03:34:00.000+00:00",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const undoneRun: ActiveTrainingRun = {
+      ...activeRun,
+      session: {
+        ...activeRun.session,
+        items: [
+          {
+            ...activeRun.session.items[0]!,
+            completedAt: null,
+            setExecutions: [],
+          },
+        ],
+      },
+    };
+    const reviseSet = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          action: "correct",
+          changedAt: "2026-08-14T03:34:00.000+00:00",
+          completedSetCount: 1,
+          exerciseCompleted: false,
+          revision: 2,
+          setExecutionId: performedSet.setExecutionId,
+          setNumber: 1,
+          totalSets: 2,
+          wasChanged: true,
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          action: "undo",
+          changedAt: "2026-08-14T03:35:00.000+00:00",
+          completedSetCount: 0,
+          exerciseCompleted: false,
+          revision: null,
+          setExecutionId: performedSet.setExecutionId,
+          setNumber: 1,
+          totalSets: 2,
+          wasChanged: true,
+        },
+      });
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, value: state(activeRun) })
+        .mockResolvedValueOnce({ ok: true, value: state(correctedRun) })
+        .mockResolvedValueOnce({ ok: true, value: state(undoneRun) }),
+      pause: vi.fn(),
+      reviseSet,
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Corrigir série 1" }),
+    );
+    const weight = within(screen.getByRole("dialog")).getByRole("spinbutton", {
+      name: /Carga/,
+    });
+    await user.clear(weight);
+    await user.type(weight, "42");
+    await user.click(screen.getByRole("button", { name: "Salvar correção" }));
+
+    await waitFor(() =>
+      expect(reviseSet).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          action: "correct",
+          actualWeightKg: 42,
+          expectedRevision: 1,
+        }),
+      ),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Corrigir série 1" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Desfazer série" }));
+
+    await waitFor(() =>
+      expect(reviseSet).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          action: "undo",
+          expectedRevision: 2,
+        }),
+      ),
+    );
+    expect(await screen.findByText("Série 1 de 2")).toBeTruthy();
+  });
+
   it("pauses an active training only after confirming in the dialog", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
@@ -282,6 +456,7 @@ describe("ActiveTrainingScreen", () => {
           wasChanged: true,
         },
       }),
+      reviseSet: vi.fn(),
       resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),
@@ -328,6 +503,7 @@ describe("ActiveTrainingScreen", () => {
       finish: vi.fn(),
       load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
       pause: vi.fn(),
+      reviseSet: vi.fn(),
       resume: vi.fn(),
       start,
       startExercise: vi.fn(),
@@ -370,6 +546,7 @@ describe("ActiveTrainingScreen", () => {
       finish: vi.fn(),
       load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
       pause,
+      reviseSet: vi.fn(),
       resume: vi.fn(),
       start,
       startExercise: vi.fn(),
@@ -397,6 +574,7 @@ describe("ActiveTrainingScreen", () => {
           exerciseName: "Prancha lateral",
           modality: "circuit" as const,
           plannedWeightKg: null,
+          previousSetReferences: [],
           repsMax: null,
           repsMin: null,
           setProgressionKg: null,
@@ -427,6 +605,7 @@ describe("ActiveTrainingScreen", () => {
         },
       }),
       pause: vi.fn(),
+      reviseSet: vi.fn(),
       resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),

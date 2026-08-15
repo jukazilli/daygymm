@@ -34,6 +34,7 @@ function createTrainingGateway(): TrainingSessionGateway {
       },
     }),
     pause: vi.fn(),
+    reviseSet: vi.fn(),
     resume: vi.fn(),
     start: vi.fn(),
     startExercise: vi.fn(),

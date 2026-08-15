@@ -3,10 +3,26 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(59);
+select plan(93);
 
 select has_table('api', 'training_session_run_sets', 'active performed sets exist');
 select has_table('api', 'training_session_sets', 'canonical performed sets exist');
+select has_table(
+  'api', 'training_session_run_set_adjustments',
+  'active set adjustment audit exists'
+);
+select has_table(
+  'api', 'training_session_set_adjustments',
+  'canonical set adjustment audit exists'
+);
+select has_column(
+  'api', 'training_session_run_sets', 'revision',
+  'active sets expose an optimistic-concurrency revision'
+);
+select has_column(
+  'api', 'training_session_sets', 'revision',
+  'canonical sets preserve their final revision'
+);
 select has_column(
   'api', 'training_session_run_items', 'set_progression_kg',
   'the active snapshot stores progression between sets'
@@ -22,6 +38,21 @@ select has_function(
   'complete_training_set',
   array['uuid', 'uuid', 'integer', 'text', 'integer', 'numeric', 'integer', 'integer'],
   'the authenticated set completion command exists'
+);
+select has_function(
+  'api',
+  'get_previous_training_set_references',
+  array['uuid'],
+  'the authenticated previous-set reference query exists'
+);
+select has_function(
+  'api',
+  'revise_training_set',
+  array[
+    'uuid', 'uuid', 'uuid', 'integer', 'text', 'integer', 'text',
+    'integer', 'numeric', 'integer', 'integer'
+  ],
+  'the authenticated set revision command exists'
 );
 select has_function(
   'api',
@@ -58,6 +89,26 @@ select ok(
   'canonical set rows force RLS'
 );
 select ok(
+  (select relrowsecurity from pg_class
+   where oid = 'api.training_session_run_set_adjustments'::regclass),
+  'active set adjustments have RLS enabled'
+);
+select ok(
+  (select relforcerowsecurity from pg_class
+   where oid = 'api.training_session_run_set_adjustments'::regclass),
+  'active set adjustments force RLS'
+);
+select ok(
+  (select relrowsecurity from pg_class
+   where oid = 'api.training_session_set_adjustments'::regclass),
+  'canonical set adjustments have RLS enabled'
+);
+select ok(
+  (select relforcerowsecurity from pg_class
+   where oid = 'api.training_session_set_adjustments'::regclass),
+  'canonical set adjustments force RLS'
+);
+select ok(
   not has_table_privilege('authenticated', 'api.training_session_run_sets', 'insert')
     and not has_table_privilege('authenticated', 'api.training_session_run_sets', 'update')
     and not has_table_privilege('authenticated', 'api.training_session_run_sets', 'delete')
@@ -65,6 +116,27 @@ select ok(
     and not has_table_privilege('authenticated', 'api.training_session_sets', 'update')
     and not has_table_privilege('authenticated', 'api.training_session_sets', 'delete'),
   'authenticated clients cannot mutate performed sets directly'
+);
+select ok(
+  not has_table_privilege(
+    'authenticated', 'api.training_session_run_set_adjustments', 'insert'
+  )
+    and not has_table_privilege(
+      'authenticated', 'api.training_session_run_set_adjustments', 'update'
+    )
+    and not has_table_privilege(
+      'authenticated', 'api.training_session_run_set_adjustments', 'delete'
+    )
+    and not has_table_privilege(
+      'authenticated', 'api.training_session_set_adjustments', 'insert'
+    )
+    and not has_table_privilege(
+      'authenticated', 'api.training_session_set_adjustments', 'update'
+    )
+    and not has_table_privilege(
+      'authenticated', 'api.training_session_set_adjustments', 'delete'
+    ),
+  'authenticated clients cannot mutate set audit rows directly'
 );
 select ok(
   not has_function_privilege('anon', 'api.start_training_exercise(uuid,uuid)', 'execute'),
@@ -85,6 +157,20 @@ select ok(
     'execute'
   ),
   'anonymous clients cannot complete a set'
+);
+select ok(
+  not has_function_privilege(
+    'anon', 'api.get_previous_training_set_references(uuid)', 'execute'
+  ),
+  'anonymous clients cannot read previous-set references'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'api.revise_training_set(uuid,uuid,uuid,integer,text,integer,text,integer,numeric,integer,integer)',
+    'execute'
+  ),
+  'anonymous clients cannot revise a performed set'
 );
 
 insert into auth.users (
@@ -434,6 +520,107 @@ select throws_ok(
   'Complete the next pending set.',
   'sets cannot be skipped'
 );
+select set_config(
+  'test.set_execution_id',
+  (select set_execution_id::text
+   from api.training_session_run_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 1),
+  true
+);
+select is(
+  (select revision from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.set_execution_id')::uuid,
+    1, 'correct', 1, 'training-set-correct:b8:b6:1:r1',
+    11, 41, null, null
+  )),
+  2,
+  'a correction increments the optimistic-concurrency revision'
+);
+select is(
+  (select actual_weight_kg from api.training_session_run_sets
+   where set_execution_id = current_setting('test.set_execution_id')::uuid),
+  41.00::numeric,
+  'a correction replaces the performed value without changing the plan'
+);
+select is(
+  (select was_changed from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.set_execution_id')::uuid,
+    1, 'correct', 1, 'training-set-correct:b8:b6:1:r1',
+    11, 41, null, null
+  )),
+  false,
+  'replaying a correction is idempotent'
+);
+select is(
+  (select count(*) from api.training_session_run_set_adjustments
+   where set_execution_id = current_setting('test.set_execution_id')::uuid),
+  1::bigint,
+  'a correction creates one active audit row'
+);
+
+select set_config('request.jwt.claim.sub', 'b2000000-0000-4000-8000-000000000002', true);
+-- RLS-N26: another authenticated user cannot read active set adjustments.
+select is(
+  (select count(*) from api.training_session_run_set_adjustments),
+  0::bigint,
+  'another user cannot read active set adjustments'
+);
+select throws_ok(
+  $$select * from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.set_execution_id')::uuid,
+    1, 'undo', 2, 'training-set-undo:b8:b6:1:r2',
+    null, null, null, null
+  )$$,
+  '23514',
+  'Active training was not found.',
+  'another user cannot revise an active set'
+);
+
+select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
+select is(
+  (select completed_set_count from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.set_execution_id')::uuid,
+    1, 'undo', 2, 'training-set-undo:b8:b6:1:r2',
+    null, null, null, null
+  )),
+  0,
+  'undo removes the latest completed set and restores its pending position'
+);
+select is(
+  (select was_changed from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.set_execution_id')::uuid,
+    1, 'undo', 2, 'training-set-undo:b8:b6:1:r2',
+    null, null, null, null
+  )),
+  false,
+  'replaying an undo is idempotent even after the set row is gone'
+);
+select is(
+  (select count(*) from api.training_session_run_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'),
+  0::bigint,
+  'undo leaves no hidden performed set behind'
+);
+select is(
+  (select was_created from api.complete_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    1, 'training-set:b8:b6:1', 10, 40, null, null
+  )),
+  true,
+  'the undone set can be performed again from the beginning'
+);
 select is(
   (select exercise_completed from api.complete_training_set(
     'b8000000-0000-4000-8000-000000000008',
@@ -449,6 +636,37 @@ select is(
      and set_number = 2),
   42.50::numeric,
   'the next set stores the progressed suggestion independently from actual load'
+);
+select set_config(
+  'test.second_set_execution_id',
+  (select set_execution_id::text
+   from api.training_session_run_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 2),
+  true
+);
+select is(
+  (select exercise_completed from api.revise_training_set(
+    'b8000000-0000-4000-8000-000000000008',
+    'b6000000-0000-4000-8000-000000000006',
+    current_setting('test.second_set_execution_id')::uuid,
+    2, 'correct', 1, 'training-set-correct:b8:b6:2:r1',
+    12, 38, null, null
+  )),
+  true,
+  'correcting a final set preserves the completed exercise state'
+);
+select is(
+  (select actual_weight_kg from api.training_session_run_sets
+   where set_execution_id = current_setting('test.second_set_execution_id')::uuid),
+  38.00::numeric,
+  'the final set exposes its corrected performed load immediately'
+);
+select is(
+  (select revision from api.training_session_run_sets
+   where set_execution_id = current_setting('test.second_set_execution_id')::uuid),
+  2,
+  'the effective final-set correction is versioned'
 );
 select ok(
   (select completed_at is not null from api.training_session_run_items
@@ -509,8 +727,26 @@ select is(
   (select actual_weight_kg from api.training_session_sets
    where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
      and set_number = 2),
-  37.50::numeric,
+  38.00::numeric,
   'canonical history preserves actual weight separately from planned weight'
+);
+select is(
+  (select revision from api.training_session_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 2),
+  2,
+  'canonical history preserves the final set revision'
+);
+select is(
+  (select count(*) from api.training_session_set_adjustments
+   where set_execution_id = current_setting('test.second_set_execution_id')::uuid),
+  1::bigint,
+  'the finished session preserves the surviving correction audit'
+);
+select is(
+  (select count(*) from api.training_session_run_set_adjustments),
+  0::bigint,
+  'active correction and undo audit is cleaned up with the finished run'
 );
 select is(
   (select planned_weight_kg from api.training_session_sets
@@ -548,6 +784,48 @@ select is(
   (select count(*) from api.training_session_sets),
   0::bigint,
   'another user cannot read canonical performed sets'
+);
+-- RLS-N27: another authenticated user cannot read canonical set adjustments.
+select is(
+  (select count(*) from api.training_session_set_adjustments),
+  0::bigint,
+  'another user cannot read canonical set adjustments'
+);
+
+select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
+select is(
+  (select was_created from api.start_training_session(
+    'b5000000-0000-4000-8000-000000000005',
+    'bc000000-0000-4000-8000-000000000012',
+    'training-start:bc000000-0000-4000-8000-000000000012'
+  )),
+  true,
+  'a later run can start from the same planned session'
+);
+select is(
+  (select count(*) from api.get_previous_training_set_references(
+    'bc000000-0000-4000-8000-000000000012'
+  )),
+  4::bigint,
+  'the later run receives one comparable reference per planned set'
+);
+select is(
+  (select actual_weight_kg from api.get_previous_training_set_references(
+    'bc000000-0000-4000-8000-000000000012'
+  ) where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+      and set_number = 2),
+  38.00::numeric,
+  'the reference uses the latest corrected performed value'
+);
+
+select set_config('request.jwt.claim.sub', 'b2000000-0000-4000-8000-000000000002', true);
+select throws_ok(
+  $$select * from api.get_previous_training_set_references(
+    'bc000000-0000-4000-8000-000000000012'
+  )$$,
+  '23514',
+  'Active training was not found.',
+  'another user cannot inspect references for the active run'
 );
 
 select * from finish();
