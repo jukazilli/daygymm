@@ -63,6 +63,37 @@ describe("TrainingHubScreen", () => {
     ).toBe("/treinos/importar");
   });
 
+  it("opens manual authoring when the selected path has no plan", async () => {
+    const gateway: PlanSourceGateway = {
+      load: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          onboardingCompleted: true,
+          selectedAt: "2026-08-14T17:00:00.000Z",
+          source: "manual",
+        },
+      }),
+      select: vi.fn(),
+    };
+    const trainingGateway = createTrainingGateway({
+      ok: true,
+      value: {
+        activeRun: null,
+        lastCompletedAt: null,
+        nextSession: null,
+        plan: null,
+        sessions: [],
+      },
+    });
+
+    render(createElement(TrainingHubScreen, { gateway, trainingGateway }));
+
+    expect(await screen.findByText("Monte seu primeiro plano.")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Montar plano" }).getAttribute("href"),
+    ).toBe("/treinos/plano");
+  });
+
   it("makes an imported plan executable", async () => {
     const user = userEvent.setup();
     const gateway: PlanSourceGateway = {
@@ -148,6 +179,14 @@ describe("TrainingHubScreen", () => {
     ).toBe("/treinos/sessao?sessao=62000000-0000-4000-8000-000000000002");
     expect(screen.getByText("Agenda semanal")).toBeTruthy();
     expect(screen.getByText("Segunda")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Editar plano" }).getAttribute("href"),
+    ).toBe("/treinos/plano");
+    expect(
+      screen
+        .getByRole("link", { name: "Configurar cargas" })
+        .getAttribute("href"),
+    ).toBe("/treinos/cargas");
 
     await user.click(screen.getByRole("button", { name: "Editar nome" }));
     const nameField = screen.getByRole("textbox", { name: "Nome do treino" });

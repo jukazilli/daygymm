@@ -197,10 +197,9 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       const { data: planData, error: planError } = await client
         .from("training_plans")
         .select(
-          "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,updated_at",
+          "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,updated_at,archived_at",
         )
-        .order("updated_at", { ascending: false })
-        .limit(1)
+        .is("archived_at", null)
         .maybeSingle();
       if (planError) {
         return failure(planError);

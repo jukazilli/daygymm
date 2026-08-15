@@ -24,22 +24,27 @@ export interface OnboardingContextRow extends Record<string, unknown> {
 
 export interface TrainingPlanRow extends Record<string, unknown> {
   active_version_id: string | null;
+  archived_at: string | null;
   current_version: number;
   item_count: number;
   name: string;
   plan_id: string;
-  provenance: "official_xlsx";
+  provenance: "manual" | "official_xlsx";
   session_count: number;
   updated_at: string;
   user_id: string;
 }
 
 export interface TrainingPlanVersionRow extends Record<string, unknown> {
+  author_user_id: string;
+  change_summary: string;
+  content_sha256: string | null;
   operation_id: string;
+  origin: "manual" | "official_xlsx";
   plan_id: string;
-  source_file_name: string;
-  source_sha256: string;
-  source_size_bytes: number;
+  source_file_name: string | null;
+  source_sha256: string | null;
+  source_size_bytes: number | null;
   user_id: string;
   version_id: string;
   version_number: number;
@@ -69,6 +74,8 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
   exercise_name: string;
   item_id: string;
   item_order: number;
+  load_increment_kg: number | null;
+  load_mode: "external" | "none" | "unconfigured";
   modality: string;
   notes: string | null;
   planned_weight_kg: number | null;
@@ -230,6 +237,17 @@ export interface TrainingPlanRenameRpcRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface TrainingPlanArchiveRpcRow extends Record<string, unknown> {
+  archived_at: string;
+  plan_id: string;
+  was_changed: boolean;
+}
+
+export interface TrainingPlanRestoreRpcRow extends Record<string, unknown> {
+  plan_id: string;
+  was_changed: boolean;
+}
+
 type TableDefinition<Row extends Record<string, unknown>> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -256,6 +274,12 @@ export interface WebDatabase {
     };
     Views: Record<string, never>;
     Functions: {
+      archive_training_plan: {
+        Args: {
+          p_plan_id: string;
+        };
+        Returns: TrainingPlanArchiveRpcRow[];
+      };
       cancel_training_session: {
         Args: {
           p_run_id: string;
@@ -278,6 +302,17 @@ export interface WebDatabase {
           p_run_id: string;
         };
         Returns: TrainingPauseRpcRow[];
+      };
+      publish_training_plan_version: {
+        Args: {
+          p_change_summary: string;
+          p_content_sha256: string;
+          p_operation_id: string;
+          p_plan_id: string | null;
+          p_plan_name: string;
+          p_sessions: unknown;
+        };
+        Returns: TrainingPlanImportRpcRow[];
       };
       import_official_xlsx_plan_v2: {
         Args: {
@@ -302,6 +337,12 @@ export interface WebDatabase {
           p_run_id: string;
         };
         Returns: TrainingPauseRpcRow[];
+      };
+      restore_training_plan: {
+        Args: {
+          p_plan_id: string;
+        };
+        Returns: TrainingPlanRestoreRpcRow[];
       };
       complete_training_exercise: {
         Args: {

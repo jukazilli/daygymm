@@ -713,6 +713,23 @@ input:focus-visible {
   margin-top: var(--space-2);
 }
 
+.plan-card-actions,
+.weekly-training-schedule .section-heading,
+.schedule-settings-link {
+  display: flex;
+  align-items: center;
+}
+
+.plan-card-actions {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.plan-card-actions .plan-name-edit {
+  margin-top: 0;
+}
+
 .plan-name-form {
   display: grid;
   gap: var(--space-3);
@@ -783,6 +800,23 @@ input:focus-visible {
   overflow: hidden;
 }
 
+.weekly-training-schedule .section-heading {
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.schedule-settings-link {
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--color-action-pressed);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.schedule-settings-link:hover {
+  color: var(--color-action);
+}
+
 .weekly-training-schedule > ol > li {
   display: grid;
   grid-template-columns: minmax(6rem, 0.35fr) minmax(0, 1fr);
@@ -832,6 +866,170 @@ input:focus-visible {
   font-weight: 800;
   line-height: 38px;
   text-decoration: none;
+}
+
+.plan-editor-page {
+  display: grid;
+  gap: var(--space-6);
+  width: min(100%, 58rem);
+  margin: 0 auto;
+}
+
+.plan-editor-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.plan-editor-header h1,
+.plan-editor-header p,
+.plan-editor-card-heading h2,
+.load-settings-card h2,
+.plan-editor-empty h2 {
+  margin: 0;
+}
+
+.plan-editor-header h1 {
+  margin-top: var(--space-1);
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+}
+
+.plan-editor-form,
+.plan-session-list,
+.plan-exercise-list,
+.load-settings-list {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.plan-editor-section,
+.plan-session-editor,
+.plan-exercise-editor,
+.load-settings-card,
+.plan-editor-empty {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.plan-editor-section,
+.plan-session-editor,
+.load-settings-card,
+.plan-editor-empty {
+  padding: clamp(var(--space-4), 5vw, var(--space-6));
+}
+
+.plan-editor-section,
+.plan-session-editor,
+.plan-exercise-editor,
+.load-settings-card,
+.plan-editor-empty,
+.load-configuration {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.plan-editor-form label,
+.load-configuration label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.plan-editor-form input,
+.plan-editor-form select,
+.plan-editor-form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.plan-editor-form textarea {
+  resize: vertical;
+}
+
+.plan-editor-form input:focus-visible,
+.plan-editor-form select:focus-visible,
+.plan-editor-form textarea:focus-visible {
+  border-color: var(--color-action);
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 1px;
+}
+
+.plan-field-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.plan-field-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.plan-editor-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.plan-exercise-editor {
+  padding: var(--space-5);
+  background: var(--color-canvas);
+}
+
+.load-configuration {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-action-soft);
+}
+
+.load-configuration legend {
+  padding: 0 var(--space-2);
+  color: var(--color-text);
+  font-weight: 900;
+}
+
+.load-configuration-help {
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.load-settings-card > div:first-child small {
+  color: var(--color-text-secondary);
+  font-weight: 800;
+}
+
+.load-settings-card > div:first-child h2 {
+  margin-top: var(--space-1);
+}
+
+.plan-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+}
+
+.plan-archived-state {
+  display: grid;
+  justify-items: start;
+  width: min(100%, 46rem);
+  margin: var(--space-8) auto 0;
 }
 
 .plan-session-list > ol,
@@ -1950,6 +2148,28 @@ input:focus-visible {
 
   .weekly-training-schedule > ol > li {
     grid-template-columns: 1fr;
+  }
+
+  .weekly-training-schedule .section-heading,
+  .plan-editor-card-heading,
+  .plan-editor-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .plan-editor-header {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .plan-field-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-editor-actions > button,
+  .plan-card-actions > a,
+  .plan-card-actions > button {
+    width: 100%;
   }
 
   .import-preview-heading,

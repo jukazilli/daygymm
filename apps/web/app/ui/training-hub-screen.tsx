@@ -154,13 +154,18 @@ function TrainingState({
               ) : null}
             </form>
           ) : (
-            <button
-              className="button-text plan-name-edit"
-              onClick={() => setEditingName(true)}
-              type="button"
-            >
-              Editar nome
-            </button>
+            <div className="plan-card-actions">
+              <button
+                className="button-text plan-name-edit"
+                onClick={() => setEditingName(true)}
+                type="button"
+              >
+                Editar nome
+              </button>
+              <Link className="button-secondary" href="/treinos/plano/">
+                Editar plano
+              </Link>
+            </div>
           )}
         </section>
 
@@ -199,6 +204,10 @@ function TrainingState({
         >
           <div className="section-heading">
             <h2 id="weekly-training-title">Agenda semanal</h2>
+            <Link className="schedule-settings-link" href="/treinos/cargas/">
+              <span aria-hidden="true">⚙</span>
+              Configurar cargas
+            </Link>
           </div>
           <ol>
             {[1, 2, 3, 4, 5, 6, 7].map((weekday) => {
@@ -251,6 +260,21 @@ function TrainingState({
         <h1>Importe seu primeiro plano.</h1>
         <Link className="button-primary" href="/treinos/importar/">
           Importar planilha
+        </Link>
+        <Link className="button-text" href="/escolher-plano/?alterar=1">
+          Alterar caminho
+        </Link>
+      </section>
+    );
+  }
+
+  if (sourceState.source === "manual") {
+    return (
+      <section className="app-state-card training-card">
+        <p className="eyebrow">Montagem manual</p>
+        <h1>Monte seu primeiro plano.</h1>
+        <Link className="button-primary" href="/treinos/plano/">
+          Montar plano
         </Link>
         <Link className="button-text" href="/escolher-plano/?alterar=1">
           Alterar caminho

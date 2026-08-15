@@ -155,50 +155,59 @@ concluída e o trigger privado impede contorno por escrita direta.
 
 ### `api.training_plans`
 
-Owner: comandos privados de importação e renomeação, chamados por wrappers
-autenticados limitados no schema `api`.
+Owner: comandos privados de importação, publicação versionada, arquivamento,
+restauração e renomeação, chamados por wrappers autenticados limitados no
+schema `api`.
 
 Finalidade: manter o plano pertencente ao usuário e apontar explicitamente para
-sua versão ativa. O cliente possui leitura do próprio plano e pode editar somente
-seu nome pelo comando dedicado; não recebe escrita direta neste agregado.
+sua versão ativa. O cliente possui leitura dos próprios planos, mas não recebe
+escrita direta neste agregado. No máximo um plano não arquivado assume a Home e
+a Agenda; arquivar remove somente o uso futuro e preserva versões e sessões
+concluídas.
 
 | Campo               | Tipo/restrição                                   | Finalidade                  | Classificação         | Retenção atual                              | Índice                            |
 | ------------------- | ------------------------------------------------ | --------------------------- | --------------------- | ------------------------------------------- | --------------------------------- |
 | `plan_id`           | UUID, PK                                         | Identificar o plano         | Identificador técnico | Ciclo da conta; política final no `FND-029` | PK                                |
 | `user_id`           | UUID, FK `api.profiles.user_id`, cascade         | Vincular o plano ao titular | Identificador pessoal | Removido em cascade com o perfil            | `training_plans_user_updated_idx` |
 | `name`              | text, 1–80                                       | Nomear o plano              | Conteúdo de treino    | Mesmo ciclo do plano                        | Não                               |
-| `provenance`        | somente `official_xlsx`                          | Registrar a origem          | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
+| `provenance`        | `official_xlsx` ou `manual`                      | Registrar a origem inicial  | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `active_version_id` | UUID, FK de versão, opcional durante a transação | Apontar a versão ativa      | Identificador técnico | Mesmo ciclo do plano                        | FK                                |
 | `current_version`   | inteiro positivo                                 | Expor a versão corrente     | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `session_count`     | inteiro, 1–14                                    | Resumir sessões             | Metadado de treino    | Mesmo ciclo do plano                        | Não                               |
 | `item_count`        | inteiro, 1–300                                   | Resumir itens               | Metadado de treino    | Mesmo ciclo do plano                        | Não                               |
+| `archived_at`       | timestamptz opcional                             | Retirar o plano do futuro   | Metadado operacional  | Mesmo ciclo do plano                        | Índice unique parcial por titular |
 | `created_at`        | timestamptz                                      | Registrar criação           | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `updated_at`        | timestamptz                                      | Ordenar planos recentes     | Metadado operacional  | Mesmo ciclo do plano                        | `training_plans_user_updated_idx` |
 
 ### `api.training_plan_versions`
 
-Owner: comandos `private.import_official_xlsx_plan()` e
-`private.import_official_xlsx_plan_with_weights()`.
+Owner: comandos privados de importação e
+`private.publish_training_plan_version()`.
 
 Finalidade: preservar uma versão imutável confirmada a partir da proposta
-normalizada no aparelho. Guarda somente hash, nome sanitizado e tamanho como
-proveniência; o arquivo XLSX original não é enviado nem armazenado.
+normalizada no aparelho. Importações guardam somente hash, nome sanitizado e
+tamanho; versões manuais guardam hash do conteúdo normalizado. O XLSX original
+não é enviado nem armazenado.
 
-| Campo               | Tipo/restrição                          | Finalidade                           | Classificação         | Retenção atual  | Índice                                    |
-| ------------------- | --------------------------------------- | ------------------------------------ | --------------------- | --------------- | ----------------------------------------- |
-| `version_id`        | UUID, PK                                | Identificar a versão                 | Identificador técnico | Ciclo do plano  | PK                                        |
-| `plan_id`           | UUID, FK `api.training_plans`, cascade  | Vincular ao plano                    | Identificador técnico | Ciclo do plano  | Unique com `version_number`               |
-| `user_id`           | UUID, FK `api.profiles`, cascade        | Aplicar isolamento por titular       | Identificador pessoal | Ciclo da conta  | `training_plan_versions_user_created_idx` |
-| `version_number`    | inteiro positivo                        | Ordenar versões                      | Metadado operacional  | Ciclo do plano  | Unique com `plan_id`                      |
-| `operation_id`      | texto técnico, unique por usuário       | Deduplicar repetição do comando      | Identificador técnico | Ciclo da versão | Unique com `user_id`                      |
-| `source_sha256`     | SHA-256 hexadecimal, unique por usuário | Deduplicar o mesmo arquivo           | Metadado técnico      | Ciclo da versão | Unique com `user_id`                      |
-| `source_file_name`  | nome sanitizado `.xlsx`, 6–120          | Registrar proveniência sem o arquivo | Metadado do conteúdo  | Ciclo da versão | Não                                       |
-| `source_size_bytes` | inteiro, 1–2.097.152                    | Evidenciar o limite validado         | Metadado técnico      | Ciclo da versão | Não                                       |
-| `created_at`        | timestamptz                             | Registrar confirmação                | Metadado operacional  | Ciclo da versão | `training_plan_versions_user_created_idx` |
+| Campo               | Tipo/restrição                         | Finalidade                           | Classificação         | Retenção atual  | Índice                                    |
+| ------------------- | -------------------------------------- | ------------------------------------ | --------------------- | --------------- | ----------------------------------------- |
+| `version_id`        | UUID, PK                               | Identificar a versão                 | Identificador técnico | Ciclo do plano  | PK                                        |
+| `plan_id`           | UUID, FK `api.training_plans`, cascade | Vincular ao plano                    | Identificador técnico | Ciclo do plano  | Unique com `version_number`               |
+| `user_id`           | UUID, FK `api.profiles`, cascade       | Aplicar isolamento por titular       | Identificador pessoal | Ciclo da conta  | `training_plan_versions_user_created_idx` |
+| `version_number`    | inteiro positivo                       | Ordenar versões                      | Metadado operacional  | Ciclo do plano  | Unique com `plan_id`                      |
+| `operation_id`      | texto técnico, unique por usuário      | Deduplicar repetição do comando      | Identificador técnico | Ciclo da versão | Unique com `user_id`                      |
+| `source_sha256`     | SHA-256 opcional, unique por usuário   | Deduplicar o mesmo arquivo XLSX      | Metadado técnico      | Ciclo da versão | Unique com `user_id`                      |
+| `source_file_name`  | nome `.xlsx` opcional, 6–120           | Registrar proveniência sem o arquivo | Metadado do conteúdo  | Ciclo da versão | Não                                       |
+| `source_size_bytes` | inteiro opcional, 1–2.097.152          | Evidenciar o limite validado         | Metadado técnico      | Ciclo da versão | Não                                       |
+| `author_user_id`    | UUID do autor                          | Rastrear quem publicou               | Identificador pessoal | Ciclo da versão | Não                                       |
+| `change_summary`    | texto, 1–240                           | Explicar a mudança                   | Conteúdo de treino    | Ciclo da versão | Não                                       |
+| `content_sha256`    | SHA-256 opcional                       | Fixar conteúdo de versão manual      | Metadado técnico      | Ciclo da versão | Não                                       |
+| `origin`            | `official_xlsx` ou `manual`            | Distinguir contrato de proveniência  | Metadado operacional  | Ciclo da versão | Não                                       |
+| `created_at`        | timestamptz                            | Registrar confirmação                | Metadado operacional  | Ciclo da versão | `training_plan_versions_user_created_idx` |
 
 ### `api.training_plan_sessions`
 
-Owner: comando `private.import_official_xlsx_plan()`.
+Owner: comandos privados de importação e publicação versionada.
 
 Finalidade: registrar as sessões ordenadas de uma versão importada, sem permitir
 mutação direta pelo cliente.
@@ -234,7 +243,7 @@ sessões recebem a projeção no mesmo commit da importação.
 
 Owner: comando `private.import_official_xlsx_plan()`.
 
-Finalidade: armazenar itens normalizados e limitados de cada sessão importada.
+Finalidade: armazenar itens normalizados e limitados de cada sessão versionada.
 Fórmulas, macros, links, objetos e conteúdo arbitrário da planilha não entram
 nesta relação.
 
@@ -249,6 +258,8 @@ nesta relação.
 | `modality`          | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
 | `sets`              | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
 | `planned_weight_kg` | decimal opcional, 0,25–2.000 kg                | Sugerir carga sem substituir o realizado   | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_mode`         | `unconfigured`, `external` ou `none`           | Classificar uso de carga em força          | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_increment_kg` | decimal opcional, 0,01–2.000 kg                | Registrar menor passo do equipamento       | Conteúdo de treino    | Ciclo da versão | Não                                    |
 | medidas e descanso  | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
 | circuito e notas    | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
 
@@ -375,7 +386,7 @@ não é exposto ao cliente.
 | `api.training_sessions`              | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando               |
 | `api.onboarding_contexts`            | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
 | `api.onboarding_contexts`            | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12`, `RLS-N13` |
-| `api.training_plans`                 | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; escrita somente por comandos limitados                                                                  | `RLS-N14`, `RLS-N21`            |
+| `api.training_plans`                 | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; publicação, arquivamento e restauração somente por comandos limitados                                   | `RLS-N14`, `RLS-N21`, `RLS-N25` |
 | `api.training_plan_versions`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_versions_select_own`; versões imutáveis                                                                               | `RLS-N15`                       |
 | `api.training_plan_sessions`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_sessions_select_own`; isolamento redundante por titular                                                               | `RLS-N16`                       |
 | `api.training_plan_items`            | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_items_select_own`; proposta revalidada pelo servidor                                                                  | `RLS-N17`                       |
@@ -423,6 +434,8 @@ negativos estáveis são:
 - `RLS-N22`: bloqueia o cancelamento da execução ativa de outro titular.
 - `RLS-N23`: isola as séries persistidas de uma execução ativa entre titulares.
 - `RLS-N24`: isola o histórico canônico de séries entre titulares.
+- `RLS-N25`: bloqueia publicação, arquivamento e restauração de plano por outro
+  titular; uma execução ativa também bloqueia a troca da versão futura.
 
 ## Pendências deliberadas para `FND-029`
 
