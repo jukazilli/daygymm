@@ -67,6 +67,25 @@ const existingDraft: TrainingPlanDraft = {
   ],
 };
 
+const carouselDraft: TrainingPlanDraft = {
+  ...existingDraft,
+  sessions: [
+    ...existingDraft.sessions,
+    {
+      dayOrder: 2,
+      items: [
+        {
+          ...existingDraft.sessions[0]!.items[0]!,
+          exerciseName: "Remada baixa",
+          itemId: "60000000-0000-4000-8000-000000000006",
+        },
+      ],
+      name: "Treino B",
+      sessionId: "70000000-0000-4000-8000-000000000007",
+    },
+  ],
+};
+
 function createGateway(
   draft: TrainingPlanDraft | null,
 ): TrainingPlanEditorGateway {
@@ -124,6 +143,79 @@ describe("TrainingPlanEditorScreen", () => {
       }),
     );
     expect(navigate).toHaveBeenCalledWith("/treinos/");
+  });
+
+  it("switches compact training and exercise cards without losing edits", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway(carouselDraft);
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        navigate: vi.fn(),
+      }),
+    );
+
+    const exerciseField = await screen.findByRole("textbox", {
+      name: "Exercício",
+    });
+    expect((exerciseField as HTMLInputElement).value).toBe("Supino reto");
+
+    await user.click(screen.getByRole("tab", { name: /Esteira/ }));
+    expect((exerciseField as HTMLInputElement).value).toBe("Esteira");
+    await user.clear(exerciseField);
+    await user.type(exerciseField, "Caminhada inclinada");
+
+    const firstTraining = screen.getByRole("tab", { name: /Treino A/ });
+    firstTraining.focus();
+    await user.keyboard("{ArrowRight}");
+    expect((exerciseField as HTMLInputElement).value).toBe("Remada baixa");
+
+    await user.keyboard("{ArrowLeft}");
+    await user.click(screen.getByRole("tab", { name: /Caminhada inclinada/ }));
+    expect((exerciseField as HTMLInputElement).value).toBe(
+      "Caminhada inclinada",
+    );
+  });
+
+  it("opens the hidden training that has an invalid required field", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway({
+      ...carouselDraft,
+      sessions: carouselDraft.sessions.map((session, sessionIndex) => ({
+        ...session,
+        items: session.items.map((item) => ({
+          ...item,
+          exerciseName: sessionIndex === 1 ? "" : item.exerciseName,
+        })),
+      })),
+    });
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        navigate: vi.fn(),
+      }),
+    );
+
+    await screen.findByRole("textbox", { name: "Exercício" });
+    await user.click(
+      screen.getByRole("button", { name: "Salvar nova versão" }),
+    );
+
+    expect(gateway.publish).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Revise os campos obrigatórios do Treino 2."),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("tab", { name: /Treino B/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      (screen.getByRole("textbox", { name: "Exercício" }) as HTMLInputElement)
+        .value,
+    ).toBe("");
   });
 
   it("configures load only for eligible strength exercises", async () => {

@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import {
   publishTrainingPlanInputSchema,
@@ -82,6 +87,87 @@ function trainingSlotLabel(dayOrder: number) {
   const weekday = ((dayOrder - 1) % 7) + 1;
   const slot = dayOrder > 7 ? "2º horário" : "1º horário";
   return `${trainingWeekdayName(weekday)} · ${slot}`;
+}
+
+interface EditorCarouselOption {
+  readonly id: string;
+  readonly index: number;
+  readonly primary: string;
+  readonly secondary: string;
+}
+
+function EditorCarousel({
+  ariaLabel,
+  idPrefix,
+  onSelect,
+  options,
+  selectedId,
+  variant,
+}: Readonly<{
+  ariaLabel: string;
+  idPrefix: string;
+  onSelect: (id: string) => void;
+  options: readonly EditorCarouselOption[];
+  selectedId: string;
+  variant: "exercise" | "session";
+}>) {
+  function selectFromKeyboard(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) {
+    let nextIndex: number | undefined;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % options.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + options.length) % options.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = options.length - 1;
+    }
+    if (nextIndex === undefined) {
+      return;
+    }
+    event.preventDefault();
+    const next = options[nextIndex];
+    if (!next) {
+      return;
+    }
+    onSelect(next.id);
+    globalThis.requestAnimationFrame(() => {
+      document.getElementById(`${idPrefix}-tab-${next.id}`)?.focus();
+    });
+  }
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      className={`plan-editor-carousel plan-editor-${variant}-carousel`}
+      role="tablist"
+    >
+      {options.map((option, optionIndex) => (
+        <button
+          aria-controls={`${idPrefix}-panel-${option.id}`}
+          aria-selected={option.id === selectedId}
+          className="plan-editor-carousel-option"
+          data-selected={option.id === selectedId ? "true" : undefined}
+          id={`${idPrefix}-tab-${option.id}`}
+          key={option.id}
+          onClick={() => onSelect(option.id)}
+          onKeyDown={(event) => selectFromKeyboard(event, optionIndex)}
+          role="tab"
+          tabIndex={option.id === selectedId ? 0 : -1}
+          type="button"
+        >
+          <span>{option.index}</span>
+          <span>
+            <strong>{option.primary}</strong>
+            <small>{option.secondary}</small>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function modalityItem(
@@ -443,6 +529,8 @@ export function TrainingPlanEditorScreen({
     providedGateway,
   );
   const [draft, setDraft] = useState<TrainingPlanDraft>();
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState("");
   const [noPlan, setNoPlan] = useState(false);
   const [operationId, setOperationId] = useState("");
   const [changeSummary, setChangeSummary] = useState("");
@@ -476,7 +564,10 @@ export function TrainingPlanEditorScreen({
         if (!result.value && mode === "loads") {
           setNoPlan(true);
         } else {
-          setDraft(result.value ?? blankDraft());
+          const nextDraft = result.value ?? blankDraft();
+          setDraft(nextDraft);
+          setSelectedSessionId(nextDraft.sessions[0]?.sessionId ?? "");
+          setSelectedItemId(nextDraft.sessions[0]?.items[0]?.itemId ?? "");
         }
         setChangeSummary(
           mode === "loads"
@@ -543,8 +634,39 @@ export function TrainingPlanEditorScreen({
         sessionId: session.sessionId,
       })),
     };
-    if (!publishTrainingPlanInputSchema.safeParse(input).success) {
-      setError("Revise os campos obrigatórios antes de salvar.");
+    const validation = publishTrainingPlanInputSchema.safeParse(input);
+    if (!validation.success) {
+      const firstIssue = validation.error.issues[0];
+      const sessionIndex =
+        firstIssue?.path[0] === "sessions" &&
+        typeof firstIssue.path[1] === "number"
+          ? firstIssue.path[1]
+          : undefined;
+      const itemIndex =
+        firstIssue?.path[2] === "items" &&
+        typeof firstIssue.path[3] === "number"
+          ? firstIssue.path[3]
+          : undefined;
+      const invalidSession =
+        sessionIndex === undefined ? undefined : draft.sessions[sessionIndex];
+      const invalidTrainingNumber =
+        sessionIndex === undefined ? undefined : sessionIndex + 1;
+
+      if (invalidSession) {
+        setSelectedSessionId(invalidSession.sessionId);
+        setSelectedItemId(
+          (itemIndex === undefined
+            ? invalidSession.items[0]
+            : invalidSession.items[itemIndex]
+          )?.itemId ?? "",
+        );
+      }
+
+      setError(
+        invalidTrainingNumber
+          ? `Revise os campos obrigatórios do Treino ${invalidTrainingNumber}.`
+          : "Revise os campos obrigatórios antes de salvar.",
+      );
       return;
     }
     setBusy(true);
@@ -744,109 +866,181 @@ export function TrainingPlanEditorScreen({
             </section>
           ) : (
             <div className="plan-session-list">
-              {draft.sessions.map((session, sessionIndex) => (
-                <section
-                  className="plan-session-editor"
-                  key={session.sessionId}
-                >
-                  <div className="plan-editor-card-heading">
-                    <h2>Treino {sessionIndex + 1}</h2>
-                    <button
-                      className="button-text button-danger-text"
-                      disabled={draft.sessions.length === 1}
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          sessions: draft.sessions.filter(
+              <EditorCarousel
+                ariaLabel="Selecionar treino para editar"
+                idPrefix="training-session"
+                onSelect={(sessionId) => {
+                  const session = draft.sessions.find(
+                    (candidate) => candidate.sessionId === sessionId,
+                  );
+                  setSelectedSessionId(sessionId);
+                  setSelectedItemId(session?.items[0]?.itemId ?? "");
+                }}
+                options={draft.sessions.map((session, index) => ({
+                  id: session.sessionId,
+                  index: index + 1,
+                  primary: session.name,
+                  secondary: trainingSlotLabel(session.dayOrder),
+                }))}
+                selectedId={
+                  draft.sessions.some(
+                    (session) => session.sessionId === selectedSessionId,
+                  )
+                    ? selectedSessionId
+                    : (draft.sessions[0]?.sessionId ?? "")
+                }
+                variant="session"
+              />
+              {(() => {
+                const session =
+                  draft.sessions.find(
+                    (candidate) => candidate.sessionId === selectedSessionId,
+                  ) ?? draft.sessions[0];
+                if (!session) {
+                  return null;
+                }
+                const sessionIndex = draft.sessions.findIndex(
+                  (candidate) => candidate.sessionId === session.sessionId,
+                );
+                const item =
+                  session.items.find(
+                    (candidate) => candidate.itemId === selectedItemId,
+                  ) ?? session.items[0];
+                return (
+                  <section
+                    aria-labelledby={`training-session-tab-${session.sessionId}`}
+                    className="plan-session-editor"
+                    id={`training-session-panel-${session.sessionId}`}
+                    role="tabpanel"
+                  >
+                    <div className="plan-editor-card-heading">
+                      <div>
+                        <small className="plan-editor-position">
+                          Treino {sessionIndex + 1} de {draft.sessions.length}
+                        </small>
+                        <h2>{session.name}</h2>
+                      </div>
+                      <button
+                        className="button-text button-danger-text"
+                        disabled={draft.sessions.length === 1}
+                        onClick={() => {
+                          const remaining = draft.sessions.filter(
                             (current) =>
                               current.sessionId !== session.sessionId,
-                          ),
-                        })
-                      }
-                      type="button"
-                    >
-                      Remover treino
-                    </button>
-                  </div>
-                  <div className="plan-field-grid plan-field-grid-two">
-                    <label>
-                      <span>Dia da semana</span>
-                      <select
-                        onChange={(event) =>
-                          updateSession(session.sessionId, (current) => ({
-                            ...current,
-                            dayOrder: Number(event.target.value),
-                          }))
-                        }
-                        value={session.dayOrder}
+                          );
+                          const replacement =
+                            remaining[
+                              Math.min(sessionIndex, remaining.length - 1)
+                            ];
+                          setDraft({ ...draft, sessions: remaining });
+                          setSelectedSessionId(replacement?.sessionId ?? "");
+                          setSelectedItemId(
+                            replacement?.items[0]?.itemId ?? "",
+                          );
+                        }}
+                        type="button"
                       >
-                        {Array.from(
-                          { length: 14 },
-                          (_, index) => index + 1,
-                        ).map((slot) => (
-                          <option key={slot} value={slot}>
-                            {trainingSlotLabel(slot)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Nome do treino</span>
-                      <input
-                        maxLength={80}
-                        onChange={(event) =>
-                          updateSession(session.sessionId, (current) => ({
-                            ...current,
-                            name: event.target.value,
-                          }))
-                        }
-                        required
-                        value={session.name}
-                      />
-                    </label>
-                  </div>
-                  <div className="plan-exercise-list">
-                    {session.items.map((item) => (
-                      <ExerciseEditor
-                        canRemove={session.items.length > 1}
-                        item={item}
-                        key={item.itemId}
-                        onChange={(changed) =>
-                          updateItem(session.sessionId, item.itemId, changed)
-                        }
-                        onRemove={() =>
-                          updateSession(session.sessionId, (current) => ({
-                            ...current,
-                            items: current.items
+                        Remover treino
+                      </button>
+                    </div>
+                    <div className="plan-field-grid plan-field-grid-two">
+                      <label>
+                        <span>Dia da semana</span>
+                        <select
+                          onChange={(event) =>
+                            updateSession(session.sessionId, (current) => ({
+                              ...current,
+                              dayOrder: Number(event.target.value),
+                            }))
+                          }
+                          value={session.dayOrder}
+                        >
+                          {Array.from(
+                            { length: 14 },
+                            (_, index) => index + 1,
+                          ).map((slot) => (
+                            <option key={slot} value={slot}>
+                              {trainingSlotLabel(slot)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Nome do treino</span>
+                        <input
+                          maxLength={80}
+                          onChange={(event) =>
+                            updateSession(session.sessionId, (current) => ({
+                              ...current,
+                              name: event.target.value,
+                            }))
+                          }
+                          required
+                          value={session.name}
+                        />
+                      </label>
+                    </div>
+                    <EditorCarousel
+                      ariaLabel={`Exercícios de ${session.name}`}
+                      idPrefix={`training-exercise-${session.sessionId}`}
+                      onSelect={setSelectedItemId}
+                      options={session.items.map((candidate, index) => ({
+                        id: candidate.itemId,
+                        index: index + 1,
+                        primary: candidate.exerciseName || "Novo exercício",
+                        secondary: modalityLabels[candidate.modality],
+                      }))}
+                      selectedId={item?.itemId ?? ""}
+                      variant="exercise"
+                    />
+                    {item ? (
+                      <div
+                        aria-labelledby={`training-exercise-${session.sessionId}-tab-${item.itemId}`}
+                        className="plan-exercise-list"
+                        id={`training-exercise-${session.sessionId}-panel-${item.itemId}`}
+                        role="tabpanel"
+                      >
+                        <ExerciseEditor
+                          canRemove={session.items.length > 1}
+                          item={item}
+                          onChange={(changed) =>
+                            updateItem(session.sessionId, item.itemId, changed)
+                          }
+                          onRemove={() => {
+                            const remaining = session.items
                               .filter(
                                 (candidate) => candidate.itemId !== item.itemId,
                               )
                               .map((candidate, index) => ({
                                 ...candidate,
                                 order: index + 1,
-                              })),
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                  <button
-                    className="button-secondary"
-                    onClick={() =>
-                      updateSession(session.sessionId, (current) => ({
-                        ...current,
-                        items: [
-                          ...current.items,
-                          blankItem(current.items.length + 1),
-                        ],
-                      }))
-                    }
-                    type="button"
-                  >
-                    Adicionar exercício
-                  </button>
-                </section>
-              ))}
+                              }));
+                            updateSession(session.sessionId, (current) => ({
+                              ...current,
+                              items: remaining,
+                            }));
+                            setSelectedItemId(remaining[0]?.itemId ?? "");
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                    <button
+                      className="button-secondary"
+                      onClick={() => {
+                        const added = blankItem(session.items.length + 1);
+                        updateSession(session.sessionId, (current) => ({
+                          ...current,
+                          items: [...current.items, added],
+                        }));
+                        setSelectedItemId(added.itemId);
+                      }}
+                      type="button"
+                    >
+                      Adicionar exercício
+                    </button>
+                  </section>
+                );
+              })()}
               <button
                 className="button-secondary add-training-day"
                 disabled={draft.sessions.length === 14}
@@ -858,18 +1052,18 @@ export function TrainingPlanEditorScreen({
                     Array.from({ length: 14 }, (_, index) => index + 1).find(
                       (slot) => !used.has(slot),
                     ) ?? 1;
+                  const addedSession = {
+                    dayOrder: nextDay,
+                    items: [blankItem(1)],
+                    name: `Treino ${String.fromCharCode(65 + draft.sessions.length)}`,
+                    sessionId: randomUuid(),
+                  };
                   setDraft({
                     ...draft,
-                    sessions: [
-                      ...draft.sessions,
-                      {
-                        dayOrder: nextDay,
-                        items: [blankItem(1)],
-                        name: `Treino ${String.fromCharCode(65 + draft.sessions.length)}`,
-                        sessionId: randomUuid(),
-                      },
-                    ],
+                    sessions: [...draft.sessions, addedSession],
                   });
+                  setSelectedSessionId(addedSession.sessionId);
+                  setSelectedItemId(addedSession.items[0]?.itemId ?? "");
                 }}
                 type="button"
               >

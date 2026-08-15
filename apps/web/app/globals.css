@@ -984,6 +984,96 @@ input:focus-visible {
   gap: var(--space-4);
 }
 
+.plan-editor-card-heading > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.plan-editor-position {
+  color: var(--color-text-secondary);
+  font-weight: 800;
+}
+
+.plan-editor-carousel {
+  display: flex;
+  gap: var(--space-3);
+  margin-inline: calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2) var(--space-3);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: var(--space-2);
+  scroll-snap-type: inline mandatory;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+}
+
+.plan-editor-carousel-option {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 min(78%, 20rem);
+  min-height: 68px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  text-align: left;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  cursor: pointer;
+}
+
+.plan-editor-exercise-carousel .plan-editor-carousel-option {
+  flex-basis: min(68%, 15rem);
+  min-height: 60px;
+}
+
+.plan-editor-carousel-option > span:first-child {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-canvas);
+  font-weight: 900;
+}
+
+.plan-editor-carousel-option > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-editor-carousel-option strong,
+.plan-editor-carousel-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-editor-carousel-option small {
+  font-weight: 700;
+}
+
+.plan-editor-carousel-option[data-selected] {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+  color: var(--color-text);
+}
+
+.plan-editor-carousel-option[data-selected] > span:first-child {
+  background: var(--color-action);
+  color: var(--color-action-contrast);
+}
+
+.plan-editor-carousel-option:focus-visible {
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 2px;
+}
+
 .plan-exercise-editor {
   padding: var(--space-5);
   background: var(--color-canvas);
@@ -2164,6 +2254,15 @@ input:focus-visible {
 
   .plan-field-grid-two {
     grid-template-columns: 1fr;
+  }
+
+  .plan-editor-carousel {
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+  }
+
+  .plan-editor-session-carousel .plan-editor-carousel-option {
+    flex-basis: 86%;
   }
 
   .plan-editor-actions > button,
