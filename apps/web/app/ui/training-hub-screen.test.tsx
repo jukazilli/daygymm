@@ -1,11 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   PlanSourceGateway,
-  TrainingPlanGateway,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
@@ -27,33 +25,39 @@ function createTrainingGateway(
   };
 }
 
+function sourceGateway(source: "manual" | "official_xlsx"): PlanSourceGateway {
+  return {
+    load: vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        onboardingCompleted: true,
+        selectedAt: "2026-08-14T17:00:00.000Z",
+        source,
+      },
+    }),
+    select: vi.fn(),
+  };
+}
+
 afterEach(cleanup);
 
 describe("TrainingHubScreen", () => {
   it("opens the official importer when the selected path has no plan", async () => {
-    const gateway: PlanSourceGateway = {
-      load: vi.fn().mockResolvedValue({
-        ok: true,
-        value: {
-          onboardingCompleted: true,
-          selectedAt: "2026-08-13T17:00:00.000Z",
-          source: "official_xlsx",
-        },
+    render(
+      createElement(TrainingHubScreen, {
+        gateway: sourceGateway("official_xlsx"),
+        trainingGateway: createTrainingGateway({
+          ok: true,
+          value: {
+            activeRun: null,
+            lastCompletedAt: null,
+            nextSession: null,
+            plan: null,
+            sessions: [],
+          },
+        }),
       }),
-      select: vi.fn(),
-    };
-    const trainingGateway = createTrainingGateway({
-      ok: true,
-      value: {
-        activeRun: null,
-        lastCompletedAt: null,
-        nextSession: null,
-        plan: null,
-        sessions: [],
-      },
-    });
-
-    render(createElement(TrainingHubScreen, { gateway, trainingGateway }));
+    );
 
     expect(await screen.findByText("Importe seu primeiro plano.")).toBeTruthy();
     expect(
@@ -64,29 +68,21 @@ describe("TrainingHubScreen", () => {
   });
 
   it("opens manual authoring when the selected path has no plan", async () => {
-    const gateway: PlanSourceGateway = {
-      load: vi.fn().mockResolvedValue({
-        ok: true,
-        value: {
-          onboardingCompleted: true,
-          selectedAt: "2026-08-14T17:00:00.000Z",
-          source: "manual",
-        },
+    render(
+      createElement(TrainingHubScreen, {
+        gateway: sourceGateway("manual"),
+        trainingGateway: createTrainingGateway({
+          ok: true,
+          value: {
+            activeRun: null,
+            lastCompletedAt: null,
+            nextSession: null,
+            plan: null,
+            sessions: [],
+          },
+        }),
       }),
-      select: vi.fn(),
-    };
-    const trainingGateway = createTrainingGateway({
-      ok: true,
-      value: {
-        activeRun: null,
-        lastCompletedAt: null,
-        nextSession: null,
-        plan: null,
-        sessions: [],
-      },
-    });
-
-    render(createElement(TrainingHubScreen, { gateway, trainingGateway }));
+    );
 
     expect(await screen.findByText("Monte seu primeiro plano.")).toBeTruthy();
     expect(
@@ -94,19 +90,7 @@ describe("TrainingHubScreen", () => {
     ).toBe("/treinos/plano");
   });
 
-  it("makes an imported plan executable", async () => {
-    const user = userEvent.setup();
-    const gateway: PlanSourceGateway = {
-      load: vi.fn().mockResolvedValue({
-        ok: true,
-        value: {
-          onboardingCompleted: true,
-          selectedAt: "2026-08-13T17:00:00.000Z",
-          source: "official_xlsx",
-        },
-      }),
-      select: vi.fn(),
-    };
+  it("keeps one primary workout action and exposes compact navigation", async () => {
     const plannedSession = {
       dayOrder: 1,
       items: [
@@ -133,41 +117,28 @@ describe("TrainingHubScreen", () => {
       sessionId: "62000000-0000-4000-8000-000000000002",
       weekday: 1,
     };
-    const trainingGateway = createTrainingGateway({
-      ok: true,
-      value: {
-        activeRun: null,
-        lastCompletedAt: null,
-        nextSession: plannedSession,
-        plan: {
-          itemCount: 1,
-          name: "Meu plano",
-          planId: "63000000-0000-4000-8000-000000000003",
-          sessionCount: 1,
-          version: 1,
-          versionId: "64000000-0000-4000-8000-000000000004",
-          wasCreated: false,
-        },
-        sessions: [plannedSession],
-      },
-    });
-    const trainingPlanGateway: TrainingPlanGateway = {
-      importOfficialXlsx: vi.fn(),
-      loadActive: vi.fn(),
-      rename: vi.fn().mockResolvedValue({
-        ok: true,
-        value: {
-          name: "Treino - 14/08/2026",
-          planId: "63000000-0000-4000-8000-000000000003",
-        },
-      }),
-    };
 
     render(
       createElement(TrainingHubScreen, {
-        gateway,
-        trainingGateway,
-        trainingPlanGateway,
+        gateway: sourceGateway("official_xlsx"),
+        trainingGateway: createTrainingGateway({
+          ok: true,
+          value: {
+            activeRun: null,
+            lastCompletedAt: null,
+            nextSession: plannedSession,
+            plan: {
+              itemCount: 1,
+              name: "Meu plano",
+              planId: "63000000-0000-4000-8000-000000000003",
+              sessionCount: 1,
+              version: 1,
+              versionId: "64000000-0000-4000-8000-000000000004",
+              wasCreated: false,
+            },
+            sessions: [plannedSession],
+          },
+        }),
       }),
     );
 
@@ -175,31 +146,19 @@ describe("TrainingHubScreen", () => {
       await screen.findByRole("heading", { name: "Treino A" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Abrir treino" }).getAttribute("href"),
+      screen.getByRole("link", { name: /Abrir treino/ }).getAttribute("href"),
     ).toBe("/treinos/sessao?sessao=62000000-0000-4000-8000-000000000002");
-    expect(screen.getByText("Agenda semanal")).toBeTruthy();
-    expect(screen.getByText("Segunda")).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Criar treino/ })).toHaveLength(
+      1,
+    );
     expect(
-      screen.getByRole("link", { name: "Editar plano" }).getAttribute("href"),
-    ).toBe("/treinos/plano");
+      screen.getByRole("link", { name: /Meus treinos/ }).getAttribute("href"),
+    ).toBe("/treinos/meus");
     expect(
       screen
-        .getByRole("link", { name: "Configurar cargas" })
+        .getByRole("link", { name: /Configurar cargas/ })
         .getAttribute("href"),
     ).toBe("/treinos/cargas");
-
-    await user.click(screen.getByRole("button", { name: "Editar nome" }));
-    const nameField = screen.getByRole("textbox", { name: "Nome do treino" });
-    await user.clear(nameField);
-    await user.type(nameField, "Treino - 14/08/2026");
-    await user.click(screen.getByRole("button", { name: "Salvar nome" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "Treino - 14/08/2026" }),
-    ).toBeTruthy();
-    expect(trainingPlanGateway.rename).toHaveBeenCalledWith(
-      "63000000-0000-4000-8000-000000000003",
-      "Treino - 14/08/2026",
-    );
+    expect(screen.queryByText("Agenda semanal")).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   defaultImportedPlanName,
+  isSupportedOfficialTrainingHeader,
   parseOfficialXlsxFile,
 } from "./official-xlsx-parser";
 
@@ -13,6 +14,27 @@ describe("defaultImportedPlanName", () => {
     expect(defaultImportedPlanName(new Date(2026, 7, 14))).toBe(
       "Treino - 14/08/2026",
     );
+  });
+
+  it("keeps legacy second-based template headers compatible", () => {
+    expect(
+      isSupportedOfficialTrainingHeader([
+        "Dia",
+        "Sessão",
+        "Ordem",
+        "Exercício",
+        "Tipo",
+        "Séries",
+        "Reps mín",
+        "Reps máx",
+        "Duração (s)",
+        "Distância (m)",
+        "Descanso (s)",
+        "Circuito",
+        "Observações",
+        "Carga (kg)",
+      ]),
+    ).toBe(true);
   });
 
   it("imports the optional planned load without changing time exercises", async () => {

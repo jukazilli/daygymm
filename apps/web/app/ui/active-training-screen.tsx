@@ -11,8 +11,14 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import {
+  formatTrainingDuration,
+  maximumExerciseDurationSeconds,
+} from "../../lib/training-duration";
 import { trainingWeekdayName } from "../../lib/training-weekdays";
+import { AppIcon } from "./app-icon";
 import { AppLoadingSkeleton } from "./app-shell";
+import { DurationInput } from "./duration-input";
 
 interface ActiveTrainingScreenProps {
   readonly gateway?: TrainingSessionGateway;
@@ -33,15 +39,6 @@ function formatClock(totalSeconds: number) {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatDuration(seconds: number) {
-  if (seconds < 60) {
-    return `${seconds} s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return remainder ? `${minutes} min ${remainder} s` : `${minutes} min`;
-}
-
 function exerciseTarget(exercise: PracticalTrainingExercise) {
   const prefix = `${exercise.sets} ${exercise.sets === 1 ? "série" : "séries"}`;
   const targets = [
@@ -51,7 +48,9 @@ function exerciseTarget(exercise: PracticalTrainingExercise) {
         : `${exercise.repsMin}–${exercise.repsMax} repetições`
       : null,
     exercise.plannedWeightKg !== null ? `${exercise.plannedWeightKg} kg` : null,
-    exercise.durationSeconds ? formatDuration(exercise.durationSeconds) : null,
+    exercise.durationSeconds
+      ? formatTrainingDuration(exercise.durationSeconds)
+      : null,
     exercise.distanceMeters ? `${exercise.distanceMeters} m` : null,
   ].filter(Boolean);
   return targets.length > 0 ? `${prefix} · ${targets.join(" · ")}` : prefix;
@@ -66,7 +65,7 @@ function setResult(exercise: PracticalTrainingExercise, setIndex: number) {
     performed.actualWeightKg !== null ? `${performed.actualWeightKg} kg` : null,
     performed.actualReps !== null ? `${performed.actualReps} repetições` : null,
     performed.actualDurationSeconds !== null
-      ? formatDuration(performed.actualDurationSeconds)
+      ? formatTrainingDuration(performed.actualDurationSeconds)
       : null,
     performed.actualDistanceMeters !== null
       ? `${performed.actualDistanceMeters} m`
@@ -132,13 +131,8 @@ function ExerciseExecution({
         ? String(lastSet.actualWeightKg)
         : "",
   );
-  const [duration, setDuration] = useState(
-    exercise.durationSeconds !== null
-      ? String(exercise.durationSeconds)
-      : lastSet?.actualDurationSeconds !== null &&
-          lastSet?.actualDurationSeconds !== undefined
-        ? String(lastSet.actualDurationSeconds)
-        : "",
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(
+    exercise.durationSeconds ?? lastSet?.actualDurationSeconds ?? null,
   );
   const [distance, setDistance] = useState(
     exercise.distanceMeters !== null ? String(exercise.distanceMeters) : "",
@@ -146,7 +140,7 @@ function ExerciseExecution({
   const nextSet = exercise.setExecutions.length + 1;
   const actualReps = needsReps ? parsedInteger(reps) : null;
   const actualWeightKg = weight ? parsedDecimal(weight) : null;
-  const actualDurationSeconds = needsDuration ? parsedInteger(duration) : null;
+  const actualDurationSeconds = needsDuration ? durationSeconds : null;
   const actualDistanceMeters = needsDistance ? parsedInteger(distance) : null;
   const canComplete =
     nextSet <= exercise.sets &&
@@ -184,7 +178,7 @@ function ExerciseExecution({
         onClick={onStart}
         type="button"
       >
-        <span aria-hidden="true">▶</span>
+        <AppIcon name="play" size={30} />
       </button>
     );
   }
@@ -243,16 +237,13 @@ function ExerciseExecution({
           ) : null}
           {needsDuration ? (
             <label>
-              <span>
-                Tempo <small>segundos</small>
-              </span>
-              <input
-                inputMode="numeric"
-                max="7200"
-                min="1"
-                onChange={(event) => setDuration(event.target.value)}
-                type="number"
-                value={duration}
+              <span>Tempo</span>
+              <DurationInput
+                maximum={maximumExerciseDurationSeconds}
+                minimum={1}
+                onChange={setDurationSeconds}
+                required
+                seconds={durationSeconds}
               />
             </label>
           ) : null}
@@ -302,7 +293,9 @@ function ExerciseExecution({
           <ol>
             {exercise.setExecutions.map((set, index) => (
               <li key={set.setExecutionId}>
-                <span>✓ Série {set.setNumber}</span>
+                <span className="completed-set-label">
+                  <AppIcon name="check" size={18} /> Série {set.setNumber}
+                </span>
                 <strong>{setResult(exercise, index)}</strong>
               </li>
             ))}
@@ -762,7 +755,7 @@ export function ActiveTrainingScreen({
       <main className="session-shell session-finished">
         <p className="eyebrow">Treino salvo</p>
         <h1>Treino concluído.</h1>
-        <p>{formatDuration(finishedDuration)} de atividade</p>
+        <p>{formatTrainingDuration(finishedDuration)} de atividade</p>
         <Link className="button-primary" href="/hoje/">
           Voltar para Hoje
         </Link>
@@ -958,7 +951,8 @@ export function ActiveTrainingScreen({
           </div>
           {currentExercise.restSeconds > 0 ? (
             <p className="exercise-rest">
-              Descanso previsto: {formatDuration(currentExercise.restSeconds)}
+              Descanso previsto:{" "}
+              {formatTrainingDuration(currentExercise.restSeconds)}
             </p>
           ) : null}
           {currentExercise.notes ? (

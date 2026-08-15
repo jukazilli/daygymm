@@ -263,6 +263,11 @@ nesta relação.
 | medidas e descanso  | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
 | circuito e notas    | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
 
+Tempos planejados e de descanso permanecem canônicos como segundos inteiros no
+banco e nos contratos. As superfícies humanas apresentam e recebem `HH:MM:SS` e
+convertem esse valor na fronteira; o importador também aceita o modelo XLSX legado
+em segundos para evitar quebra de arquivos existentes.
+
 ### `api.training_session_runs`
 
 Owner: comandos `private.start_training_session()`,

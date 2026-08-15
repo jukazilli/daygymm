@@ -2182,6 +2182,221 @@ input:focus-visible {
   background: var(--color-action-soft);
 }
 
+.icon-button {
+  display: inline-grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-action-pressed);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.icon-button:focus-visible {
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 2px;
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.plan-editor-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.plan-editor-back,
+.plan-editor-save,
+.button-primary:has(svg),
+.button-secondary:has(svg) {
+  gap: var(--space-2);
+}
+
+.plan-editor-form input,
+.plan-editor-form select,
+.plan-editor-form textarea {
+  min-height: 54px;
+  font-size: 1rem;
+}
+
+.editor-entity-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-entity-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 76px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+}
+
+.editor-entity-index {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-action-soft);
+  color: var(--color-action-pressed);
+  font-weight: 900;
+}
+
+.editor-entity-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.editor-entity-copy strong,
+.editor-entity-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-entity-copy small {
+  color: var(--color-text-secondary);
+}
+
+.training-hub-layout,
+.my-trainings-page {
+  width: min(100%, 58rem);
+  margin: 0 auto;
+}
+
+.training-hub-primary h1 {
+  margin: var(--space-1) 0;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+}
+
+.training-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.training-quick-action {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 92px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.training-quick-action:hover {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.training-quick-action > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.training-quick-action small {
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.training-quick-action-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--color-action-soft);
+  color: var(--color-action-pressed);
+}
+
+.my-trainings-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.page-guidance {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.weekly-training-list,
+.weekly-training-sessions {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weekly-training-day {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.3fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.weekly-training-day[data-today] {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.weekly-training-day-heading,
+.weekly-training-session > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.weekly-training-day small {
+  color: var(--color-text-secondary);
+}
+
+.weekly-training-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.weekly-training-session:hover {
+  border-color: var(--color-action);
+}
+
 @media (max-width: 760px) {
   .auth-shell {
     display: block;
@@ -2248,8 +2463,27 @@ input:focus-visible {
   }
 
   .plan-editor-header {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--space-3);
+  }
+
+  .plan-editor-header > div {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .plan-editor-save {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 48px;
+  }
+
+  .training-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-training-day {
+    grid-template-columns: 1fr;
   }
 
   .plan-field-grid-two {

@@ -214,7 +214,7 @@ describe("ActiveTrainingScreen", () => {
     ).toBe("12");
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
-    expect(screen.getByText("✓ Série 1")).toBeTruthy();
+    expect(screen.getByText("Série 1")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
     await user.click(
       await screen.findByRole("button", { name: "Finalizar treino" }),
@@ -410,11 +410,11 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
-    const duration = await screen.findByRole("spinbutton", {
-      name: "Tempo segundos",
+    const duration = await screen.findByRole("textbox", {
+      name: "Tempo",
     });
-    expect(duration.getAttribute("value")).toBe("30");
+    expect(duration.getAttribute("value")).toBe("00:00:30");
     expect(screen.queryByText(/null/i)).toBeNull();
-    expect(screen.getByText("2 séries · 30 s")).toBeTruthy();
+    expect(screen.getByText("2 séries · 00:00:30")).toBeTruthy();
   });
 });

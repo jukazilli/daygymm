@@ -14,6 +14,7 @@ import type {
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
 import { trainingSessionHref } from "../../lib/training-weekdays";
+import { AppIcon } from "./app-icon";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TodayScreenProps {
@@ -226,30 +227,26 @@ export function TodayScreen({
           <div className="home-module-grid">
             <Link className="home-module-card" href="/nutricao/">
               <span className="module-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M7 3v7m3-7v7M5 7h7m-3 3v11m8-18v18m0-18c-2 2-3 5-3 8h3" />
-                </svg>
+                <AppIcon name="utensils" />
               </span>
               <span>
                 <strong>Nutrição</strong>
                 <small>Refeições e metas</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
-                →
+                <AppIcon name="forward" size={20} />
               </span>
             </Link>
             <Link className="home-module-card" href="/gdshop/">
               <span className="module-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 8h14l-1 12H6ZM9 9V6a3 3 0 0 1 6 0v3" />
-                </svg>
+                <AppIcon name="shop" />
               </span>
               <span>
                 <strong>GdShop</strong>
                 <small>Produtos para sua rotina</small>
               </span>
               <span className="module-arrow" aria-hidden="true">
-                →
+                <AppIcon name="forward" size={20} />
               </span>
             </Link>
           </div>

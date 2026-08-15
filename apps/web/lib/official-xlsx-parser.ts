@@ -8,6 +8,8 @@ import {
 } from "@daygym/contracts";
 import type { Sheet } from "read-excel-file/browser";
 
+import { parseTrainingDurationCell } from "./training-duration";
+
 const maximumFileBytes = 2_097_152;
 const maximumExpandedBytes = 12_582_912;
 const maximumArchiveEntries = 200;
@@ -22,13 +24,15 @@ const expectedHeaders = [
   "Séries",
   "Reps mín",
   "Reps máx",
-  "Duração (s)",
+  "Duração (HH:MM:SS)",
   "Distância (m)",
-  "Descanso (s)",
+  "Descanso (HH:MM:SS)",
   "Circuito",
   "Observações",
 ] as const;
 const optionalPlannedWeightHeader = "Carga (kg)";
+const legacyDurationHeader = "Duração (s)";
+const legacyRestHeader = "Descanso (s)";
 
 type CellValue = string | number | boolean | Date | null;
 
@@ -86,6 +90,33 @@ function cellInteger(value: CellValue): number | null {
 
 function optionalInteger(value: CellValue): number | null {
   return value === null || value === "" ? null : cellInteger(value);
+}
+
+function optionalDuration(value: CellValue): number | null {
+  if (typeof value === "boolean") {
+    return null;
+  }
+  return parseTrainingDurationCell(value);
+}
+
+export function isSupportedOfficialTrainingHeader(
+  header: readonly CellValue[],
+) {
+  return (
+    expectedHeaders.every((expected, index) => {
+      const actual = cellText(header[index] ?? null);
+      if (index === 8) {
+        return actual === expected || actual === legacyDurationHeader;
+      }
+      if (index === 10) {
+        return actual === expected || actual === legacyRestHeader;
+      }
+      return actual === expected;
+    }) &&
+    (header[13] === undefined ||
+      header[13] === null ||
+      cellText(header[13]) === optionalPlannedWeightHeader)
+  );
 }
 
 function optionalDecimal(value: CellValue): number | null {
@@ -244,11 +275,11 @@ function buildItem(
   issues: PlanImportIssue[],
 ): OfficialXlsxPlanItem | null {
   const modality = modalityFromCell(row[4] ?? null);
-  const rest = optionalInteger(row[10] ?? null);
+  const rest = optionalDuration(row[10] ?? null);
   const candidate = {
     circuitGroup: cellText(row[11] ?? null),
     distanceMeters: optionalInteger(row[9] ?? null),
-    durationSeconds: optionalInteger(row[8] ?? null),
+    durationSeconds: optionalDuration(row[8] ?? null),
     exerciseName: cellText(row[3] ?? null) ?? "",
     modality,
     notes: cellText(row[12] ?? null),
@@ -261,7 +292,7 @@ function buildItem(
   };
   if (rest === null) {
     issues.push({
-      message: "Descanso vazio: será usado o padrão de 60 segundos.",
+      message: "Descanso vazio: será usado o padrão de 00:01:00.",
       row: rowNumber,
       severity: "warning",
     });
@@ -368,13 +399,7 @@ export async function parseOfficialXlsxFile(
     };
   }
   const [header, ...rows] = sheet.data.map((row) => row.map(trustedCell));
-  const headerMatches =
-    expectedHeaders.every(
-      (expected, index) => cellText(header?.[index] ?? null) === expected,
-    ) &&
-    (header?.[13] === undefined ||
-      header?.[13] === null ||
-      cellText(header[13]) === optionalPlannedWeightHeader);
+  const headerMatches = isSupportedOfficialTrainingHeader(header ?? []);
   if (!headerMatches) {
     return {
       ...baseResult,

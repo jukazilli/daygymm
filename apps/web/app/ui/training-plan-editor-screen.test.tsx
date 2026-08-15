@@ -128,9 +128,13 @@ describe("TrainingPlanEditorScreen", () => {
 
     render(createElement(TrainingPlanEditorScreen, { gateway, navigate }));
 
-    const exercise = await screen.findByRole("textbox", {
-      name: "Exercício",
-    });
+    await user.click(
+      await screen.findByRole("button", { name: "Editar Treino A" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Editar Novo exercício" }),
+    );
+    const exercise = screen.getByRole("textbox", { name: "Exercício" });
     await user.type(exercise, "Agachamento");
     await user.click(screen.getByRole("button", { name: "Criar plano" }));
 
@@ -145,7 +149,7 @@ describe("TrainingPlanEditorScreen", () => {
     expect(navigate).toHaveBeenCalledWith("/treinos/");
   });
 
-  it("switches compact training and exercise cards without losing edits", async () => {
+  it("drills from the training list into exercises without losing edits", async () => {
     const user = userEvent.setup();
     const gateway = createGateway(carouselDraft);
 
@@ -156,28 +160,32 @@ describe("TrainingPlanEditorScreen", () => {
       }),
     );
 
-    const exerciseField = await screen.findByRole("textbox", {
-      name: "Exercício",
-    });
-    expect((exerciseField as HTMLInputElement).value).toBe("Supino reto");
-
-    await user.click(screen.getByRole("tab", { name: /Esteira/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "Editar Treino A" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Editar Esteira" }));
+    const exerciseField = screen.getByRole("textbox", { name: "Exercício" });
     expect((exerciseField as HTMLInputElement).value).toBe("Esteira");
     await user.clear(exerciseField);
     await user.type(exerciseField, "Caminhada inclinada");
-
-    const firstTraining = screen.getByRole("tab", { name: /Treino A/ });
-    firstTraining.focus();
-    await user.keyboard("{ArrowRight}");
-    expect((exerciseField as HTMLInputElement).value).toBe("Remada baixa");
-
-    const secondTraining = screen.getByRole("tab", { name: /Treino B/ });
-    await waitFor(() => expect(document.activeElement).toBe(secondTraining));
-    await user.keyboard("{ArrowLeft}");
-    await user.click(screen.getByRole("tab", { name: /Caminhada inclinada/ }));
-    expect((exerciseField as HTMLInputElement).value).toBe(
-      "Caminhada inclinada",
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(
+      screen.getByRole("button", { name: "Editar Caminhada inclinada" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    await user.click(screen.getByRole("button", { name: "Editar Treino B" }));
+    expect(
+      screen.getByRole("button", { name: "Editar Remada baixa" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    await user.click(screen.getByRole("button", { name: "Editar Treino A" }));
+    await user.click(
+      screen.getByRole("button", { name: "Editar Caminhada inclinada" }),
     );
+    expect(
+      (screen.getByRole("textbox", { name: "Exercício" }) as HTMLInputElement)
+        .value,
+    ).toBe("Caminhada inclinada");
   });
 
   it("opens the hidden training that has an invalid required field", async () => {
@@ -200,20 +208,13 @@ describe("TrainingPlanEditorScreen", () => {
       }),
     );
 
-    await screen.findByRole("textbox", { name: "Exercício" });
-    await user.click(
-      screen.getByRole("button", { name: "Salvar nova versão" }),
-    );
+    await screen.findByRole("button", { name: "Editar Treino A" });
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     expect(gateway.publish).not.toHaveBeenCalled();
     expect(
       await screen.findByText("Revise os campos obrigatórios do Treino 2."),
     ).toBeTruthy();
-    expect(
-      screen
-        .getByRole("tab", { name: /Treino B/ })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
     expect(
       (screen.getByRole("textbox", { name: "Exercício" }) as HTMLInputElement)
         .value,
@@ -248,9 +249,7 @@ describe("TrainingPlanEditorScreen", () => {
       }),
       "2.5",
     );
-    await user.click(
-      screen.getByRole("button", { name: "Salvar nova versão" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     await waitFor(() => expect(gateway.publish).toHaveBeenCalledOnce());
     const published = vi.mocked(gateway.publish).mock.calls[0]?.[0];

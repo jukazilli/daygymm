@@ -8,24 +8,18 @@ import type {
   PlanSourceGateway,
   PlanSourceState,
   PracticalTrainingState,
-  TrainingPlanGateway,
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
 import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
-import {
-  currentTrainingWeekday,
-  trainingSessionHref,
-  trainingWeekdayName,
-} from "../../lib/training-weekdays";
+import { trainingSessionHref } from "../../lib/training-weekdays";
+import { AppIcon, type AppIconName } from "./app-icon";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
 
 interface TrainingHubScreenProps {
   readonly gateway?: PlanSourceGateway;
   readonly navigate?: (path: string) => void;
-  readonly trainingPlanGateway?: TrainingPlanGateway;
   readonly trainingGateway?: TrainingSessionGateway;
 }
 
@@ -45,19 +39,38 @@ function defaultNavigate(path: string) {
   window.location.assign(path);
 }
 
+function QuickAccess({
+  description,
+  href,
+  icon,
+  title,
+}: Readonly<{
+  description: string;
+  href: string;
+  icon: AppIconName;
+  title: string;
+}>) {
+  return (
+    <Link className="training-quick-action" href={href}>
+      <span className="training-quick-action-icon">
+        <AppIcon name={icon} />
+      </span>
+      <span>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+      <AppIcon name="forward" size={20} />
+    </Link>
+  );
+}
+
 function TrainingState({
-  onRename,
   sourceState,
   trainingState,
 }: Readonly<{
-  onRename: (planId: string, name: string) => Promise<boolean>;
   sourceState: PlanSourceState;
   trainingState: PracticalTrainingState;
 }>) {
-  const [editingName, setEditingName] = useState(false);
-  const [planName, setPlanName] = useState(trainingState.plan?.name ?? "");
-  const [renameBusy, setRenameBusy] = useState(false);
-  const [renameFailed, setRenameFailed] = useState(false);
   if (!sourceState.onboardingCompleted) {
     return (
       <section className="app-state-card training-card">
@@ -88,94 +101,14 @@ function TrainingState({
       ? activeRun.session.items.filter((item) => item.completedAt).length
       : 0;
     return (
-      <div className="training-plan-layout">
-        <section className="app-state-card training-card">
-          <p className="eyebrow">
-            Plano ativo · versão {trainingState.plan.version}
-          </p>
-          <h1>{trainingState.plan.name}</h1>
-          <p>
-            {trainingState.plan.sessionCount} sessões ·{" "}
-            {trainingState.plan.itemCount} exercícios
-          </p>
-          {editingName ? (
-            <form
-              className="plan-name-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (renameBusy) {
-                  return;
-                }
-                setRenameBusy(true);
-                setRenameFailed(false);
-                void onRename(trainingState.plan!.planId, planName).then(
-                  (saved) => {
-                    setRenameBusy(false);
-                    setRenameFailed(!saved);
-                    if (saved) {
-                      setEditingName(false);
-                    }
-                  },
-                );
-              }}
-            >
-              <label>
-                <span>Nome do treino</span>
-                <input
-                  maxLength={80}
-                  onChange={(event) => setPlanName(event.target.value)}
-                  value={planName}
-                />
-              </label>
-              <div>
-                <button
-                  className="button-primary"
-                  disabled={renameBusy || !planName.trim()}
-                  type="submit"
-                >
-                  {renameBusy ? "Salvando…" : "Salvar nome"}
-                </button>
-                <button
-                  className="button-text"
-                  onClick={() => {
-                    setPlanName(trainingState.plan!.name);
-                    setEditingName(false);
-                    setRenameFailed(false);
-                  }}
-                  type="button"
-                >
-                  Cancelar
-                </button>
-              </div>
-              {renameFailed ? (
-                <p className="status-message status-error" role="alert">
-                  Não foi possível salvar o nome.
-                </p>
-              ) : null}
-            </form>
-          ) : (
-            <div className="plan-card-actions">
-              <button
-                className="button-text plan-name-edit"
-                onClick={() => setEditingName(true)}
-                type="button"
-              >
-                Editar nome
-              </button>
-              <Link className="button-secondary" href="/treinos/plano/">
-                Editar plano
-              </Link>
-            </div>
-          )}
-        </section>
-
+      <div className="training-plan-layout training-hub-layout">
         {trainingState.nextSession ? (
-          <section className="next-training-card">
+          <section className="next-training-card training-hub-primary">
             <div>
               <p className="eyebrow">
                 {activeRun ? "Em andamento" : "Treino de hoje"}
               </p>
-              <h2>{trainingState.nextSession.name}</h2>
+              <h1>{trainingState.nextSession.name}</h1>
               <p>
                 {activeRun
                   ? `${completedCount} de ${activeRun.session.items.length} exercícios`
@@ -186,68 +119,52 @@ function TrainingState({
               className="button-primary"
               href={trainingSessionHref(trainingState.nextSession.sessionId)}
             >
-              {activeRun ? "Continuar treino" : "Abrir treino"}
+              <AppIcon name={activeRun ? "play" : "workouts"} size={20} />
+              <span>{activeRun ? "Continuar treino" : "Abrir treino"}</span>
             </Link>
           </section>
         ) : (
-          <section className="next-training-card training-rest-card">
+          <section className="next-training-card training-rest-card training-hub-primary">
             <div>
               <p className="eyebrow">Hoje</p>
-              <h2>Dia de descanso.</h2>
+              <h1>Dia de descanso.</h1>
+              <p>Se quiser treinar, escolha uma sessão do seu plano.</p>
             </div>
+            <Link className="button-primary" href="/treinos/meus/">
+              Escolher treino
+            </Link>
           </section>
         )}
 
-        <section
-          className="weekly-training-schedule"
-          aria-labelledby="weekly-training-title"
-        >
+        <section aria-labelledby="training-quick-access-title">
           <div className="section-heading">
-            <h2 id="weekly-training-title">Agenda semanal</h2>
-            <Link className="schedule-settings-link" href="/treinos/cargas/">
-              <span aria-hidden="true">⚙</span>
-              Configurar cargas
-            </Link>
+            <div>
+              <p className="eyebrow">
+                {trainingState.plan.name} · versão {trainingState.plan.version}
+              </p>
+              <h2 id="training-quick-access-title">Acessos rápidos</h2>
+            </div>
           </div>
-          <ol>
-            {[1, 2, 3, 4, 5, 6, 7].map((weekday) => {
-              const scheduledSessions = trainingState.sessions.filter(
-                (session) => session.weekday === weekday,
-              );
-              return (
-                <li
-                  data-today={
-                    weekday === currentTrainingWeekday() ? "true" : undefined
-                  }
-                  key={weekday}
-                >
-                  <div className="schedule-day">
-                    <strong>{trainingWeekdayName(weekday)}</strong>
-                    {weekday === currentTrainingWeekday() ? (
-                      <small>Hoje</small>
-                    ) : null}
-                  </div>
-                  <div className="schedule-sessions">
-                    {scheduledSessions.length > 0 ? (
-                      scheduledSessions.map((session) => (
-                        <div key={session.sessionId}>
-                          <span>
-                            <strong>{session.name}</strong>
-                            <small>{session.items.length} exercícios</small>
-                          </span>
-                          <Link href={trainingSessionHref(session.sessionId)}>
-                            Abrir
-                          </Link>
-                        </div>
-                      ))
-                    ) : (
-                      <small>Descanso</small>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          <div className="training-quick-actions">
+            <QuickAccess
+              description="Crie ou edite o plano atual"
+              href="/treinos/plano/"
+              icon="plan"
+              title="Criar treino"
+            />
+            <QuickAccess
+              description="Veja a agenda e escolha uma sessão"
+              href="/treinos/meus/"
+              icon="calendar"
+              title="Meus treinos"
+            />
+            <QuickAccess
+              description="Defina carga inicial e passo"
+              href="/treinos/cargas/"
+              icon="settings"
+              title="Configurar cargas"
+            />
+          </div>
         </section>
       </div>
     );
@@ -299,15 +216,11 @@ function TrainingState({
 export function TrainingHubScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
-  trainingPlanGateway: providedTrainingPlanGateway,
   trainingGateway: providedTrainingGateway,
 }: TrainingHubScreenProps) {
   const gatewayRef = useRef<PlanSourceGateway | undefined>(providedGateway);
   const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
     providedTrainingGateway,
-  );
-  const trainingPlanGatewayRef = useRef<TrainingPlanGateway | undefined>(
-    providedTrainingPlanGateway,
   );
   const [sourceState, setSourceState] = useState<PlanSourceState>();
   const [trainingState, setTrainingState] = useState<PracticalTrainingState>();
@@ -321,27 +234,6 @@ export function TrainingHubScreen({
   function trainingGateway() {
     trainingGatewayRef.current ??= createWebTrainingSessionGateway();
     return trainingGatewayRef.current;
-  }
-
-  function trainingPlanGateway() {
-    trainingPlanGatewayRef.current ??= createWebTrainingPlanGateway();
-    return trainingPlanGatewayRef.current;
-  }
-
-  async function renamePlan(planId: string, name: string) {
-    const result = await trainingPlanGateway().rename(planId, name);
-    if (!result.ok) {
-      if (result.reason === "session") {
-        navigate("/entrar/");
-      }
-      return false;
-    }
-    setTrainingState((current) =>
-      current?.plan
-        ? { ...current, plan: { ...current.plan, name: result.value.name } }
-        : current,
-    );
-    return true;
   }
 
   useEffect(() => {
@@ -378,7 +270,6 @@ export function TrainingHubScreen({
       ) : null}
       {sourceState && trainingState ? (
         <TrainingState
-          onRename={renamePlan}
           sourceState={sourceState}
           trainingState={trainingState}
         />
