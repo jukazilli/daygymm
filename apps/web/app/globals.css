@@ -605,12 +605,28 @@ input:focus-visible {
   padding-bottom: calc(116px + env(safe-area-inset-bottom));
 }
 
-.focused-back-action {
+.focused-header {
   position: fixed;
   z-index: 40;
-  top: calc(var(--space-3) + env(safe-area-inset-top));
-  left: max(var(--space-5), calc((100vw - 58rem) / 2));
+  top: 0;
+  right: 0;
+  left: 0;
+  height: calc(76px + env(safe-area-inset-top));
+  background: var(--color-canvas);
+}
+
+.focused-header-inner {
+  display: flex;
+  align-items: center;
+  width: min(calc(100% - (2 * var(--space-5))), 58rem);
+  height: 100%;
+  margin: 0 auto;
+  padding-top: env(safe-area-inset-top);
+}
+
+.focused-back-action {
   display: grid;
+  flex: 0 0 48px;
   width: 48px;
   height: 48px;
   place-items: center;
@@ -2604,8 +2620,8 @@ input:focus-visible {
     padding-left: var(--space-4);
   }
 
-  .focused-back-action {
-    left: var(--space-3);
+  .focused-header-inner {
+    width: calc(100% - (2 * var(--space-4)));
   }
 
   .fixed-action-bar {
@@ -2711,6 +2727,10 @@ input:focus-visible {
   .app-shell {
     padding-right: var(--space-3);
     padding-left: var(--space-3);
+  }
+
+  .focused-header-inner {
+    width: calc(100% - (2 * var(--space-3)));
   }
 
   .fixed-action-bar {

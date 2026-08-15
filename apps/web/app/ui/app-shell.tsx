@@ -70,13 +70,8 @@ export function FocusedBackAction({ href, onClick }: FocusedBackActionProps) {
     </>
   );
 
-  return href ? (
-    <Link
-      aria-label="Voltar"
-      className="focused-back-action"
-      href={href}
-      title="Voltar"
-    >
+  const action = href ? (
+    <Link aria-label="Voltar" className="focused-back-action" href={href}>
       {content}
     </Link>
   ) : (
@@ -84,11 +79,16 @@ export function FocusedBackAction({ href, onClick }: FocusedBackActionProps) {
       aria-label="Voltar"
       className="focused-back-action"
       onClick={onClick}
-      title="Voltar"
       type="button"
     >
       {content}
     </button>
+  );
+
+  return (
+    <div className="focused-header">
+      <div className="focused-header-inner">{action}</div>
+    </div>
   );
 }
 

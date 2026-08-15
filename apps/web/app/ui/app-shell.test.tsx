@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AppShell } from "./app-shell";
+import { AppShell, FocusedBackAction } from "./app-shell";
 
 afterEach(cleanup);
 
@@ -43,5 +43,25 @@ describe("AppShell", () => {
     expect(screen.queryByText("Prévia")).toBeNull();
     expect(screen.queryByRole("navigation")).toBeNull();
     expect(screen.getByRole("heading", { name: "Montar plano" })).toBeTruthy();
+  });
+
+  it("keeps the focused back action inside an opaque fixed header", () => {
+    render(
+      createElement(AppShell, {
+        active: "workouts",
+        children: [
+          createElement(FocusedBackAction, {
+            href: "/treinos/",
+            key: "back",
+          }),
+          createElement("h1", { key: "title" }, "Planos de treino"),
+        ],
+        variant: "focused",
+      }),
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Voltar" }).closest(".focused-header"),
+    ).toBeTruthy();
   });
 });

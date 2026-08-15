@@ -83,4 +83,24 @@ describe("training plan editor contracts", () => {
       }),
     ).toEqual(expect.objectContaining({ currentVersion: 10, sessionCount: 6 }));
   });
+
+  it("accepts the timezone offset returned by PostgREST for timestamptz", () => {
+    expect(
+      trainingPlanSummarySchema.parse({
+        archivedAt: "2026-08-14T15:00:00+00:00",
+        currentVersion: 3,
+        itemCount: 18,
+        name: "Plano anterior",
+        planId: "60000000-0000-4000-8000-000000000006",
+        provenance: "official_xlsx",
+        sessionCount: 4,
+        updatedAt: "2026-08-15T15:00:00.123456+00:00",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        archivedAt: "2026-08-14T15:00:00+00:00",
+        updatedAt: "2026-08-15T15:00:00.123456+00:00",
+      }),
+    );
+  });
 });

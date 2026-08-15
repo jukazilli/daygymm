@@ -8,6 +8,7 @@ import type {
 } from "./training-plan-import.js";
 
 const uuidSchema = z.string().uuid();
+const databaseTimestampSchema = z.string().datetime({ offset: true });
 const optionalInteger = (maximum: number) =>
   z.number().int().min(1).max(maximum).nullable();
 const optionalWeightSchema = z
@@ -221,14 +222,14 @@ export const publishTrainingPlanInputSchema = z
 
 export const trainingPlanSummarySchema = z
   .object({
-    archivedAt: z.string().datetime().nullable(),
+    archivedAt: databaseTimestampSchema.nullable(),
     currentVersion: z.number().int().positive(),
     itemCount: z.number().int().min(0),
     name: z.string().trim().min(1).max(80),
     planId: uuidSchema,
     provenance: z.enum(["manual", "official_xlsx"]),
     sessionCount: z.number().int().min(0),
-    updatedAt: z.string().datetime(),
+    updatedAt: databaseTimestampSchema,
   })
   .strict();
 
