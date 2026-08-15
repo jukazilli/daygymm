@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   publishTrainingPlanInputSchema,
   trainingPlanDraftItemSchema,
+  trainingPlanSummarySchema,
 } from "./training-plan-editor.js";
 
 const strengthItem = {
@@ -66,5 +67,20 @@ describe("training plan editor contracts", () => {
         ],
       }),
     ).toThrow();
+  });
+
+  it("accepts the versioned summary shown in the plan catalog", () => {
+    expect(
+      trainingPlanSummarySchema.parse({
+        archivedAt: null,
+        currentVersion: 10,
+        itemCount: 38,
+        name: "Treino - Cardio + Massa muscular",
+        planId: "50000000-0000-4000-8000-000000000005",
+        provenance: "manual",
+        sessionCount: 6,
+        updatedAt: "2026-08-15T15:00:00.000Z",
+      }),
+    ).toEqual(expect.objectContaining({ currentVersion: 10, sessionCount: 6 }));
   });
 });

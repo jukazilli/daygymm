@@ -219,6 +219,19 @@ export const publishTrainingPlanInputSchema = z
     validatePlanSessions(input.sessions, issue);
   });
 
+export const trainingPlanSummarySchema = z
+  .object({
+    archivedAt: z.string().datetime().nullable(),
+    currentVersion: z.number().int().positive(),
+    itemCount: z.number().int().min(0),
+    name: z.string().trim().min(1).max(80),
+    planId: uuidSchema,
+    provenance: z.enum(["manual", "official_xlsx"]),
+    sessionCount: z.number().int().min(0),
+    updatedAt: z.string().datetime(),
+  })
+  .strict();
+
 export interface TrainingPlanArchiveResult {
   readonly archivedAt: string;
   readonly planId: string;
@@ -239,12 +252,14 @@ export type TrainingPlanDraft = z.infer<typeof trainingPlanDraftSchema>;
 export type PublishTrainingPlanInput = z.infer<
   typeof publishTrainingPlanInputSchema
 >;
+export type TrainingPlanSummary = z.infer<typeof trainingPlanSummarySchema>;
 
 export interface TrainingPlanEditorGateway {
   archive(
     planId: string,
   ): Promise<TrainingPlanResult<TrainingPlanArchiveResult>>;
-  load(): Promise<TrainingPlanResult<TrainingPlanDraft | null>>;
+  list(): Promise<TrainingPlanResult<readonly TrainingPlanSummary[]>>;
+  load(planId?: string): Promise<TrainingPlanResult<TrainingPlanDraft | null>>;
   publish(
     input: PublishTrainingPlanInput,
   ): Promise<TrainingPlanResult<ImportedTrainingPlan>>;

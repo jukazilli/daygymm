@@ -87,7 +87,7 @@ describe("TrainingHubScreen", () => {
     expect(await screen.findByText("Monte seu primeiro plano.")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Montar plano" }).getAttribute("href"),
-    ).toBe("/treinos/plano");
+    ).toBe("/treinos/planos");
   });
 
   it("makes My trainings the only highlighted action in the training hub", async () => {
@@ -154,6 +154,9 @@ describe("TrainingHubScreen", () => {
     expect(screen.getAllByRole("link", { name: /Criar treino/ })).toHaveLength(
       1,
     );
+    expect(
+      screen.getByRole("link", { name: /Criar treino/ }).getAttribute("href"),
+    ).toBe("/treinos/planos");
     expect(
       screen
         .getByRole("link", { name: /Configurar cargas/ })

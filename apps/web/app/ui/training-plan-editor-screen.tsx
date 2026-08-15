@@ -34,9 +34,11 @@ import {
 import { DurationInput } from "./duration-input";
 
 interface TrainingPlanEditorScreenProps {
+  readonly createNew?: boolean;
   readonly gateway?: TrainingPlanEditorGateway;
   readonly mode?: "full" | "loads";
   readonly navigate?: (path: string) => void;
+  readonly planId?: string;
 }
 
 interface LoadEditSnapshot {
@@ -705,9 +707,11 @@ function EditListGuideDialog({
 }
 
 export function TrainingPlanEditorScreen({
+  createNew = false,
   gateway: providedGateway,
   mode = "full",
   navigate = defaultNavigate,
+  planId,
 }: TrainingPlanEditorScreenProps) {
   const gatewayRef = useRef<TrainingPlanEditorGateway | undefined>(
     providedGateway,
@@ -735,9 +739,15 @@ export function TrainingPlanEditorScreen({
   }
 
   useEffect(() => {
+    if (mode === "full" && createNew) {
+      setDraft(blankDraft());
+      setChangeSummary("Criei o plano");
+      setOperationId(`plan-publish:${randomUuid()}`);
+      return;
+    }
     let active = true;
     void gateway()
-      .load()
+      .load(planId)
       .then((result) => {
         if (!active) {
           return;
@@ -750,7 +760,7 @@ export function TrainingPlanEditorScreen({
           setFailed(true);
           return;
         }
-        if (!result.value && mode === "loads") {
+        if (!result.value && (mode === "loads" || planId)) {
           setNoPlan(true);
         } else {
           const nextDraft = result.value ?? blankDraft();
@@ -768,7 +778,7 @@ export function TrainingPlanEditorScreen({
     return () => {
       active = false;
     };
-  }, [mode, navigate]);
+  }, [createNew, mode, navigate, planId]);
 
   useEffect(() => {
     if (
@@ -904,7 +914,7 @@ export function TrainingPlanEditorScreen({
       setSavedMessage("Carga atualizada.");
       return;
     }
-    navigate("/treinos/");
+    navigate("/treinos/planos/");
   }
 
   async function archive() {
@@ -1033,7 +1043,7 @@ export function TrainingPlanEditorScreen({
       setSelectedSessionId("");
       return;
     }
-    navigate("/treinos/");
+    navigate(mode === "full" ? "/treinos/planos/" : "/treinos/");
   }
 
   function openLoadEditor(sessionId: string, item: TrainingPlanDraftItem) {

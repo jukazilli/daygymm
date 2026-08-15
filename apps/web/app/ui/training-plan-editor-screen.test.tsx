@@ -100,6 +100,7 @@ function createGateway(
         wasChanged: true,
       },
     }),
+    list: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     load: vi.fn().mockResolvedValue({ ok: true, value: draft }),
     publish: vi.fn().mockResolvedValue({
       ok: true,
@@ -167,7 +168,13 @@ describe("TrainingPlanEditorScreen", () => {
     const gateway = createGateway(null);
     const navigate = vi.fn();
 
-    render(createElement(TrainingPlanEditorScreen, { gateway, navigate }));
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        createNew: true,
+        gateway,
+        navigate,
+      }),
+    );
 
     await user.click(
       await screen.findByRole("button", { name: "Editar Treino A" }),
@@ -187,7 +194,25 @@ describe("TrainingPlanEditorScreen", () => {
         planId: null,
       }),
     );
-    expect(navigate).toHaveBeenCalledWith("/treinos/");
+    expect(gateway.load).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/treinos/planos/");
+  });
+
+  it("loads the plan selected in the catalog", async () => {
+    const gateway = createGateway(existingDraft);
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        navigate: vi.fn(),
+        planId: existingPlanId,
+      }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Editar Treino A" }),
+    ).toBeTruthy();
+    expect(gateway.load).toHaveBeenCalledWith(existingPlanId);
   });
 
   it("drills from the training list into exercises without losing edits", async () => {

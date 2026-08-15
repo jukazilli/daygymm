@@ -127,8 +127,8 @@ function TrainingState({
           </div>
           <div className="training-quick-actions">
             <QuickAccess
-              description="Crie ou edite o plano atual"
-              href="/treinos/plano/"
+              description="Crie ou edite seus planos"
+              href="/treinos/planos/"
               icon="plan"
               title="Criar treino"
             />
@@ -164,7 +164,7 @@ function TrainingState({
       <section className="app-state-card training-card">
         <p className="eyebrow">Montagem manual</p>
         <h1>Monte seu primeiro plano.</h1>
-        <Link className="button-primary" href="/treinos/plano/">
+        <Link className="button-primary" href="/treinos/planos/">
           Montar plano
         </Link>
         <Link className="button-text" href="/escolher-plano/?alterar=1">

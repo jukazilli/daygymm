@@ -2,6 +2,7 @@ import {
   importedTrainingPlanSchema,
   publishTrainingPlanInputSchema,
   trainingPlanDraftSchema,
+  trainingPlanSummarySchema,
   type PublishTrainingPlanInput,
   type TrainingPlanDraftItem,
   type TrainingPlanEditorGateway,
@@ -133,7 +134,7 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
       }
     },
 
-    async load() {
+    async list() {
       try {
         const client = getWebSupabaseClient();
         const { data: sessionData, error: sessionError } =
@@ -141,13 +142,56 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
         if (sessionError || !sessionData.session) {
           return { ok: false, reason: "session" };
         }
-        const { data: planData, error: planError } = await client
+        const { data, error } = await client
           .from("training_plans")
           .select(
             "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,created_at,updated_at,archived_at",
           )
-          .is("archived_at", null)
-          .maybeSingle();
+          .order("updated_at", { ascending: false });
+        if (error) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: ((data ?? []) as TrainingPlanRow[]).map((plan) =>
+            trainingPlanSummarySchema.parse({
+              archivedAt: plan.archived_at,
+              currentVersion: plan.current_version,
+              itemCount: plan.item_count,
+              name: plan.name,
+              planId: plan.plan_id,
+              provenance: plan.provenance,
+              sessionCount: plan.session_count,
+              updatedAt: plan.updated_at,
+            }),
+          ),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.name === "ZodError") {
+          return failure(error);
+        }
+        return { ok: false, reason: "configuration" };
+      }
+    },
+
+    async load(planId) {
+      try {
+        const client = getWebSupabaseClient();
+        const { data: sessionData, error: sessionError } =
+          await client.auth.getSession();
+        if (sessionError || !sessionData.session) {
+          return { ok: false, reason: "session" };
+        }
+        let planQuery = client
+          .from("training_plans")
+          .select(
+            "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,created_at,updated_at,archived_at",
+          );
+        planQuery = planId
+          ? planQuery.eq("plan_id", planId).is("archived_at", null)
+          : planQuery.is("archived_at", null);
+        const { data: planData, error: planError } =
+          await planQuery.maybeSingle();
         if (planError) {
           return failure(planError);
         }
