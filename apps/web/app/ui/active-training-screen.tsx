@@ -168,14 +168,16 @@ function SetRevisionDialog({
   busy,
   exercise,
   isLatest,
-  onClose,
+  onBack,
+  onComplete,
   onRevise,
   set,
 }: Readonly<{
   busy: boolean;
   exercise: PracticalTrainingExercise;
   isLatest: boolean;
-  onClose: () => void;
+  onBack: () => void;
+  onComplete: () => void;
   onRevise: (request: SetRevisionRequest) => Promise<boolean>;
   set: PracticalTrainingSet;
 }>) {
@@ -212,12 +214,12 @@ function SetRevisionDialog({
     dialogRef.current?.focus();
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape" && !busy) {
-        onClose();
+        onBack();
       }
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [busy, onClose]);
+  }, [busy, onBack]);
 
   async function saveCorrection() {
     if (!isValid || !isChanged) {
@@ -232,128 +234,243 @@ function SetRevisionDialog({
       set,
     });
     if (succeeded) {
-      onClose();
+      onComplete();
     }
   }
 
   async function undoSet() {
     const succeeded = await onRevise({ action: "undo", set });
     if (succeeded) {
-      onClose();
+      onComplete();
     }
   }
 
   return (
-    <div
-      className="session-dialog-backdrop"
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target && !busy) {
-          onClose();
-        }
-      }}
-      role="presentation"
-    >
+    <div className="focused-flow-backdrop" role="presentation">
       <section
         aria-labelledby="set-revision-title"
         aria-modal="true"
-        className="session-dialog set-revision-dialog"
+        className="focused-flow-dialog set-revision-dialog"
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
       >
-        <div>
+        <header className="focused-flow-header">
+          <button
+            aria-label="Voltar"
+            className="focused-back-action"
+            disabled={busy}
+            onClick={onBack}
+            type="button"
+          >
+            <AppIcon name="back" size={30} />
+          </button>
+        </header>
+        <div className="focused-flow-content">
           <p className="eyebrow">{exercise.exerciseName}</p>
           <h2 id="set-revision-title">Série {set.setNumber}</h2>
+          <div className="set-fields">
+            {exercise.modality === "strength" ? (
+              <label>
+                <span>
+                  Carga <small>kg</small>
+                </span>
+                <input
+                  inputMode="decimal"
+                  min="0.25"
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="—"
+                  step="0.01"
+                  type="number"
+                  value={weight}
+                />
+              </label>
+            ) : null}
+            {set.actualReps !== null ? (
+              <label>
+                <span>Repetições</span>
+                <input
+                  inputMode="numeric"
+                  max="1000"
+                  min="1"
+                  onChange={(event) => setReps(event.target.value)}
+                  type="number"
+                  value={reps}
+                />
+              </label>
+            ) : null}
+            {set.actualDurationSeconds !== null ? (
+              <label>
+                <span>Tempo</span>
+                <DurationInput
+                  maximum={maximumExerciseDurationSeconds}
+                  minimum={1}
+                  onChange={setDurationSeconds}
+                  required
+                  seconds={durationSeconds}
+                />
+              </label>
+            ) : null}
+            {set.actualDistanceMeters !== null ? (
+              <label>
+                <span>
+                  Distância <small>metros</small>
+                </span>
+                <input
+                  inputMode="numeric"
+                  max="100000"
+                  min="1"
+                  onChange={(event) => setDistance(event.target.value)}
+                  type="number"
+                  value={distance}
+                />
+              </label>
+            ) : null}
+          </div>
+          {isLatest ? (
+            <button
+              className="button-danger set-undo-action"
+              disabled={busy}
+              onClick={() => void undoSet()}
+              type="button"
+            >
+              Desfazer esta série
+            </button>
+          ) : null}
         </div>
-        <p>Corrija somente o que você realizou nesta série.</p>
-        <div className="set-fields">
-          {exercise.modality === "strength" ? (
-            <label>
-              <span>
-                Carga <small>kg</small>
-              </span>
-              <input
-                inputMode="decimal"
-                min="0.25"
-                onChange={(event) => setWeight(event.target.value)}
-                placeholder="—"
-                step="0.01"
-                type="number"
-                value={weight}
-              />
-            </label>
-          ) : null}
-          {set.actualReps !== null ? (
-            <label>
-              <span>Repetições</span>
-              <input
-                inputMode="numeric"
-                max="1000"
-                min="1"
-                onChange={(event) => setReps(event.target.value)}
-                type="number"
-                value={reps}
-              />
-            </label>
-          ) : null}
-          {set.actualDurationSeconds !== null ? (
-            <label>
-              <span>Tempo</span>
-              <DurationInput
-                maximum={maximumExerciseDurationSeconds}
-                minimum={1}
-                onChange={setDurationSeconds}
-                required
-                seconds={durationSeconds}
-              />
-            </label>
-          ) : null}
-          {set.actualDistanceMeters !== null ? (
-            <label>
-              <span>
-                Distância <small>metros</small>
-              </span>
-              <input
-                inputMode="numeric"
-                max="100000"
-                min="1"
-                onChange={(event) => setDistance(event.target.value)}
-                type="number"
-                value={distance}
-              />
-            </label>
-          ) : null}
-        </div>
-        <div className="session-dialog-actions">
+        <div className="focused-flow-action">
           <button
             className="button-primary"
             disabled={busy || !isValid || !isChanged}
             onClick={() => void saveCorrection()}
             type="button"
           >
-            {busy ? "Salvando…" : "Salvar correção"}
-          </button>
-          {isLatest ? (
-            <button
-              className="button-danger"
-              disabled={busy}
-              onClick={() => void undoSet()}
-              type="button"
-            >
-              Desfazer série
-            </button>
-          ) : null}
-          <button
-            className="button-text"
-            disabled={busy}
-            onClick={onClose}
-            type="button"
-          >
-            Voltar ao treino
+            {busy ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </section>
     </div>
+  );
+}
+
+function SetSelectionDialog({
+  exercise,
+  onClose,
+  onContinue,
+}: Readonly<{
+  exercise: PracticalTrainingExercise;
+  onClose: () => void;
+  onContinue: (set: PracticalTrainingSet) => void;
+}>) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const [selectedSetId, setSelectedSetId] = useState(
+    exercise.setExecutions.at(-1)?.setExecutionId,
+  );
+  const selectedSet = exercise.setExecutions.find(
+    (set) => set.setExecutionId === selectedSetId,
+  );
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="focused-flow-backdrop" role="presentation">
+      <section
+        aria-labelledby="set-selection-title"
+        aria-modal="true"
+        className="focused-flow-dialog"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header className="focused-flow-header">
+          <button
+            aria-label="Voltar"
+            className="focused-back-action"
+            onClick={onClose}
+            type="button"
+          >
+            <AppIcon name="back" size={30} />
+          </button>
+        </header>
+        <div className="focused-flow-content">
+          <p className="eyebrow">{exercise.exerciseName}</p>
+          <h2 id="set-selection-title">Escolha uma série</h2>
+          <fieldset className="set-selection-list">
+            <legend className="sr-only">Séries concluídas</legend>
+            {exercise.setExecutions.map((set, index) => (
+              <label key={set.setExecutionId}>
+                <input
+                  checked={selectedSetId === set.setExecutionId}
+                  name="completed-set"
+                  onChange={() => setSelectedSetId(set.setExecutionId)}
+                  type="radio"
+                  value={set.setExecutionId}
+                />
+                <span>Série {set.setNumber}</span>
+                <strong>{setResult(exercise, index)}</strong>
+              </label>
+            ))}
+          </fieldset>
+        </div>
+        <div className="focused-flow-action">
+          <button
+            className="button-primary"
+            disabled={!selectedSet}
+            onClick={() => selectedSet && onContinue(selectedSet)}
+            type="button"
+          >
+            Continuar
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SetRevisionFlow({
+  busy,
+  exercise,
+  onClose,
+  onRevise,
+}: Readonly<{
+  busy: boolean;
+  exercise: PracticalTrainingExercise;
+  onClose: () => void;
+  onRevise: (request: SetRevisionRequest) => Promise<boolean>;
+}>) {
+  const [selectedSet, setSelectedSet] = useState<PracticalTrainingSet>();
+
+  if (!selectedSet) {
+    return (
+      <SetSelectionDialog
+        exercise={exercise}
+        onClose={onClose}
+        onContinue={setSelectedSet}
+      />
+    );
+  }
+
+  return (
+    <SetRevisionDialog
+      busy={busy}
+      exercise={exercise}
+      isLatest={
+        selectedSet.setNumber === exercise.setExecutions.at(-1)?.setNumber
+      }
+      onBack={() => setSelectedSet(undefined)}
+      onComplete={onClose}
+      onRevise={onRevise}
+      set={selectedSet}
+    />
   );
 }
 
@@ -370,7 +487,8 @@ function ExerciseExecution({
   onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
   onStart: () => void;
 }>) {
-  const [selectedSet, setSelectedSet] = useState<PracticalTrainingSet>();
+  const revisionTriggerRef = useRef<HTMLButtonElement>(null);
+  const [revisionOpen, setRevisionOpen] = useState(false);
   const lastSet = exercise.setExecutions.at(-1);
   const [missingMeasure, setMissingMeasure] = useState<
     MissingMeasure | undefined
@@ -433,42 +551,36 @@ function ExerciseExecution({
     setWeight(String(Math.min(2_000, Math.max(0.25, adjusted))));
   }
 
+  function closeRevisionFlow() {
+    setRevisionOpen(false);
+    window.requestAnimationFrame(() => revisionTriggerRef.current?.focus());
+  }
+
   if (exercise.completedAt) {
     return (
       <>
         <div className="exercise-completed-summary">
           <strong>Concluído</strong>
-          {exercise.setExecutions.length > 0 ? (
-            <ol>
-              {exercise.setExecutions.map((set, index) => (
-                <li key={set.setExecutionId}>
-                  <button
-                    aria-label={`Corrigir série ${set.setNumber}`}
-                    className="completed-set-action"
-                    onClick={() => setSelectedSet(set)}
-                    type="button"
-                  >
-                    <span>Série {set.setNumber}</span>
-                    <strong>{setResult(exercise, index)}</strong>
-                    <AppIcon name="forward" size={18} />
-                  </button>
-                </li>
-              ))}
-            </ol>
-          ) : (
+          {exercise.setExecutions.length === 0 ? (
             <p>{exerciseTarget(exercise)}</p>
-          )}
+          ) : null}
         </div>
-        {selectedSet ? (
-          <SetRevisionDialog
+        {exercise.setExecutions.length > 0 ? (
+          <button
+            className="button-secondary set-adjustment-trigger"
+            onClick={() => setRevisionOpen(true)}
+            ref={revisionTriggerRef}
+            type="button"
+          >
+            Ajustar ou desfazer
+          </button>
+        ) : null}
+        {revisionOpen ? (
+          <SetRevisionFlow
             busy={busy}
             exercise={exercise}
-            isLatest={
-              selectedSet.setNumber === exercise.setExecutions.at(-1)?.setNumber
-            }
-            onClose={() => setSelectedSet(undefined)}
+            onClose={closeRevisionFlow}
             onRevise={onReviseSet}
-            set={selectedSet}
           />
         ) : null}
       </>
@@ -618,41 +730,21 @@ function ExerciseExecution({
       ) : null}
 
       {exercise.setExecutions.length > 0 ? (
-        <section
-          className="completed-sets"
-          aria-labelledby="completed-sets-title"
+        <button
+          className="button-secondary set-adjustment-trigger"
+          onClick={() => setRevisionOpen(true)}
+          ref={revisionTriggerRef}
+          type="button"
         >
-          <h2 id="completed-sets-title">Realizado</h2>
-          <ol>
-            {exercise.setExecutions.map((set, index) => (
-              <li key={set.setExecutionId}>
-                <button
-                  aria-label={`Corrigir série ${set.setNumber}`}
-                  className="completed-set-action"
-                  onClick={() => setSelectedSet(set)}
-                  type="button"
-                >
-                  <span className="completed-set-label">
-                    <AppIcon name="check" size={18} /> Série {set.setNumber}
-                  </span>
-                  <strong>{setResult(exercise, index)}</strong>
-                  <AppIcon name="forward" size={18} />
-                </button>
-              </li>
-            ))}
-          </ol>
-        </section>
+          Ajustar ou desfazer
+        </button>
       ) : null}
-      {selectedSet ? (
-        <SetRevisionDialog
+      {revisionOpen ? (
+        <SetRevisionFlow
           busy={busy}
           exercise={exercise}
-          isLatest={
-            selectedSet.setNumber === exercise.setExecutions.at(-1)?.setNumber
-          }
-          onClose={() => setSelectedSet(undefined)}
+          onClose={closeRevisionFlow}
           onRevise={onReviseSet}
-          set={selectedSet}
         />
       ) : null}
     </div>
@@ -703,6 +795,56 @@ function ElapsedTimer({
 
   const formatted = formatClock(elapsedSeconds);
   return <time aria-label={`Tempo de treino ${formatted}`}>{formatted}</time>;
+}
+
+function RestScreen({
+  durationSeconds,
+  onComplete,
+}: Readonly<{
+  durationSeconds: number;
+  onComplete: () => void;
+}>) {
+  const [remainingSeconds, setRemainingSeconds] = useState(durationSeconds);
+
+  useEffect(() => {
+    setRemainingSeconds(durationSeconds);
+  }, [durationSeconds]);
+
+  useEffect(() => {
+    if (remainingSeconds <= 0) {
+      onComplete();
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setRemainingSeconds((current) => Math.max(0, current - 1)),
+      1_000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [onComplete, remainingSeconds]);
+
+  const formatted = formatClock(remainingSeconds);
+  return (
+    <section
+      aria-labelledby="rest-title"
+      aria-modal="true"
+      className="rest-screen"
+      role="dialog"
+    >
+      <div className="rest-screen-content">
+        <p className="eyebrow" id="rest-title">
+          Descanso
+        </p>
+        <time aria-live="polite" dateTime={`PT${remainingSeconds}S`}>
+          {formatted}
+        </time>
+      </div>
+      <div className="focused-flow-action">
+        <button className="button-primary" onClick={onComplete} type="button">
+          Concluir descanso
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function PauseTrainingDialog({
@@ -808,6 +950,10 @@ export function ActiveTrainingScreen({
     "cancel" | "pause" | "restart"
   >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [restState, setRestState] = useState<{
+    durationSeconds: number;
+    nextExerciseIndex: number;
+  }>();
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
 
@@ -955,14 +1101,35 @@ export function ActiveTrainingScreen({
     }
     const refreshed = await refresh();
     setBusy(false);
+    const refreshedItems = refreshed?.activeRun?.session.items;
+    const firstPending = refreshedItems?.findIndex((item) => !item.completedAt);
+    const shouldRest =
+      result.value.wasCreated &&
+      currentExercise.restSeconds > 0 &&
+      firstPending !== undefined &&
+      firstPending >= 0;
+    if (shouldRest) {
+      setRestState({
+        durationSeconds: currentExercise.restSeconds,
+        nextExerciseIndex: result.value.exerciseCompleted
+          ? firstPending
+          : selectedIndex,
+      });
+      return;
+    }
     if (result.value.exerciseCompleted) {
-      const firstPending = refreshed?.activeRun?.session.items.findIndex(
-        (item) => !item.completedAt,
-      );
       if (firstPending !== undefined && firstPending >= 0) {
         setSelectedIndex(firstPending);
       }
     }
+  }
+
+  function completeRest() {
+    if (!restState) {
+      return;
+    }
+    setSelectedIndex(restState.nextExerciseIndex);
+    setRestState(undefined);
   }
 
   async function reviseCurrentSet(request: SetRevisionRequest) {
@@ -1184,7 +1351,13 @@ export function ActiveTrainingScreen({
     return (
       <main className="session-shell session-overview">
         <header className="session-topbar">
-          <Link href="/treinos/">Voltar</Link>
+          <Link
+            aria-label="Voltar"
+            className="session-back-action"
+            href="/treinos/"
+          >
+            <AppIcon name="back" size={30} />
+          </Link>
           <span>Versão {state.plan.version}</span>
         </header>
         <section className="session-intro">
@@ -1235,15 +1408,22 @@ export function ActiveTrainingScreen({
     <main className="session-shell session-active">
       <header className="session-topbar">
         {run.pausedAt ? (
-          <Link href="/treinos/">Voltar</Link>
+          <Link
+            aria-label="Voltar"
+            className="session-back-action"
+            href="/treinos/"
+          >
+            <AppIcon name="back" size={30} />
+          </Link>
         ) : (
           <button
+            aria-label="Voltar"
             className="session-pause-action"
             disabled={busy}
             onClick={() => setPauseDialogOpen(true)}
             type="button"
           >
-            Pausar
+            <AppIcon name="back" size={30} />
           </button>
         )}
         <ElapsedTimer
@@ -1343,16 +1523,6 @@ export function ActiveTrainingScreen({
             onReviseSet={reviseCurrentSet}
             onStart={() => void startCurrentExercise()}
           />
-          <div className="exercise-target">
-            <span>Planejado</span>
-            <strong>{exerciseTarget(currentExercise)}</strong>
-          </div>
-          {currentExercise.restSeconds > 0 ? (
-            <p className="exercise-rest">
-              Descanso previsto:{" "}
-              {formatTrainingDuration(currentExercise.restSeconds)}
-            </p>
-          ) : null}
           {currentExercise.notes ? (
             <p className="exercise-notes">{currentExercise.notes}</p>
           ) : null}
@@ -1372,6 +1542,12 @@ export function ActiveTrainingScreen({
           onConfirm={() => void pauseTraining()}
           onRestart={() => void restartTraining()}
           pendingAction={dialogAction}
+        />
+      ) : null}
+      {restState ? (
+        <RestScreen
+          durationSeconds={restState.durationSeconds}
+          onComplete={completeRest}
         />
       ) : null}
     </main>

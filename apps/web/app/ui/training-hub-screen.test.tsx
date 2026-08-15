@@ -164,6 +164,9 @@ describe("TrainingHubScreen", () => {
         .getByRole("link", { name: /Configurar cargas/ })
         .getAttribute("href"),
     ).toBe("/treinos/cargas");
+    expect(
+      screen.getByRole("link", { name: /Histórico/ }).getAttribute("href"),
+    ).toBe("/treinos/historico");
     expect(screen.queryByText("Treino de hoje")).toBeNull();
     expect(screen.queryByRole("link", { name: /Abrir treino$/ })).toBeNull();
     expect(screen.queryByText("Agenda semanal")).toBeNull();

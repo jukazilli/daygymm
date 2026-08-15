@@ -1166,27 +1166,33 @@ input:focus-visible {
 }
 
 .session-topbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--space-3);
   min-height: 52px;
   margin-bottom: var(--space-6);
+  background: var(--color-card);
 }
 
-.session-topbar a,
+.session-back-action,
 .session-pause-action {
-  width: fit-content;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-action);
   font: inherit;
-  font-weight: 800;
   text-decoration: none;
 }
 
 .session-pause-action {
-  padding: 0;
-  border: 0;
-  background: transparent;
   cursor: pointer;
 }
 
@@ -1346,27 +1352,6 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.exercise-target {
-  display: grid;
-  gap: var(--space-1);
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--color-card);
-}
-
-.exercise-target > span {
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 700;
-}
-
-.exercise-target > strong {
-  font-size: clamp(1.2rem, 5vw, 1.55rem);
-  font-variant-numeric: tabular-nums;
-}
-
-.exercise-rest,
 .exercise-notes {
   color: var(--color-text-secondary);
   line-height: 1.5;
@@ -1440,6 +1425,10 @@ input:focus-visible {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.set-execution > .set-fields {
+  grid-template-columns: 1fr;
 }
 
 .set-fields label {
@@ -1535,16 +1524,10 @@ input:focus-visible {
   cursor: pointer;
 }
 
-.completed-sets,
 .exercise-completed-summary {
   display: grid;
   gap: var(--space-3);
   margin-top: var(--space-2);
-}
-
-.completed-sets h2 {
-  margin: 0;
-  font-size: 1rem;
 }
 
 .plan-editor-form input {
@@ -1586,65 +1569,6 @@ input:focus-visible {
   min-height: 44px;
 }
 
-.completed-sets ol,
-.exercise-completed-summary ol {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.completed-sets li,
-.exercise-completed-summary li {
-  min-height: 42px;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  background: var(--color-card);
-  font-size: 0.875rem;
-}
-
-.completed-set-action {
-  display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto 18px;
-  gap: var(--space-3);
-  align-items: center;
-  width: 100%;
-  min-height: 48px;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.completed-set-action:hover,
-.completed-set-action:focus-visible {
-  background: var(--color-action-soft);
-}
-
-.completed-set-action > span {
-  color: var(--color-success);
-  font-weight: 800;
-}
-
-.completed-set-action > strong {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.completed-set-action > svg {
-  color: var(--color-text-secondary);
-}
-
-.completed-set-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .exercise-completed-summary > strong {
   color: var(--color-success);
   font-size: 1.125rem;
@@ -1653,6 +1577,149 @@ input:focus-visible {
 .exercise-completed-summary > p {
   margin: 0;
   color: var(--color-text-secondary);
+}
+
+.set-adjustment-trigger {
+  width: 100%;
+  min-height: 52px;
+  margin-top: var(--space-3);
+}
+
+.focused-flow-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--color-canvas);
+}
+
+.focused-flow-dialog {
+  width: min(100%, 48rem);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  background: var(--color-canvas);
+}
+
+.focused-flow-header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  min-height: calc(76px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--space-5) 0;
+  background: var(--color-canvas);
+}
+
+.focused-flow-content {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-8);
+}
+
+.focused-flow-content h2 {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  line-height: 1.05;
+}
+
+.focused-flow-action {
+  position: fixed;
+  z-index: 120;
+  right: 50%;
+  bottom: 0;
+  width: min(100%, 48rem);
+  padding: var(--space-4) var(--space-5)
+    max(var(--space-4), env(safe-area-inset-bottom));
+  background: var(--color-canvas);
+  transform: translateX(50%);
+}
+
+.focused-flow-action .button-primary {
+  width: 100%;
+  min-height: 58px;
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgb(16 24 40 / 18%);
+}
+
+.set-selection-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.set-selection-list label {
+  display: grid;
+  grid-template-columns: auto minmax(max-content, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  cursor: pointer;
+}
+
+.set-selection-list label:has(input:checked) {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.set-selection-list input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-action);
+}
+
+.set-selection-list span {
+  font-weight: 800;
+}
+
+.set-selection-list strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.set-revision-dialog .set-fields {
+  grid-template-columns: 1fr;
+}
+
+.set-undo-action {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+.rest-screen {
+  position: fixed;
+  z-index: 130;
+  inset: 0;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  background: var(--color-card);
+}
+
+.rest-screen-content {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.rest-screen-content p {
+  margin: 0;
+}
+
+.rest-screen-content time {
+  font-size: clamp(4rem, 22vw, 8rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.055em;
+  line-height: 1;
 }
 
 .finish-training {
@@ -1728,10 +1795,6 @@ input:focus-visible {
 
 .session-dialog-actions button {
   width: 100%;
-}
-
-.set-revision-dialog .set-fields {
-  grid-template-columns: 1fr;
 }
 
 .session-finished,

@@ -6,7 +6,7 @@
 - Source pixels: não mensurados porque o anexo da conversa não possui arquivo local exposto.
 - Implementation pixels: não capturados.
 - Density normalization: não aplicável sem os dois artefatos locais.
-- State: editor de plano com lista de treinos, importador com prévia e CTA, onboarding e escolha de origem.
+- State: editor de plano, importador, onboarding, hub de Treinos e execução por série com descanso focado.
 
 **Full-view comparison evidence**
 
@@ -14,7 +14,7 @@ Bloqueada: conforme a preferência de validação manual do owner, nenhum navega
 
 **Focused region comparison evidence**
 
-Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: chevron fixo sem caixa, ausência de logo e selo `Prévia`, CTA fixo sobre o conteúdo, safe areas, cards inteiros tocáveis e diálogo didático.
+Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: chevron opaco e fixo, ausência de logo e selo `Prévia`, CTA fixo sobre o conteúdo, safe areas, inputs de carga/repetições empilhados, seleção de série em tela cheia e cronômetro de descanso.
 
 **Findings**
 
@@ -25,6 +25,7 @@ Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: che
 **Comparison history**
 
 - Iteração 1: implementação estrutural concluída; comparação visual não iniciada porque não há navegador escolhido nem screenshot renderizado.
+- Iteração 2: execução simplificada; histórico saiu do exercício, correção ganhou fluxo progressivo e descanso passou a ocupar uma tela focada. Aceite visual permanece manual em staging.
 
 **Implementation checklist**
 
@@ -33,5 +34,8 @@ Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: che
 - Conferir contraste dos tokens laranja, branco e texto secundário.
 - Conferir ícones Lucide e ausência de emoji ou lápis.
 - Conferir textos dos CTAs e do tutorial.
+- Conferir se carga e repetições mantêm a mesma largura útil sem compressão.
+- Conferir o fluxo `Ajustar ou desfazer → escolher série → continuar → salvar`.
+- Conferir o descanso em tela cheia, contagem regressiva e saída antecipada.
 
 final result: blocked

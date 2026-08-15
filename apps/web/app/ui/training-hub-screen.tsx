@@ -138,6 +138,12 @@ function TrainingState({
               icon="settings"
               title="Configurar cargas"
             />
+            <QuickAccess
+              description="Reveja seus treinos concluídos"
+              href="/treinos/historico/"
+              icon="history"
+              title="Histórico"
+            />
           </div>
         </section>
       </div>

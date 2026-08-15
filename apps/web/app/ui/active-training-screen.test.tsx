@@ -241,8 +241,14 @@ describe("ActiveTrainingScreen", () => {
         .getAttribute("value"),
     ).toBe("40");
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Descanso" }),
+    ).toBeTruthy();
+    expect(screen.getByText("01:30")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Concluir descanso" }));
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
-    expect(screen.getByText("Série 1")).toBeTruthy();
+    expect(screen.queryByText("Planejado")).toBeNull();
+    expect(screen.queryByText("Realizado")).toBeNull();
     expect(
       screen
         .getByRole("spinbutton", { name: "Carga kg" })
@@ -392,14 +398,18 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
 
     await user.click(
-      await screen.findByRole("button", { name: "Corrigir série 1" }),
+      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
     );
+    expect(
+      screen.getByRole("dialog", { name: "Escolha uma série" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
     const weight = within(screen.getByRole("dialog")).getByRole("spinbutton", {
       name: /Carga/,
     });
     await user.clear(weight);
     await user.type(weight, "42");
-    await user.click(screen.getByRole("button", { name: "Salvar correção" }));
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     await waitFor(() =>
       expect(reviseSet).toHaveBeenNthCalledWith(
@@ -412,9 +422,12 @@ describe("ActiveTrainingScreen", () => {
       ),
     );
     await user.click(
-      await screen.findByRole("button", { name: "Corrigir série 1" }),
+      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
     );
-    await user.click(screen.getByRole("button", { name: "Desfazer série" }));
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.click(
+      screen.getByRole("button", { name: "Desfazer esta série" }),
+    );
 
     await waitFor(() =>
       expect(reviseSet).toHaveBeenNthCalledWith(
@@ -426,6 +439,93 @@ describe("ActiveTrainingScreen", () => {
       ),
     );
     expect(await screen.findByText("Série 1 de 2")).toBeTruthy();
+  });
+
+  it("lets the user choose an older set without offering an unsafe undo", async () => {
+    const user = userEvent.setup();
+    const firstSet = {
+      actualDistanceMeters: null,
+      actualDurationSeconds: null,
+      actualReps: 10,
+      actualWeightKg: 40,
+      completedAt: "2026-08-14T03:32:00.000+00:00",
+      plannedDistanceMeters: null,
+      plannedDurationSeconds: null,
+      plannedRepsMax: 12,
+      plannedRepsMin: 8,
+      plannedWeightKg: 40,
+      revision: 1,
+      setExecutionId: "76000000-0000-4000-8000-000000000006",
+      setNumber: 1,
+      updatedAt: "2026-08-14T03:32:00.000+00:00",
+    };
+    const secondSet = {
+      ...firstSet,
+      actualReps: 11,
+      actualWeightKg: 42.5,
+      completedAt: "2026-08-14T03:34:00.000+00:00",
+      plannedWeightKg: 42.5,
+      setExecutionId: "76000000-0000-4000-8000-000000000007",
+      setNumber: 2,
+      updatedAt: "2026-08-14T03:34:00.000+00:00",
+    };
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            setExecutions: [firstSet, secondSet],
+            sets: 3,
+            startedAt: "2026-08-14T03:31:00.000+00:00",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
+    );
+    const firstSetOption = screen.getByRole("radio", { name: /Série 1/ });
+    const secondSetOption = screen.getByRole("radio", { name: /Série 2/ });
+    expect((secondSetOption as HTMLInputElement).checked).toBe(true);
+
+    await user.click(firstSetOption);
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(screen.getByRole("dialog", { name: "Série 1" })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Desfazer esta série" }),
+    ).toBeNull();
+
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Série 1" })).getByRole(
+        "button",
+        { name: "Voltar" },
+      ),
+    );
+    await user.click(screen.getByRole("radio", { name: /Série 2/ }));
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(
+      screen.getByRole("button", { name: "Desfazer esta série" }),
+    ).toBeTruthy();
   });
 
   it("pauses an active training only after confirming in the dialog", async () => {
@@ -464,7 +564,7 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway, navigate }));
 
-    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    await user.click(await screen.findByRole("button", { name: "Voltar" }));
     expect(
       screen.getByRole("dialog", { name: "O que fazer com este treino?" }),
     ).toBeTruthy();
@@ -511,7 +611,7 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
-    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    await user.click(await screen.findByRole("button", { name: "Voltar" }));
     await user.click(screen.getByRole("button", { name: "Recomeçar do zero" }));
 
     expect(cancel).toHaveBeenCalledWith(activeRun.runId);
@@ -519,7 +619,7 @@ describe("ActiveTrainingScreen", () => {
     expect(cancel.mock.invocationCallOrder[0]!).toBeLessThan(
       start.mock.invocationCallOrder[0]!,
     );
-    expect(screen.getByRole("button", { name: "Pausar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Voltar" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -554,7 +654,7 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway, navigate }));
 
-    await user.click(await screen.findByRole("button", { name: "Pausar" }));
+    await user.click(await screen.findByRole("button", { name: "Voltar" }));
     await user.click(screen.getByRole("button", { name: "Cancelar treino" }));
 
     expect(cancel).toHaveBeenCalledWith(activeRun.runId);
@@ -618,6 +718,6 @@ describe("ActiveTrainingScreen", () => {
     });
     expect(duration.getAttribute("value")).toBe("00:00:30");
     expect(screen.queryByText(/null/i)).toBeNull();
-    expect(screen.getByText("2 séries · 00:00:30")).toBeTruthy();
+    expect(screen.queryByText("Planejado")).toBeNull();
   });
 });
