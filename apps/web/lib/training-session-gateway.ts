@@ -96,6 +96,7 @@ function mapPlanItem(
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
+    setProgressionKg: row.set_progression_kg,
     sets: row.sets,
     setExecutions: [],
     startedAt: null,
@@ -137,6 +138,7 @@ function mapRunItem(
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
+    setProgressionKg: row.set_progression_kg,
     sets: row.sets,
     setExecutions: sets
       .filter((set) => set.plan_item_id === row.plan_item_id)
@@ -237,7 +239,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         client
           .from("training_plan_items")
           .select(
-            "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
+            "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
           )
           .eq("version_id", activeVersionId)
           .order("item_order"),
@@ -292,7 +294,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
           client
             .from("training_session_run_items")
             .select(
-              "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
+              "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
             )
             .eq("run_id", runRow.run_id)
             .order("item_order"),

@@ -12,6 +12,12 @@ const optionalWeightSchema = z
   .max(2_000)
   .multipleOf(0.01)
   .nullable();
+const optionalSetProgressionSchema = z
+  .number()
+  .min(0)
+  .max(2_000)
+  .multipleOf(0.01)
+  .nullable();
 
 export const practicalTrainingSetSchema = z
   .object({
@@ -38,6 +44,7 @@ export const practicalTrainingExerciseSchema = z
     durationSeconds: z.number().int().min(1).max(7_200).nullable(),
     exerciseName: z.string().min(1).max(120),
     itemId: uuidSchema,
+    setProgressionKg: optionalSetProgressionSchema,
     modality: trainingModalitySchema,
     notes: z.string().max(500).nullable(),
     order: z.number().int().min(1).max(100),

@@ -44,6 +44,7 @@ export const trainingPlanDraftItemSchema = z
     repsMax: optionalInteger(1_000),
     repsMin: optionalInteger(1_000),
     restSeconds: z.number().int().min(0).max(1_800),
+    setProgressionKg: z.number().min(0).max(2_000).multipleOf(0.01).nullable(),
     sets: z.number().int().min(1).max(20),
   })
   .strict()
@@ -99,7 +100,8 @@ export const trainingPlanDraftItemSchema = z
       if (
         item.loadMode !== "none" ||
         item.plannedWeightKg !== null ||
-        item.loadIncrementKg !== null
+        item.loadIncrementKg !== null ||
+        item.setProgressionKg !== null
       ) {
         issue.addIssue({
           code: "custom",
@@ -111,17 +113,34 @@ export const trainingPlanDraftItemSchema = z
     }
     if (
       item.loadMode === "external" &&
-      (item.plannedWeightKg === null || item.loadIncrementKg === null)
+      (item.plannedWeightKg === null ||
+        item.loadIncrementKg === null ||
+        item.setProgressionKg === null)
     ) {
       issue.addIssue({
         code: "custom",
-        message: "External load requires an initial load and equipment step.",
+        message:
+          "External load requires an initial load, set progression, and session step.",
         path: ["loadMode"],
       });
     }
     if (
+      item.loadMode === "external" &&
+      item.plannedWeightKg !== null &&
+      item.setProgressionKg !== null &&
+      item.plannedWeightKg + item.setProgressionKg * (item.sets - 1) > 2_000
+    ) {
+      issue.addIssue({
+        code: "custom",
+        message: "The last suggested set load cannot exceed 2000 kg.",
+        path: ["setProgressionKg"],
+      });
+    }
+    if (
       item.loadMode === "none" &&
-      (item.plannedWeightKg !== null || item.loadIncrementKg !== null)
+      (item.plannedWeightKg !== null ||
+        item.loadIncrementKg !== null ||
+        item.setProgressionKg !== null)
     ) {
       issue.addIssue({
         code: "custom",
@@ -129,10 +148,13 @@ export const trainingPlanDraftItemSchema = z
         path: ["loadMode"],
       });
     }
-    if (item.loadMode === "unconfigured" && item.loadIncrementKg !== null) {
+    if (
+      item.loadMode === "unconfigured" &&
+      (item.loadIncrementKg !== null || item.setProgressionKg !== null)
+    ) {
       issue.addIssue({
         code: "custom",
-        message: "An unconfigured load cannot have an equipment step.",
+        message: "An unconfigured load cannot keep progression values.",
         path: ["loadIncrementKg"],
       });
     }

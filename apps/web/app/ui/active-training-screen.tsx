@@ -39,6 +39,29 @@ function formatClock(totalSeconds: number) {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function roundedWeight(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatWeight(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function suggestedSetWeight(
+  exercise: PracticalTrainingExercise,
+  setNumber: number,
+) {
+  if (exercise.plannedWeightKg === null) {
+    return null;
+  }
+  return roundedWeight(
+    exercise.plannedWeightKg +
+      (exercise.setProgressionKg ?? 0) * (setNumber - 1),
+  );
+}
+
 function exerciseTarget(exercise: PracticalTrainingExercise) {
   const prefix = `${exercise.sets} ${exercise.sets === 1 ? "série" : "séries"}`;
   const targets = [
@@ -48,6 +71,9 @@ function exerciseTarget(exercise: PracticalTrainingExercise) {
         : `${exercise.repsMin}–${exercise.repsMax} repetições`
       : null,
     exercise.plannedWeightKg !== null ? `${exercise.plannedWeightKg} kg` : null,
+    exercise.setProgressionKg !== null && exercise.setProgressionKg > 0
+      ? `+${formatWeight(exercise.setProgressionKg)} kg/série`
+      : null,
     exercise.durationSeconds
       ? formatTrainingDuration(exercise.durationSeconds)
       : null,
@@ -116,6 +142,8 @@ function ExerciseExecution({
     exercise.durationSeconds !== null || missingMeasure === "duration";
   const needsDistance = exercise.distanceMeters !== null;
   const hasKnownMeasure = hasPlannedReps || needsDuration || needsDistance;
+  const nextSet = exercise.setExecutions.length + 1;
+  const suggestedWeight = suggestedSetWeight(exercise, nextSet);
   const [reps, setReps] = useState(
     hasPlannedReps
       ? String(exercise.repsMax)
@@ -124,8 +152,8 @@ function ExerciseExecution({
         : "",
   );
   const [weight, setWeight] = useState(
-    exercise.plannedWeightKg !== null
-      ? String(exercise.plannedWeightKg)
+    suggestedWeight !== null
+      ? String(suggestedWeight)
       : lastSet?.actualWeightKg !== null &&
           lastSet?.actualWeightKg !== undefined
         ? String(lastSet.actualWeightKg)
@@ -137,7 +165,10 @@ function ExerciseExecution({
   const [distance, setDistance] = useState(
     exercise.distanceMeters !== null ? String(exercise.distanceMeters) : "",
   );
-  const nextSet = exercise.setExecutions.length + 1;
+  const weightStep =
+    exercise.setProgressionKg && exercise.setProgressionKg > 0
+      ? exercise.setProgressionKg
+      : 0.25;
   const actualReps = needsReps ? parsedInteger(reps) : null;
   const actualWeightKg = weight ? parsedDecimal(weight) : null;
   const actualDurationSeconds = needsDuration ? durationSeconds : null;
@@ -147,6 +178,13 @@ function ExerciseExecution({
     (!needsReps || actualReps !== null) &&
     (!needsDuration || actualDurationSeconds !== null) &&
     (!needsDistance || actualDistanceMeters !== null);
+
+  function adjustWeight(direction: -1 | 1) {
+    const currentWeight =
+      parsedDecimal(weight) ?? suggestedWeight ?? weightStep;
+    const adjusted = roundedWeight(currentWeight + direction * weightStep);
+    setWeight(String(Math.min(2_000, Math.max(0.25, adjusted))));
+  }
 
   if (exercise.completedAt) {
     return (
@@ -207,20 +245,39 @@ function ExerciseExecution({
       {hasKnownMeasure || missingMeasure ? (
         <div className="set-fields">
           {exercise.modality === "strength" ? (
-            <label>
-              <span>
+            <div className="set-load-field">
+              <label htmlFor={`set-weight-${exercise.itemId}`}>
                 Carga <small>kg</small>
-              </span>
-              <input
-                inputMode="decimal"
-                min="0.25"
-                onChange={(event) => setWeight(event.target.value)}
-                placeholder="—"
-                step="0.25"
-                type="number"
-                value={weight}
-              />
-            </label>
+              </label>
+              <div className="set-load-control">
+                <button
+                  aria-label={`Reduzir carga em ${formatWeight(weightStep)} kg`}
+                  className="icon-button"
+                  onClick={() => adjustWeight(-1)}
+                  type="button"
+                >
+                  <AppIcon name="decrease" size={20} />
+                </button>
+                <input
+                  id={`set-weight-${exercise.itemId}`}
+                  inputMode="decimal"
+                  min="0.25"
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="—"
+                  step="0.01"
+                  type="number"
+                  value={weight}
+                />
+                <button
+                  aria-label={`Aumentar carga em ${formatWeight(weightStep)} kg`}
+                  className="icon-button"
+                  onClick={() => adjustWeight(1)}
+                  type="button"
+                >
+                  <AppIcon name="increase" size={20} />
+                </button>
+              </div>
+            </div>
           ) : null}
           {needsReps ? (
             <label>

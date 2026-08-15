@@ -28,6 +28,7 @@ const plannedSession = {
       repsMax: 12,
       repsMin: 8,
       restSeconds: 90,
+      setProgressionKg: 2.5,
       sets: 2,
       setExecutions: [],
       startedAt: null,
@@ -212,9 +213,27 @@ describe("ActiveTrainingScreen", () => {
         await screen.findByRole("spinbutton", { name: "Repetições" })
       ).getAttribute("value"),
     ).toBe("12");
+    expect(
+      screen
+        .getByRole("spinbutton", { name: "Carga kg" })
+        .getAttribute("value"),
+    ).toBe("40");
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
     expect(screen.getByText("Série 1")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("spinbutton", { name: "Carga kg" })
+        .getAttribute("value"),
+    ).toBe("42.5");
+    await user.click(
+      screen.getByRole("button", { name: "Reduzir carga em 2,5 kg" }),
+    );
+    expect(
+      screen
+        .getByRole("spinbutton", { name: "Carga kg" })
+        .getAttribute("value"),
+    ).toBe("40");
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
     await user.click(
       await screen.findByRole("button", { name: "Finalizar treino" }),
@@ -228,6 +247,10 @@ describe("ActiveTrainingScreen", () => {
       plannedSession.items[0]?.itemId,
     );
     expect(gateway.completeSet).toHaveBeenCalledTimes(2);
+    expect(gateway.completeSet).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ actualWeightKg: 40, setNumber: 2 }),
+    );
     expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
   });
 
@@ -376,6 +399,7 @@ describe("ActiveTrainingScreen", () => {
           plannedWeightKg: null,
           repsMax: null,
           repsMin: null,
+          setProgressionKg: null,
           setExecutions: [],
           startedAt: "2026-08-14T03:31:00.000+00:00",
         },

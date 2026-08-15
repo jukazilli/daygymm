@@ -59,6 +59,7 @@ function mapItem(row: TrainingPlanItemRow): TrainingPlanDraftItem {
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
+    setProgressionKg: strength ? row.set_progression_kg : null,
     sets: row.sets,
   };
 }
@@ -80,6 +81,7 @@ function rpcSessions(input: PublishTrainingPlanInput) {
       reps_max: item.repsMax,
       reps_min: item.repsMin,
       rest_seconds: item.restSeconds,
+      set_progression_kg: item.setProgressionKg,
       sets: item.sets,
     })),
     name: session.name,
@@ -166,7 +168,7 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
           client
             .from("training_plan_items")
             .select(
-              "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,load_mode,load_increment_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
+              "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,load_mode,load_increment_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
             )
             .eq("version_id", versionId)
             .order("item_order"),
@@ -214,7 +216,7 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
         });
         const client = getWebSupabaseClient();
         const { data, error } = await client.rpc(
-          "publish_training_plan_version",
+          "publish_training_plan_version_v2",
           {
             p_change_summary: input.changeSummary,
             p_content_sha256: contentSha256,

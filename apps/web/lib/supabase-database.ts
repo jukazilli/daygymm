@@ -83,6 +83,7 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
   reps_min: number | null;
   rest_seconds: number;
   session_id: string;
+  set_progression_kg: number | null;
   sets: number;
   user_id: string;
   version_id: string;
@@ -116,6 +117,7 @@ export interface TrainingSessionRunItemRow extends Record<string, unknown> {
   reps_min: number | null;
   rest_seconds: number;
   run_id: string;
+  set_progression_kg: number | null;
   sets: number;
   started_at: string | null;
   user_id: string;
@@ -304,6 +306,17 @@ export interface WebDatabase {
         Returns: TrainingPauseRpcRow[];
       };
       publish_training_plan_version: {
+        Args: {
+          p_change_summary: string;
+          p_content_sha256: string;
+          p_operation_id: string;
+          p_plan_id: string | null;
+          p_plan_name: string;
+          p_sessions: unknown;
+        };
+        Returns: TrainingPlanImportRpcRow[];
+      };
+      publish_training_plan_version_v2: {
         Args: {
           p_change_summary: string;
           p_content_sha256: string;

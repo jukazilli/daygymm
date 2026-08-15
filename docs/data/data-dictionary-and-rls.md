@@ -247,21 +247,22 @@ Finalidade: armazenar itens normalizados e limitados de cada sessão versionada.
 Fórmulas, macros, links, objetos e conteúdo arbitrário da planilha não entram
 nesta relação.
 
-| Campo               | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
-| ------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
-| `item_id`           | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
-| `session_id`        | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
-| `version_id`        | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
-| `user_id`           | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
-| `item_order`        | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
-| `exercise_name`     | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `modality`          | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `sets`              | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `planned_weight_kg` | decimal opcional, 0,25–2.000 kg                | Sugerir carga sem substituir o realizado   | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `load_mode`         | `unconfigured`, `external` ou `none`           | Classificar uso de carga em força          | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `load_increment_kg` | decimal opcional, 0,01–2.000 kg                | Registrar menor passo do equipamento       | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| medidas e descanso  | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| circuito e notas    | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| Campo                | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
+| -------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
+| `item_id`            | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
+| `session_id`         | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
+| `version_id`         | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
+| `user_id`            | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
+| `item_order`         | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
+| `exercise_name`      | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `modality`           | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `sets`               | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `planned_weight_kg`  | decimal opcional, 0,25–2.000 kg                | Sugerir carga sem substituir o realizado   | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_mode`          | `unconfigured`, `external` ou `none`           | Classificar uso de carga em força          | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_increment_kg`  | decimal opcional, 0,01–2.000 kg                | Registrar menor passo do equipamento       | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `set_progression_kg` | decimal opcional, 0–2.000 kg                   | Incrementar sugestão entre séries          | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| medidas e descanso   | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| circuito e notas     | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
 
 Tempos planejados e de descanso permanecem canônicos como segundos inteiros no
 banco e nos contratos. As superfícies humanas apresentam e recebem `HH:MM:SS` e
@@ -309,8 +310,13 @@ relações de séries e nunca sobrescrevem o alvo planejado.
 | `user_id`                 | UUID, FK de perfil                                | Aplicar isolamento redundante   | Identificador pessoal      | Mesmo ciclo da execução       | `training_session_run_items_user_run_idx` |
 | alvo do exercício         | ordem, nome, modalidade, sets e medidas limitadas | Preservar o alvo apresentado    | Conteúdo de treino         | Mesmo ciclo da execução       | Ordem unique por execução                 |
 | `planned_weight_kg`       | decimal opcional, 0,25–2.000 kg                   | Preservar a carga planejada     | Conteúdo de treino         | Mesmo ciclo da execução       | Não                                       |
+| `set_progression_kg`      | decimal opcional, 0–2.000 kg                      | Preservar progressão por série  | Conteúdo de treino         | Mesmo ciclo da execução       | Não                                       |
 | `started_at`              | timestamptz opcional do servidor                  | Retomar o exercício iniciado    | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
 | `completed_at`            | timestamptz opcional do servidor                  | Marcar a última série concluída | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+
+`set_progression_kg` guarda o snapshot imutável vigente no início da execução.
+A carga planejada de cada registro de série é derivada no servidor; a carga
+realizada permanece um campo independente e editável pelo titular.
 
 ### `api.training_session_run_sets`
 

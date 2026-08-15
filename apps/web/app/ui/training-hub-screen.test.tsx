@@ -108,6 +108,7 @@ describe("TrainingHubScreen", () => {
           repsMax: 12,
           repsMin: 8,
           restSeconds: 90,
+          setProgressionKg: null,
           sets: 3,
           setExecutions: [],
           startedAt: null,

@@ -3,10 +3,14 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(54);
+select plan(59);
 
 select has_table('api', 'training_session_run_sets', 'active performed sets exist');
 select has_table('api', 'training_session_sets', 'canonical performed sets exist');
+select has_column(
+  'api', 'training_session_run_items', 'set_progression_kg',
+  'the active snapshot stores progression between sets'
+);
 select has_function(
   'api',
   'start_training_exercise',
@@ -164,7 +168,8 @@ values (
 
 insert into api.training_plan_items (
   item_id, session_id, version_id, user_id, item_order, exercise_name,
-  modality, sets, reps_min, reps_max, planned_weight_kg,
+  modality, sets, reps_min, reps_max, planned_weight_kg, load_mode,
+  load_increment_kg, set_progression_kg,
   duration_seconds, distance_meters, rest_seconds, circuit_group, notes
 )
 values
@@ -173,15 +178,16 @@ values
     'b5000000-0000-4000-8000-000000000005',
     'b4000000-0000-4000-8000-000000000004',
     'b1000000-0000-4000-8000-000000000001',
-    1, 'Stiff', 'strength', 2, 10, 12, 40, null, null, 60, null, null
+    1, 'Stiff', 'strength', 2, 10, 12, 40, 'external', 5, 2.5,
+    null, null, 60, null, null
   ),
   (
     'b7000000-0000-4000-8000-000000000007',
     'b5000000-0000-4000-8000-000000000005',
     'b4000000-0000-4000-8000-000000000004',
     'b1000000-0000-4000-8000-000000000001',
-    2, 'Prancha lateral', 'circuit', 2, null, null, null, 30, null, 60,
-    'Circuito abdominal', null
+    2, 'Prancha lateral', 'circuit', 2, null, null, null, 'none', null, null,
+    30, null, 60, 'Circuito abdominal', null
   );
 
 update api.training_plans
@@ -237,6 +243,12 @@ select is(
    where plan_item_id = 'b6000000-0000-4000-8000-000000000006'),
   40.00::numeric,
   'the active snapshot keeps the planned weight'
+);
+select is(
+  (select set_progression_kg from api.training_session_run_items
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'),
+  2.50::numeric,
+  'the active snapshot keeps progression between sets'
 );
 select is(
   (select was_changed from api.pause_training_session(
@@ -372,6 +384,13 @@ select is(
   'the command reports one completed set'
 );
 select is(
+  (select planned_weight_kg from api.training_session_run_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 1),
+  40.00::numeric,
+  'the first set keeps the configured initial load as its suggestion'
+);
+select is(
   (select exercise_completed from api.complete_training_set(
     'b8000000-0000-4000-8000-000000000008',
     'b6000000-0000-4000-8000-000000000006',
@@ -423,6 +442,13 @@ select is(
   )),
   true,
   'the last set automatically completes the exercise'
+);
+select is(
+  (select planned_weight_kg from api.training_session_run_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 2),
+  42.50::numeric,
+  'the next set stores the progressed suggestion independently from actual load'
 );
 select ok(
   (select completed_at is not null from api.training_session_run_items
@@ -485,6 +511,13 @@ select is(
      and set_number = 2),
   37.50::numeric,
   'canonical history preserves actual weight separately from planned weight'
+);
+select is(
+  (select planned_weight_kg from api.training_session_sets
+   where plan_item_id = 'b6000000-0000-4000-8000-000000000006'
+     and set_number = 2),
+  42.50::numeric,
+  'canonical history preserves the progressed suggestion for the set'
 );
 select is(
   (select actual_duration_seconds from api.training_session_sets

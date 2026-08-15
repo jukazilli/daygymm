@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(37);
+select plan(39);
 
 select has_table('api', 'training_plans', 'training plans exist');
 select has_column('api', 'training_plans', 'archived_at', 'plans can be archived');
@@ -11,9 +11,10 @@ select has_column('api', 'training_plan_versions', 'author_user_id', 'versions r
 select has_column('api', 'training_plan_versions', 'change_summary', 'versions explain their change');
 select has_column('api', 'training_plan_items', 'load_mode', 'strength items classify load usage');
 select has_column('api', 'training_plan_items', 'load_increment_kg', 'strength items store the equipment step');
+select has_column('api', 'training_plan_items', 'set_progression_kg', 'strength items store progression between sets');
 select has_function(
   'api',
-  'publish_training_plan_version',
+  'publish_training_plan_version_v2',
   array['uuid', 'text', 'text', 'text', 'text', 'jsonb'],
   'the bounded version publication command exists'
 );
@@ -22,7 +23,7 @@ select has_function('api', 'restore_training_plan', array['uuid'], 'the restore 
 select ok(
   has_function_privilege(
     'authenticated',
-    'api.publish_training_plan_version(uuid,text,text,text,text,jsonb)',
+    'api.publish_training_plan_version_v2(uuid,text,text,text,text,jsonb)',
     'execute'
   ),
   'authenticated users can publish a bounded plan version'
@@ -30,7 +31,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'api.publish_training_plan_version(uuid,text,text,text,text,jsonb)',
+    'api.publish_training_plan_version_v2(uuid,text,text,text,text,jsonb)',
     'execute'
   ),
   'anonymous users cannot publish a plan version'
@@ -92,7 +93,7 @@ select lives_ok(
 );
 select lives_ok(
   $$create temporary table pg_temp.first_publication as
-    select * from api.publish_training_plan_version(
+    select * from api.publish_training_plan_version_v2(
       null,
       'plan-publish:c3000000-0000-4000-8000-000000000003',
       repeat('a', 64),
@@ -112,6 +113,7 @@ select lives_ok(
             "planned_weight_kg": 40,
             "load_mode": "external",
             "load_increment_kg": 2.5,
+            "set_progression_kg": 2.5,
             "duration_seconds": null,
             "distance_meters": null,
             "rest_seconds": 90,
@@ -128,6 +130,7 @@ select lives_ok(
             "planned_weight_kg": null,
             "load_mode": "none",
             "load_increment_kg": null,
+            "set_progression_kg": null,
             "duration_seconds": 1200,
             "distance_meters": null,
             "rest_seconds": 0,
@@ -150,12 +153,12 @@ select is(
 );
 select is(
   (
-    select planned_weight_kg::text || ':' || load_increment_kg::text
+    select planned_weight_kg::text || ':' || load_increment_kg::text || ':' || set_progression_kg::text
     from api.training_plan_items
     where exercise_name = 'Supino reto'
   ),
-  '40.00:2.50',
-  'the strength item stores initial load and equipment step'
+  '40.00:2.50:2.50',
+  'the strength item stores initial load, session step, and set progression'
 );
 select is(
   (select load_mode from api.training_plan_items where exercise_name = 'Esteira'),
@@ -170,7 +173,7 @@ select is(
 
 select lives_ok(
   $$create temporary table pg_temp.second_publication as
-    select * from api.publish_training_plan_version(
+    select * from api.publish_training_plan_version_v2(
       (select plan_id from pg_temp.first_publication),
       'plan-publish:c4000000-0000-4000-8000-000000000004',
       repeat('b', 64),
@@ -189,6 +192,7 @@ select lives_ok(
           "planned_weight_kg": null,
           "load_mode": "unconfigured",
           "load_increment_kg": null,
+          "set_progression_kg": null,
           "duration_seconds": null,
           "distance_meters": null,
           "rest_seconds": 90,
@@ -215,7 +219,7 @@ select is(
   'version one keeps its original exercise snapshot'
 );
 select throws_ok(
-  $$select * from api.publish_training_plan_version(
+  $$select * from api.publish_training_plan_version_v2(
       (select plan_id from pg_temp.first_publication),
       'plan-publish:c5000000-0000-4000-8000-000000000005',
       repeat('c', 64), 'Inválido', 'Carga indevida',
@@ -232,6 +236,7 @@ select throws_ok(
           "planned_weight_kg": 20,
           "load_mode": "external",
           "load_increment_kg": 2,
+          "set_progression_kg": 2,
           "duration_seconds": 900,
           "distance_meters": null,
           "rest_seconds": 0,
@@ -244,6 +249,36 @@ select throws_ok(
   'Plan item is invalid.',
   'non-strength exercises reject load configuration'
 );
+select throws_ok(
+  $$select * from api.publish_training_plan_version_v2(
+      (select plan_id from pg_temp.first_publication),
+      'plan-publish:c5100000-0000-4000-8000-000000000005',
+      repeat('e', 64), 'Inválido', 'Progressão ausente',
+      '[{
+        "day_order": 1,
+        "name": "Força",
+        "items": [{
+          "order": 1,
+          "exercise_name": "Supino",
+          "modality": "strength",
+          "sets": 3,
+          "reps_min": 8,
+          "reps_max": 12,
+          "planned_weight_kg": 40,
+          "load_mode": "external",
+          "load_increment_kg": 2,
+          "duration_seconds": null,
+          "distance_meters": null,
+          "rest_seconds": 60,
+          "circuit_group": null,
+          "notes": null
+        }]
+      }]'::jsonb
+    )$$,
+  '22023',
+  'Plan item progression is invalid.',
+  'external load requires an explicit set progression'
+);
 
 select set_config('request.jwt.claim.sub', 'c2000000-0000-4000-8000-000000000002', true);
 -- RLS-N25: another authenticated user cannot read or version the owner plan.
@@ -254,7 +289,7 @@ select is(
   'RLS hides another user plan versions'
 );
 select throws_ok(
-  $$select * from api.publish_training_plan_version(
+  $$select * from api.publish_training_plan_version_v2(
       (select plan_id from pg_temp.first_publication),
       'plan-publish:c6000000-0000-4000-8000-000000000006',
       repeat('d', 64), 'Ataque', 'Tentativa indevida',
@@ -271,6 +306,7 @@ select throws_ok(
           "planned_weight_kg": null,
           "load_mode": "unconfigured",
           "load_increment_kg": null,
+          "set_progression_kg": null,
           "duration_seconds": null,
           "distance_meters": null,
           "rest_seconds": 90,

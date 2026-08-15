@@ -41,6 +41,7 @@ const existingDraft: TrainingPlanDraft = {
           repsMax: 12,
           repsMin: 8,
           restSeconds: 90,
+          setProgressionKg: null,
           sets: 3,
         },
         {
@@ -58,6 +59,7 @@ const existingDraft: TrainingPlanDraft = {
           repsMax: null,
           repsMin: null,
           restSeconds: 0,
+          setProgressionKg: null,
           sets: 1,
         },
       ],
@@ -118,7 +120,10 @@ function createGateway(
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 describe("TrainingPlanEditorScreen", () => {
   it("creates the first manual plan with a version summary", async () => {
@@ -232,6 +237,104 @@ describe("TrainingPlanEditorScreen", () => {
   it("configures load only for eligible strength exercises", async () => {
     const user = userEvent.setup();
     const gateway = createGateway(existingDraft);
+    const navigate = vi.fn();
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        mode: "loads",
+        navigate,
+      }),
+    );
+
+    const guide = await screen.findByRole("dialog", {
+      name: "Carga, progressão e passo",
+    });
+    expect(within(guide).getByText("Progressão entre séries")).toBeTruthy();
+    await user.click(within(guide).getByRole("button", { name: "OK" }));
+    expect(await screen.findByText("Supino reto")).toBeTruthy();
+    expect(screen.queryByText("Esteira")).toBeNull();
+    expect(
+      screen.queryByRole("combobox", { name: "Como você treina?" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Salvar carga" })).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "Editar carga de Supino reto" }),
+    );
+    expect(screen.getByRole("button", { name: "Voltar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Salvar carga" })).toBeTruthy();
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Como você treina?" }),
+      "external",
+    );
+    await user.type(
+      screen.getByRole("spinbutton", { name: "Carga inicial (kg)" }),
+      "40",
+    );
+    await user.clear(
+      screen.getByRole("spinbutton", {
+        name: "Progressão entre séries (kg)",
+      }),
+    );
+    await user.type(
+      screen.getByRole("spinbutton", {
+        name: "Progressão entre séries (kg)",
+      }),
+      "2.5",
+    );
+    await user.type(
+      screen.getByRole("spinbutton", {
+        name: "Passo entre sessões (kg)",
+      }),
+      "5",
+    );
+    expect(screen.getByText("40 → 42,5 → 45 kg")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Salvar carga" }));
+
+    await waitFor(() => expect(gateway.publish).toHaveBeenCalledOnce());
+    const published = vi.mocked(gateway.publish).mock.calls[0]?.[0];
+    expect(published?.sessions[0]?.items[0]).toEqual(
+      expect.objectContaining({
+        loadIncrementKg: 5,
+        loadMode: "external",
+        plannedWeightKg: 40,
+        setProgressionKg: 2.5,
+      }),
+    );
+    expect(published?.sessions[0]?.items[1]).toEqual(
+      expect.objectContaining({
+        loadMode: "none",
+        modality: "cardio",
+        setProgressionKg: null,
+      }),
+    );
+    expect(navigate).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole("button", {
+        name: "Editar carga de Supino reto",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("Carga atualizada.")).toBeTruthy();
+  });
+
+  it("remembers when the load guide should stay hidden", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway(existingDraft);
+    const first = render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        mode: "loads",
+        navigate: vi.fn(),
+      }),
+    );
+
+    const guide = await screen.findByRole("dialog", {
+      name: "Carga, progressão e passo",
+    });
+    await user.click(
+      within(guide).getByRole("button", { name: "Não mostrar novamente" }),
+    );
+    first.unmount();
 
     render(
       createElement(TrainingPlanEditorScreen, {
@@ -242,35 +345,7 @@ describe("TrainingPlanEditorScreen", () => {
     );
 
     expect(await screen.findByText("Supino reto")).toBeTruthy();
-    expect(screen.queryByText("Esteira")).toBeNull();
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Como você treina?" }),
-      "external",
-    );
-    await user.type(
-      screen.getByRole("spinbutton", { name: "Carga inicial (kg)" }),
-      "40",
-    );
-    await user.type(
-      screen.getByRole("spinbutton", {
-        name: "Passo do equipamento (kg)",
-      }),
-      "2.5",
-    );
-    await user.click(screen.getByRole("button", { name: "Salvar" }));
-
-    await waitFor(() => expect(gateway.publish).toHaveBeenCalledOnce());
-    const published = vi.mocked(gateway.publish).mock.calls[0]?.[0];
-    expect(published?.sessions[0]?.items[0]).toEqual(
-      expect.objectContaining({
-        loadIncrementKg: 2.5,
-        loadMode: "external",
-        plannedWeightKg: 40,
-      }),
-    );
-    expect(published?.sessions[0]?.items[1]).toEqual(
-      expect.objectContaining({ loadMode: "none", modality: "cardio" }),
-    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("archives a plan without losing the option to undo", async () => {

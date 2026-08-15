@@ -16,6 +16,7 @@ const session = {
       durationSeconds: null,
       exerciseName: "Agachamento",
       itemId: "51000000-0000-4000-8000-000000000001",
+      setProgressionKg: 2.5,
       modality: "strength",
       notes: null,
       order: 1,

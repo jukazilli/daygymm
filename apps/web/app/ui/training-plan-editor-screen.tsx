@@ -34,6 +34,11 @@ interface TrainingPlanEditorScreenProps {
   readonly navigate?: (path: string) => void;
 }
 
+interface LoadEditSnapshot {
+  readonly item: TrainingPlanDraftItem;
+  readonly sessionId: string;
+}
+
 const modalityLabels: Record<TrainingModality, string> = {
   cardio: "Cardio",
   circuit: "Circuito",
@@ -41,6 +46,7 @@ const modalityLabels: Record<TrainingModality, string> = {
   strength: "Força",
   time: "Tempo",
 };
+const loadGuidePreferenceKey = "daygym:load-guide:v1";
 
 function defaultNavigate(path: string) {
   window.location.assign(path);
@@ -66,6 +72,7 @@ function blankItem(order: number): TrainingPlanDraftItem {
     repsMax: 12,
     repsMin: 8,
     restSeconds: 60,
+    setProgressionKg: null,
     sets: 3,
   };
 }
@@ -104,11 +111,13 @@ interface EditorListOption {
 }
 
 function EditorEntityList({
+  actionLabel,
   ariaLabel,
   onSelect,
   options,
   variant,
 }: Readonly<{
+  actionLabel?: (option: EditorListOption) => string;
   ariaLabel: string;
   onSelect: (id: string) => void;
   options: readonly EditorListOption[];
@@ -127,10 +136,10 @@ function EditorEntityList({
             <small>{option.secondary}</small>
           </span>
           <button
-            aria-label={`Editar ${option.primary}`}
+            aria-label={actionLabel?.(option) ?? `Editar ${option.primary}`}
             className="icon-button"
             onClick={() => onSelect(option.id)}
-            title={`Editar ${option.primary}`}
+            title={actionLabel?.(option) ?? `Editar ${option.primary}`}
             type="button"
           >
             <AppIcon name="edit" />
@@ -170,6 +179,7 @@ function modalityItem(
     plannedWeightKg: null,
     repsMax: null,
     repsMin: null,
+    setProgressionKg: null,
   };
   if (modality === "strength") {
     return { ...common, repsMax: 12, repsMin: 8 };
@@ -196,6 +206,42 @@ function exerciseSummary(item: TrainingPlanDraftItem) {
   return `${item.sets} séries · ${modalityLabels[item.modality]}`;
 }
 
+function formattedLoad(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function loadSummary(item: TrainingPlanDraftItem) {
+  if (item.loadMode === "none") {
+    return "Sem carga externa";
+  }
+  if (
+    item.loadMode === "external" &&
+    item.plannedWeightKg !== null &&
+    item.loadIncrementKg !== null &&
+    item.setProgressionKg !== null
+  ) {
+    return `${formattedLoad(item.plannedWeightKg)} kg · +${formattedLoad(item.setProgressionKg)} kg/série · ${formattedLoad(item.loadIncrementKg)} kg/sessão`;
+  }
+  return "Configurar carga";
+}
+
+function loadSequence(item: TrainingPlanDraftItem) {
+  if (
+    item.loadMode !== "external" ||
+    item.plannedWeightKg === null ||
+    item.setProgressionKg === null
+  ) {
+    return null;
+  }
+  const initialLoad = item.plannedWeightKg;
+  const progression = item.setProgressionKg;
+  return Array.from({ length: item.sets }, (_, index) =>
+    formattedLoad(initialLoad + progression * index),
+  ).join(" → ");
+}
+
 function LoadConfiguration({
   item,
   onChange,
@@ -203,12 +249,16 @@ function LoadConfiguration({
   item: TrainingPlanDraftItem;
   onChange: (item: TrainingPlanDraftItem) => void;
 }>) {
+  const sequence = loadSequence(item);
+
   function changeMode(loadMode: TrainingLoadMode) {
     onChange({
       ...item,
       loadIncrementKg: loadMode === "external" ? item.loadIncrementKg : null,
       loadMode,
       plannedWeightKg: loadMode === "none" ? null : item.plannedWeightKg,
+      setProgressionKg:
+        loadMode === "external" ? (item.setProgressionKg ?? 0) : null,
     });
   }
 
@@ -244,13 +294,31 @@ function LoadConfiguration({
                   })
                 }
                 required
-                step="0.25"
+                step="0.01"
                 type="number"
                 value={item.plannedWeightKg ?? ""}
               />
             </label>
             <label>
-              <span>Passo do equipamento (kg)</span>
+              <span>Progressão entre séries (kg)</span>
+              <input
+                inputMode="decimal"
+                max="2000"
+                min="0"
+                onChange={(event) =>
+                  onChange({
+                    ...item,
+                    setProgressionKg: numberValue(event.target.value),
+                  })
+                }
+                required
+                step="0.01"
+                type="number"
+                value={item.setProgressionKg ?? ""}
+              />
+            </label>
+            <label>
+              <span>Passo entre sessões (kg)</span>
               <input
                 inputMode="decimal"
                 max="2000"
@@ -268,9 +336,15 @@ function LoadConfiguration({
               />
             </label>
           </div>
+          {sequence ? (
+            <output className="load-sequence" aria-live="polite">
+              <span>Cargas sugeridas</span>
+              <strong>{sequence} kg</strong>
+            </output>
+          ) : null}
           <small className="load-configuration-help">
-            O passo orienta a próxima sessão. A carga não aumenta
-            automaticamente entre as séries.
+            A progressão preenche as séries deste treino. O passo orienta a
+            sugestão das próximas sessões. Toda carga continua editável.
           </small>
         </>
       ) : null}
@@ -513,6 +587,61 @@ function ArchiveDialog({
   );
 }
 
+function LoadGuideDialog({
+  onClose,
+  onHide,
+}: Readonly<{
+  onClose: () => void;
+  onHide: () => void;
+}>) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    confirmRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="session-dialog-backdrop" role="presentation">
+      <section
+        aria-labelledby="load-guide-title"
+        aria-modal="true"
+        className="session-dialog load-guide-dialog"
+        role="dialog"
+      >
+        <h2 id="load-guide-title">Carga, progressão e passo</h2>
+        <dl className="load-guide-list">
+          <div>
+            <dt>Carga inicial</dt>
+            <dd>Ponto de partida da primeira série.</dd>
+          </div>
+          <div>
+            <dt>Progressão entre séries</dt>
+            <dd>Preenche automaticamente as próximas séries.</dd>
+          </div>
+          <div>
+            <dt>Passo entre sessões</dt>
+            <dd>Orienta a sugestão de carga dos próximos treinos.</dd>
+          </div>
+        </dl>
+        <p>As cargas são sugestões: você pode ajustá-las durante o treino.</p>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            onClick={onClose}
+            ref={confirmRef}
+            type="button"
+          >
+            OK
+          </button>
+          <button className="button-secondary" onClick={onHide} type="button">
+            Não mostrar novamente
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function TrainingPlanEditorScreen({
   gateway: providedGateway,
   mode = "full",
@@ -524,6 +653,8 @@ export function TrainingPlanEditorScreen({
   const [draft, setDraft] = useState<TrainingPlanDraft>();
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [loadEditSnapshot, setLoadEditSnapshot] = useState<LoadEditSnapshot>();
+  const [savedMessage, setSavedMessage] = useState("");
   const [noPlan, setNoPlan] = useState(false);
   const [operationId, setOperationId] = useState("");
   const [changeSummary, setChangeSummary] = useState("");
@@ -532,6 +663,7 @@ export function TrainingPlanEditorScreen({
   const [error, setError] = useState<string>();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archivedPlanId, setArchivedPlanId] = useState<string>();
+  const [loadGuideOpen, setLoadGuideOpen] = useState(false);
 
   function gateway() {
     gatewayRef.current ??= createWebTrainingPlanEditorGateway();
@@ -573,6 +705,15 @@ export function TrainingPlanEditorScreen({
       active = false;
     };
   }, [mode, navigate]);
+
+  useEffect(() => {
+    if (
+      mode === "loads" &&
+      window.localStorage.getItem(loadGuidePreferenceKey) !== "hidden"
+    ) {
+      setLoadGuideOpen(true);
+    }
+  }, [mode]);
 
   function updateSession(
     sessionId: string,
@@ -676,6 +817,19 @@ export function TrainingPlanEditorScreen({
       );
       return;
     }
+    if (mode === "loads") {
+      setDraft((current) =>
+        current
+          ? { ...current, currentVersion: result.value.version }
+          : current,
+      );
+      setOperationId(`plan-publish:${randomUuid()}`);
+      setSelectedSessionId("");
+      setSelectedItemId("");
+      setLoadEditSnapshot(undefined);
+      setSavedMessage("Carga atualizada.");
+      return;
+    }
     navigate("/treinos/");
   }
 
@@ -775,9 +929,26 @@ export function TrainingPlanEditorScreen({
       .filter((item) => item.modality === "strength")
       .map((item) => ({ item, session })),
   );
+  const selectedLoad =
+    mode === "loads" && selectedItemId
+      ? strengthItems.find(({ item }) => item.itemId === selectedItemId)
+      : undefined;
+  const saveLabel =
+    mode === "loads" ? "Salvar carga" : draft.planId ? "Salvar" : "Criar plano";
   function returnToPreviousLevel() {
     if (selectedItemId) {
+      if (mode === "loads" && loadEditSnapshot) {
+        updateItem(
+          loadEditSnapshot.sessionId,
+          loadEditSnapshot.item.itemId,
+          loadEditSnapshot.item,
+        );
+        setLoadEditSnapshot(undefined);
+      }
       setSelectedItemId("");
+      if (mode === "loads") {
+        setSelectedSessionId("");
+      }
       return;
     }
     if (selectedSessionId) {
@@ -787,38 +958,59 @@ export function TrainingPlanEditorScreen({
     navigate("/treinos/");
   }
 
+  function openLoadEditor(sessionId: string, item: TrainingPlanDraftItem) {
+    setSavedMessage("");
+    setLoadEditSnapshot({ item: { ...item }, sessionId });
+    setSelectedSessionId(sessionId);
+    setSelectedItemId(item.itemId);
+  }
+
   return (
     <AppShell active="workouts">
       <div className="plan-editor-page">
         <header className="plan-editor-header">
-          <button
-            className="button-text plan-editor-back"
-            onClick={returnToPreviousLevel}
-            type="button"
-          >
-            <AppIcon name="back" size={20} />
-            <span>Voltar</span>
-          </button>
-          <div>
-            <p className="eyebrow">
-              {mode === "loads"
-                ? "Cargas do plano"
-                : draft.planId
-                  ? `Versão ${draft.currentVersion}`
-                  : "Novo plano"}
-            </p>
-            <h1>{mode === "loads" ? "Configurar cargas" : "Montar plano"}</h1>
-          </div>
-          {mode === "full" || strengthItems.length > 0 ? (
+          <div className="plan-editor-toolbar">
             <button
-              className="button-primary plan-editor-save"
-              disabled={busy}
-              form="training-plan-form"
-              type="submit"
+              aria-label="Voltar"
+              className="icon-button plan-editor-back"
+              onClick={returnToPreviousLevel}
+              title="Voltar"
+              type="button"
             >
-              {busy ? "Salvando…" : draft.planId ? "Salvar" : "Criar plano"}
+              <AppIcon name="back" />
             </button>
-          ) : null}
+            {mode === "full" || selectedLoad ? (
+              <button
+                aria-busy={busy}
+                aria-label={busy ? "Salvando" : saveLabel}
+                className="icon-button icon-button-primary plan-editor-save"
+                disabled={busy}
+                form="training-plan-form"
+                title={busy ? "Salvando" : saveLabel}
+                type="submit"
+              >
+                <AppIcon name="check" />
+              </button>
+            ) : null}
+          </div>
+          <div className="plan-editor-title">
+            <p className="eyebrow">
+              {selectedLoad
+                ? "Configurar carga"
+                : mode === "loads"
+                  ? "Cargas do plano"
+                  : draft.planId
+                    ? `Versão ${draft.currentVersion}`
+                    : "Novo plano"}
+            </p>
+            <h1>
+              {selectedLoad
+                ? selectedLoad.item.exerciseName
+                : mode === "loads"
+                  ? "Configurar cargas"
+                  : "Montar plano"}
+            </h1>
+          </div>
         </header>
 
         <form
@@ -857,22 +1049,57 @@ export function TrainingPlanEditorScreen({
           ) : null}
 
           {mode === "loads" ? (
-            <section className="plan-editor-section load-settings-list">
+            <section className="load-settings-list">
               {strengthItems.length > 0 ? (
-                strengthItems.map(({ item, session }) => (
-                  <article className="load-settings-card" key={item.itemId}>
+                selectedLoad ? (
+                  <article
+                    className="load-settings-card load-settings-detail"
+                    key={selectedLoad.item.itemId}
+                  >
                     <div>
-                      <small>{trainingSlotLabel(session.dayOrder)}</small>
-                      <h2>{item.exerciseName}</h2>
+                      <small>
+                        {selectedLoad.session.name} ·{" "}
+                        {trainingSlotLabel(selectedLoad.session.dayOrder)}
+                      </small>
+                      <h2>{exerciseSummary(selectedLoad.item)}</h2>
                     </div>
                     <LoadConfiguration
-                      item={item}
+                      item={selectedLoad.item}
                       onChange={(changed) =>
-                        updateItem(session.sessionId, item.itemId, changed)
+                        updateItem(
+                          selectedLoad.session.sessionId,
+                          selectedLoad.item.itemId,
+                          changed,
+                        )
                       }
                     />
                   </article>
-                ))
+                ) : (
+                  <EditorEntityList
+                    actionLabel={(option) =>
+                      `Editar carga de ${option.primary}`
+                    }
+                    ariaLabel="Exercícios com configuração de carga"
+                    onSelect={(itemId) => {
+                      const selected = strengthItems.find(
+                        ({ item }) => item.itemId === itemId,
+                      );
+                      if (selected) {
+                        openLoadEditor(
+                          selected.session.sessionId,
+                          selected.item,
+                        );
+                      }
+                    }}
+                    options={strengthItems.map(({ item, session }, index) => ({
+                      id: item.itemId,
+                      index: index + 1,
+                      primary: item.exerciseName,
+                      secondary: `${session.name} · ${loadSummary(item)}`,
+                    }))}
+                    variant="exercise"
+                  />
+                )
               ) : (
                 <div className="plan-editor-empty">
                   <h2>Este plano não tem exercícios de força.</h2>
@@ -881,6 +1108,11 @@ export function TrainingPlanEditorScreen({
                   </Link>
                 </div>
               )}
+              {savedMessage && !selectedLoad ? (
+                <p className="status-message status-success" role="status">
+                  {savedMessage}
+                </p>
+              ) : null}
             </section>
           ) : (
             <div className="plan-session-list">
@@ -1103,6 +1335,15 @@ export function TrainingPlanEditorScreen({
           busy={busy}
           onClose={() => setArchiveOpen(false)}
           onConfirm={() => void archive()}
+        />
+      ) : null}
+      {loadGuideOpen ? (
+        <LoadGuideDialog
+          onClose={() => setLoadGuideOpen(false)}
+          onHide={() => {
+            window.localStorage.setItem(loadGuidePreferenceKey, "hidden");
+            setLoadGuideOpen(false);
+          }}
         />
       ) : null}
     </AppShell>

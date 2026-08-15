@@ -20,6 +20,7 @@ const strengthItem = {
   repsMax: 12,
   repsMin: 8,
   restSeconds: 90,
+  setProgressionKg: 2.5,
   sets: 3,
 } as const;
 

@@ -877,9 +877,18 @@ input:focus-visible {
 
 .plan-editor-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-5);
+  gap: var(--space-4);
+}
+
+.plan-editor-toolbar {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plan-editor-title {
+  min-width: 0;
 }
 
 .plan-editor-header h1,
@@ -1018,6 +1027,26 @@ input:focus-visible {
 .load-configuration-help {
   color: var(--color-text-secondary);
   line-height: 1.45;
+}
+
+.load-sequence {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text);
+}
+
+.load-sequence > span {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.load-sequence > strong {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .load-settings-card > div:first-child small {
@@ -1365,6 +1394,30 @@ input:focus-visible {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.set-load-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.set-load-field > label {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.set-load-control {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.set-load-control .icon-button {
+  width: 48px;
+  height: 58px;
 }
 
 .set-fields label > span {
@@ -2161,12 +2214,18 @@ input:focus-visible {
   opacity: 0.5;
 }
 
-.plan-editor-header {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.icon-button-primary {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-action-contrast);
 }
 
-.plan-editor-back,
-.plan-editor-save,
+.icon-button-primary:hover:not(:disabled) {
+  border-color: var(--color-action-pressed);
+  background: var(--color-action-pressed);
+  color: var(--color-action-contrast);
+}
+
 .button-primary:has(svg),
 .button-secondary:has(svg) {
   gap: var(--space-2);
@@ -2233,6 +2292,27 @@ input:focus-visible {
 
 .editor-entity-copy small {
   color: var(--color-text-secondary);
+}
+
+.load-guide-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.load-guide-list > div {
+  display: grid;
+  gap: 2px;
+}
+
+.load-guide-list dt {
+  font-weight: 900;
+}
+
+.load-guide-list dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 .training-hub-layout,
@@ -2439,22 +2519,6 @@ input:focus-visible {
   .plan-editor-actions {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .plan-editor-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-3);
-  }
-
-  .plan-editor-header > div {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .plan-editor-save {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 48px;
   }
 
   .training-quick-actions {
