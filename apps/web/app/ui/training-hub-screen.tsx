@@ -223,6 +223,19 @@ export function TrainingHubScreen({
         if (!active) {
           return;
         }
+        if (
+          trainingResult.ok &&
+          trainingResult.value.plan &&
+          !sourceResult.ok
+        ) {
+          setSourceState({
+            onboardingCompleted: true,
+            selectedAt: null,
+            source: "manual",
+          });
+          setTrainingState(trainingResult.value);
+          return;
+        }
         if (!sourceResult.ok || !trainingResult.ok) {
           if (
             (!sourceResult.ok && sourceResult.reason === "session") ||

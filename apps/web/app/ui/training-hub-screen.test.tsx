@@ -40,6 +40,13 @@ function sourceGateway(source: "manual" | "official_xlsx"): PlanSourceGateway {
   };
 }
 
+function unavailableSourceGateway(): PlanSourceGateway {
+  return {
+    load: vi.fn().mockResolvedValue({ ok: false, reason: "unexpected" }),
+    select: vi.fn(),
+  };
+}
+
 afterEach(cleanup);
 
 describe("TrainingHubScreen", () => {
@@ -170,5 +177,44 @@ describe("TrainingHubScreen", () => {
     expect(screen.queryByText("Treino de hoje")).toBeNull();
     expect(screen.queryByRole("link", { name: /Abrir treino$/ })).toBeNull();
     expect(screen.queryByText("Agenda semanal")).toBeNull();
+  });
+
+  it("keeps a local plan usable when plan-source metadata is offline", async () => {
+    const session = {
+      dayOrder: 1,
+      items: [],
+      name: "Treino offline",
+      sessionId: "65000000-0000-4000-8000-000000000005",
+      weekday: 1,
+    };
+
+    render(
+      createElement(TrainingHubScreen, {
+        gateway: unavailableSourceGateway(),
+        trainingGateway: createTrainingGateway({
+          ok: true,
+          value: {
+            activeRun: null,
+            lastCompletedAt: null,
+            nextSession: session,
+            plan: {
+              itemCount: 0,
+              name: "Plano local",
+              planId: "66000000-0000-4000-8000-000000000006",
+              sessionCount: 1,
+              version: 1,
+              versionId: "67000000-0000-4000-8000-000000000007",
+              wasCreated: false,
+            },
+            sessions: [session],
+          },
+        }),
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Meus treinos" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Não foi possível carregar.")).toBeNull();
   });
 });
