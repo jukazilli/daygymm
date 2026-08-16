@@ -1,8 +1,8 @@
 # Persistência local e outbox do treino
 
-Status: US-009A verificada em staging; US-009B1 implementada localmente para a
-execução web/PWA e aguardando a prova hospedada. US-009 permanece parcial e
-rastreada na
+Status: US-009A e US-009B1 verificadas em staging para a execução web/PWA.
+US-009 permanece parcial até a prova SQLCipher em aparelho físico da US-009B2 e
+continua rastreada na
 [issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
@@ -76,7 +76,9 @@ Os testes do gateway local-first cobrem:
 6. pendência preservada no logout e retomada pelo mesmo titular;
 7. copy e ações de estado offline/conflito na tela de execução;
 8. RPCs autenticados, timestamps validados e recibo de cancelamento sem acesso
-   anônimo.
+   anônimo;
+9. hub de treinos disponível pelo snapshot local quando apenas os metadados de
+   origem do plano estão indisponíveis.
 
 ## Evidência hospedada — 16/08/2026
 
@@ -90,6 +92,28 @@ Os testes do gateway local-first cobrem:
 - reconexão esvaziou a outbox; novo reload online manteve exatamente uma série
   canônica, sem duplicação;
 - a execução sintética foi cancelada ao final do smoke.
+
+### Fechamento da US-009B1 web/PWA
+
+- commits funcionais `b497048`, `22c6763` e `7599280` promovidos somente para
+  staging; produção permaneceu inalterada;
+- CI `31926428420` aprovou qualidade, a migration corretiva, 420 asserções de
+  banco, API e worker; CI `31927057937` revalidou a correção de navegação
+  offline;
+- Cloudflare Pages publicou o mesmo commit usado no smoke hospedado;
+- início da sessão, início do exercício, primeira série e sua revisão foram
+  gravados offline como quatro comandos pendentes com ordem causal;
+- reload ainda offline restaurou sessão, série e cronômetro a partir dos
+  instantes persistidos; a revisão local permaneceu em 11 kg × 11 repetições,
+  revisão 2;
+- reconexão zerou a outbox e preservou exatamente uma série canônica revisada;
+- pausa e retomada offline entraram na fila na ordem correta, o cronômetro ficou
+  congelado enquanto pausado e voltou a avançar depois da retomada;
+- o primeiro smoke revelou que o hub ainda dependia dos metadados remotos da
+  origem do plano. A dependência foi isolada: com plano local válido, o hub
+  continua disponível offline;
+- a execução sintética foi cancelada ao final e a inspeção confirmou outbox
+  vazia e nenhum treino ativo.
 
 ## Limites do corte seguinte
 

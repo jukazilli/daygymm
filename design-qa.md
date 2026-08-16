@@ -56,3 +56,18 @@ final result: US-008 accepted; non-blocking P2 visual follow-up
   para o aceite final da história.
 
 final result: US-009A verified in staging; US-009B and physical-device acceptance pending
+
+## US-009B1 — ciclo completo offline na web/PWA
+
+- O status bloqueado abre somente as duas decisões necessárias: tentar novamente
+  ou usar a versão online, avisando antes do descarte das alterações pendentes.
+- Início, correção, pausa e retomada mantêm a interface de execução existente;
+  nenhum banner ou tutorial foi acrescentado ao fluxo.
+- O smoke hospedado encontrou um erro de navegação ao pausar offline: o hub
+  dependia dos metadados remotos de origem do plano. Com um plano válido no
+  snapshot, o hub agora continua acessível mesmo que esses metadados não
+  respondam.
+- A inspeção em viewport de desktop confirmou estados e comportamento, mas a
+  comparação visual em iPhone permanece na prova física da US-009B2.
+
+final result: US-009B1 verified in staging; physical-device visual evidence pending
