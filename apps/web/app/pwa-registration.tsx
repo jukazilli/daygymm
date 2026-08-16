@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const offlineAppRoutes = [
   "/hoje/",
   "/treinos/",
+  "/treinos/meus/",
   "/treinos/sessao/",
   "/comecar/",
   "/entrar/",

@@ -1,8 +1,9 @@
-const CACHE_NAME = "daygym-runtime-v2";
+const CACHE_NAME = "daygym-runtime-v3";
 const CACHE_PREFIX = "daygym-runtime-";
 const OFFLINE_ROUTE_FALLBACKS = [
   "/hoje/",
   "/treinos/",
+  "/treinos/meus/",
   "/treinos/sessao/",
   "/comecar/",
   "/entrar/",
@@ -54,7 +55,15 @@ async function cachedNavigation(request) {
     return cached;
   }
 
-  for (const route of OFFLINE_ROUTE_FALLBACKS) {
+  const requestedPath = new URL(request.url).pathname;
+  const fallbackRoutes = requestedPath.startsWith("/treinos/")
+    ? [
+        "/treinos/",
+        ...OFFLINE_ROUTE_FALLBACKS.filter((route) => route !== "/treinos/"),
+      ]
+    : OFFLINE_ROUTE_FALLBACKS;
+
+  for (const route of fallbackRoutes) {
     const fallback = await caches.match(route, { ignoreSearch: true });
     if (fallback) {
       return Response.redirect(new URL(route, self.location.origin), 302);

@@ -668,7 +668,7 @@ input:focus-visible {
   padding: var(--space-5) 0 var(--space-6);
 }
 
-.preview-badge,
+.offline-badge,
 .construction-pill {
   display: inline-flex;
   align-items: center;
@@ -681,6 +681,21 @@ input:focus-visible {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.offline-badge {
+  border-color: color-mix(in srgb, var(--color-action) 35%, transparent);
+  background: var(--color-action-soft);
+  color: var(--color-action-pressed);
+}
+
+.offline-badge::before {
+  width: 7px;
+  height: 7px;
+  margin-right: var(--space-2);
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
 }
 
 .app-content {

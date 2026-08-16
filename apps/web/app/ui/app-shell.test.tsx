@@ -1,10 +1,23 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AppShell, FocusedBackAction } from "./app-shell";
 
-afterEach(cleanup);
+const initialOnline = navigator.onLine;
+
+function setOnline(value: boolean) {
+  Object.defineProperty(navigator, "onLine", {
+    configurable: true,
+    value,
+  });
+  window.dispatchEvent(new Event(value ? "online" : "offline"));
+}
+
+afterEach(() => {
+  cleanup();
+  setOnline(initialOnline);
+});
 
 describe("AppShell", () => {
   it("keeps the five canonical destinations scannable and names the active one", () => {
@@ -28,6 +41,23 @@ describe("AppShell", () => {
     expect(
       screen.getByRole("link", { name: "Feed" }).getAttribute("href"),
     ).toBe("/feed");
+    expect(screen.queryByText("Prévia")).toBeNull();
+    expect(screen.queryByText("Modo offline")).toBeNull();
+  });
+
+  it("shows connectivity only while the app is offline", () => {
+    render(
+      createElement(AppShell, {
+        active: "today",
+        children: createElement("p", null, "Conteúdo"),
+      }),
+    );
+
+    act(() => setOnline(false));
+    expect(screen.getByRole("status").textContent).toBe("Modo offline");
+
+    act(() => setOnline(true));
+    expect(screen.queryByText("Modo offline")).toBeNull();
   });
 
   it("removes institutional chrome from a focused task", () => {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AppIcon, type AppIconName } from "./app-icon";
+import { ConnectivityStatus } from "./connectivity-status";
 
 export type AppDestination =
   "feed" | "profile" | "progress" | "today" | "workouts";
@@ -114,7 +115,7 @@ export function AppShell({
           <Link className="brand" href="/hoje/" aria-label="DayGym — Hoje">
             DayGym
           </Link>
-          <span className="preview-badge">Prévia</span>
+          <ConnectivityStatus />
         </header>
       ) : null}
 
