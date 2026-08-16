@@ -195,6 +195,16 @@ conta os restaure.
   [issue #39](https://github.com/jukazilli/daygymm/issues/39), vinculada à
   US-009 e à prova física da issue #38.
 
+Evidência hospedada em 16/08/2026: commits funcionais `0d96880` e `3b6c377`,
+com documentação em `fab0170` e `ba7c3cc`, promovidos somente para staging. O
+CI `31966544566` aprovou 206 testes e os demais gates. Em navegador novo, o
+cache `daygym-runtime-v3` continha `/treinos/`, `/treinos/meus/` e
+`/treinos/sessao/`. Com a rede bloqueada, a agenda exibiu seis sessões; uma
+sessão de segunda-feira abriu mesmo no domingo e pôde ser iniciada, criando um
+registro local pendente. A reconexão mudou o estado para `Sincronizado`; a
+execução sintética foi cancelada ao final. `Modo offline` apareceu sem rede e
+sumiu após a reconexão.
+
 ## Limites do corte seguinte
 
 US-009B2b ainda deve executar o

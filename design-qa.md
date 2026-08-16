@@ -121,6 +121,8 @@ final result: cold-open offline verified in staging; 30-minute physical proof pe
   `Treinos → Meus treinos → escolher sessão → iniciar` sem retorno indevido à
   Home. A sessão escolhida também é resolvida pelo plano local quando o treino
   do dia não existe.
-- A implementação e a validação do owner permanecem rastreadas na issue #39.
+- O smoke hospedado confirmou `Modo offline` no shell, seis sessões na agenda,
+  abertura e início da sessão escolhida sem rede e remoção do aviso após a
+  reconexão. A validação do owner permanece rastreada na issue #39.
 
-final result: offline agenda correction implemented; staging and owner verification pending
+final result: offline agenda correction verified in staging; owner verification pending
