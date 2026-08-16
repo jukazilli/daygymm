@@ -266,6 +266,29 @@ describe("TrainingSessionLocalFirstRuntime", () => {
     });
   });
 
+  it("selects a saved session from the weekly agenda while offline", async () => {
+    const snapshot = idleState();
+    const selectedSession = {
+      ...snapshot.sessions[0]!,
+      name: "Treino B",
+      sessionId: "60000000-0000-4000-8000-000000000009",
+      weekday: 2,
+    };
+    snapshot.nextSession = null;
+    snapshot.sessions = [...snapshot.sessions, selectedSession];
+    await store.saveSnapshot(ownerId, snapshot);
+    const remote = remoteGateway();
+    const gateway = localGateway(store, new MutableConnectivity(false), remote);
+
+    const selected = await gateway.load(selectedSession.sessionId);
+
+    expect(selected).toMatchObject({
+      ok: true,
+      value: { nextSession: { sessionId: selectedSession.sessionId } },
+    });
+    expect(remote.load).not.toHaveBeenCalled();
+  });
+
   it("replays once and replaces the optimistic set identity with the canonical state", async () => {
     const connectivity = new MutableConnectivity(false);
     const completeSet = vi.fn().mockResolvedValue(successfulCompletion());

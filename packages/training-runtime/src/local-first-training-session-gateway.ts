@@ -164,6 +164,19 @@ function localRevision(
   };
 }
 
+function selectLocalSession(
+  state: PracticalTrainingState,
+  preferredSessionId?: string,
+) {
+  if (state.activeRun || !preferredSessionId) {
+    return state;
+  }
+  const selected = state.sessions.find(
+    (session) => session.sessionId === preferredSessionId,
+  );
+  return selected ? { ...state, nextSession: selected } : state;
+}
+
 export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessionGateway {
   private activeOwnerId: string | null = null;
   private connectivitySubscription: (() => void) | undefined;
@@ -240,12 +253,18 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
           void this.runSynchronization(false);
         }
         if (snapshot) {
-          return { ok: true, value: snapshot } as const;
+          return {
+            ok: true,
+            value: selectLocalSession(snapshot, preferredSessionId),
+          } as const;
         }
       }
       if (!this.connectivity.isOnline() && snapshot) {
         this.updateSyncState({ status: "offline" });
-        return { ok: true, value: snapshot } as const;
+        return {
+          ok: true,
+          value: selectLocalSession(snapshot, preferredSessionId),
+        } as const;
       }
       const remote = await this.remote.load(preferredSessionId);
       if (remote.ok) {
@@ -257,7 +276,12 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
         });
         return remote;
       }
-      return snapshot ? ({ ok: true, value: snapshot } as const) : remote;
+      return snapshot
+        ? ({
+            ok: true,
+            value: selectLocalSession(snapshot, preferredSessionId),
+          } as const)
+        : remote;
     } catch {
       this.blockLocalPersistence();
       return this.remote.load(preferredSessionId);
