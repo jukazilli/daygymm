@@ -10,11 +10,11 @@
 
 **Full-view comparison evidence**
 
-Bloqueada: conforme a preferência de validação manual do owner, nenhum navegador foi escolhido para esta execução e não foi feita captura renderizada.
+O owner concluiu o teste manual em staging e aceitou funcionalmente a US-008 em 16/08/2026. Não foi anexada captura renderizada comparável; essa lacuna visual permanece como refinamento P2 e não bloqueia mais o fechamento funcional da história.
 
 **Focused region comparison evidence**
 
-Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: chevron opaco e fixo, ausência de logo e selo `Prévia`, CTA fixo sobre o conteúdo, safe areas, inputs de carga/repetições empilhados, seleção de série em tela cheia e cronômetro de descanso.
+Aceite funcional informado pelo owner. Uma futura rodada visual ainda deve comparar: chevron opaco e fixo, ausência de logo e selo `Prévia`, CTA fixo sobre o conteúdo, safe areas, inputs de carga/repetições empilhados, seleção de série em tela cheia e cronômetro de descanso.
 
 **Findings**
 
@@ -26,6 +26,7 @@ Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: che
 
 - Iteração 1: implementação estrutural concluída; comparação visual não iniciada porque não há navegador escolhido nem screenshot renderizado.
 - Iteração 2: execução simplificada; histórico saiu do exercício, correção ganhou fluxo progressivo e descanso passou a ocupar uma tela focada. Aceite visual permanece manual em staging.
+- Iteração 3: owner testou e aceitou funcionalmente a US-008 em staging. Melhorias adicionais de UI/UX foram adiadas como refinamento P2, sem reabrir a história.
 
 **Implementation checklist**
 
@@ -38,4 +39,4 @@ Bloqueada pelo mesmo motivo. As regiões que precisam de aceite manual são: che
 - Conferir o fluxo `Ajustar ou desfazer → escolher série → continuar → salvar`.
 - Conferir o descanso em tela cheia, contagem regressiva e saída antecipada.
 
-final result: blocked
+final result: US-008 accepted; non-blocking P2 visual follow-up
