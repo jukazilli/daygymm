@@ -160,6 +160,21 @@ conta os restaure.
   tempo continua correto ao reabrir o app e desconta pausas;
 - produção permaneceu inalterada.
 
+### Correção de abertura offline do PWA
+
+- a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
+  acesso ao snapshot local quando o navegador já está offline;
+- um ponteiro local validado para o UUID do último titular desbloqueia somente o
+  armazenamento local e é removido após logout confirmado;
+- o checkpoint de `PlanSourceState` guarda apenas conclusão/origem do plano e
+  não replica as respostas do onboarding;
+- Home e Treinos priorizam plano ou execução já persistidos quando os metadados
+  remotos de onboarding estão indisponíveis;
+- `daygym-runtime-v2` antecipa `/hoje/`, `/treinos/`, `/treinos/sessao/`,
+  `/comecar/` e `/entrar/`, além de apagar caches runtime obsoletos;
+- primeira instalação ou primeira carga ainda exige rede para obter código e
+  dados; depois disso não existe requisito de abrir online no mesmo dia.
+
 ## Limites do corte seguinte
 
 US-009B2b ainda deve executar o

@@ -90,3 +90,18 @@ final result: US-009B1 verified in staging; physical-device visual evidence pend
   físico da US-009B2b.
 
 final result: mobile journey implemented in staging; physical-device proof pending
+
+## US-009B1 — cold open offline do PWA
+
+- O erro `Não foi possível carregar suas respostas` vinha da rota `/comecar/`,
+  que consultava onboarding remoto antes de considerar o plano IndexedDB.
+- A abertura offline agora recupera o titular e o checkpoint mínimo locais;
+  plano ou treino ativo têm precedência sobre metadados de origem indisponíveis.
+- O estado sem rede só pede conexão quando a configuração realmente nunca foi
+  concluída; usuários com treino salvo seguem para Home.
+- O app shell guarda antecipadamente Home, Treinos, Sessão, Onboarding e Login,
+  sem exigir que cada rota tenha sido visitada manualmente.
+- O primeiro carregamento da versão continua necessariamente online; reaberturas
+  posteriores podem começar já em modo avião.
+
+final result: cold-open regression covered in code; hosted staging smoke pending

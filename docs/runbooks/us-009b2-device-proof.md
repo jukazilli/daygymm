@@ -20,6 +20,10 @@ série, revisão, sessão ou evento duplicado.
    `training_outbox_operations`.
 5. Garantir bateria suficiente e desativar qualquer VPN que altere o teste de
    conectividade.
+6. Depois de uma carga online da versão candidata, feche o aplicativo sem
+   encerrar a conta. Ative o modo avião antes de reabrir e confirme que Home e
+   Treinos aparecem pelo estado local. Não abra o aplicativo online novamente
+   entre esses passos.
 
 ## Execução de 30 minutos
 
