@@ -1,7 +1,8 @@
 # Persistência local e outbox do treino
 
-Status: US-009A implementada para a execução web/PWA; US-009 permanece parcial
-e rastreada na [issue #38](https://github.com/jukazilli/daygymm/issues/38).
+Status: US-009A implementada e verificada em staging para a execução web/PWA;
+US-009 permanece parcial e rastreada na
+[issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
 
@@ -56,8 +57,18 @@ Os testes do gateway local-first cobrem:
 5. conflito preservado e exposto como estado visível;
 6. copy e ação de `Salvo neste aparelho` na tela de execução.
 
-O gate hospedado ainda precisa provar que a rota de execução já visitada abre
-sem rede e lê o snapshot IndexedDB depois de fechar/reabrir o navegador.
+## Evidência hospedada — 16/08/2026
+
+- commit funcional `cd6b486`; documentação/rastreabilidade `88aa648`;
+- CI de staging `31923777514` aprovada, incluindo banco, API e worker;
+- service worker ativo com `daygym-runtime-v1` e rota de sessão no cache;
+- série 1 concluída com o contexto do navegador offline e confirmada como
+  `Salvo neste aparelho`;
+- reload ainda offline recuperou a execução em `Série 2 de 4`;
+- inspeção do IndexedDB confirmou um snapshot e uma operação pendente;
+- reconexão esvaziou a outbox; novo reload online manteve exatamente uma série
+  canônica, sem duplicação;
+- a execução sintética foi cancelada ao final do smoke.
 
 ## Limites do corte seguinte
 

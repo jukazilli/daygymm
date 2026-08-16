@@ -50,7 +50,9 @@ final result: US-008 accepted; non-blocking P2 visual follow-up
   não foi adicionado banner, tutorial ou texto explicativo ao fluxo imersivo.
 - O feedback não depende apenas de cor: cada estado tem texto, e o controle
   pendente possui nome acessível com a quantidade de registros.
-- Evidência visual em dispositivo e teste manual offline ainda são necessários
-  depois da publicação em staging; até lá, o corte permanece parcial.
+- O smoke hospedado em navegador real confirmou os estados `Offline`,
+  `Salvo neste aparelho`, `Sincronização pendente` e `Sincronizado`, inclusive
+  após reload offline. Evidência visual em dispositivo físico ainda é necessária
+  para o aceite final da história.
 
-final result: US-009A structurally ready for staging; visual/device acceptance pending
+final result: US-009A verified in staging; US-009B and physical-device acceptance pending
