@@ -53,6 +53,17 @@ afterEach(() => {
 });
 
 describe("AuthScreen", () => {
+  it("never falls back to a GET submission that exposes credentials in the URL", () => {
+    render(createElement(AuthScreen, { mode: "sign-in" }));
+
+    expect(
+      screen
+        .getByRole("button", { name: "Entrar" })
+        .closest("form")
+        ?.getAttribute("method"),
+    ).toBe("post");
+  });
+
   it("shows only a generic credential error during sign in", async () => {
     const user = userEvent.setup();
     const gateway = createGateway({

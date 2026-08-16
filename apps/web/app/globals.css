@@ -1196,11 +1196,28 @@ input:focus-visible {
   cursor: pointer;
 }
 
-.session-topbar > span:last-child {
+.session-saved {
   justify-self: end;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text-secondary);
+  font: inherit;
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+button.session-saved:not(:disabled) {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+button.session-saved:hover,
+button.session-saved:focus-visible {
+  color: var(--color-action-pressed);
+  text-decoration-color: currentColor;
 }
 
 .session-topbar time {
@@ -1212,6 +1229,16 @@ input:focus-visible {
   margin-right: 5px;
   color: var(--color-success);
   content: "●";
+}
+
+.session-saved[data-sync-status="offline"]::before,
+.session-saved[data-sync-status="pending"]::before,
+.session-saved[data-sync-status="syncing"]::before {
+  color: var(--color-action);
+}
+
+.session-saved[data-sync-status="conflict"]::before {
+  color: var(--color-danger);
 }
 
 .session-intro {

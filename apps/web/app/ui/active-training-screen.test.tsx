@@ -11,8 +11,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   ActiveTrainingRun,
+  LocalFirstTrainingSessionGateway,
   PracticalTrainingState,
   TrainingSessionGateway,
+  TrainingSessionSyncState,
 } from "@daygym/contracts";
 
 import { ActiveTrainingScreen } from "./active-training-screen";
@@ -338,6 +340,84 @@ describe("ActiveTrainingScreen", () => {
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
     expect(screen.queryByText("Não foi possível salvar agora.")).toBeNull();
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it("shows that an offline set is safe on this device and can be retried", async () => {
+    const user = userEvent.setup();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            startedAt: "2026-08-14T03:31:00.000+00:00",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
+    };
+    let notifySyncState:
+      ((state: TrainingSessionSyncState) => void) | undefined;
+    const synchronize = vi.fn().mockResolvedValue(undefined);
+    const gateway: LocalFirstTrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn().mockImplementation(async () => {
+        notifySyncState?.({
+          lastSyncedAt: null,
+          pendingCount: 1,
+          status: "offline",
+        });
+        return {
+          ok: true,
+          value: {
+            completedAt: "2026-08-14T03:32:00.000+00:00",
+            completedSetCount: 1,
+            exerciseCompleted: false,
+            setExecutionId: "76000000-0000-4000-8000-000000000006",
+            setNumber: 1,
+            totalSets: 2,
+            wasCreated: true,
+          },
+        };
+      }),
+      finish: vi.fn(),
+      getSyncState: () => ({
+        lastSyncedAt: null,
+        pendingCount: 0,
+        status: "synced",
+      }),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+      subscribeSyncState(listener) {
+        notifySyncState = listener;
+        listener(this.getSyncState());
+        return () => {
+          notifySyncState = undefined;
+        };
+      },
+      synchronize,
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+    await user.click(
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
+
+    expect(await screen.findByText("Salvo neste aparelho")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Sincronizar 1 registro pendente",
+      }),
+    );
+    expect(synchronize).toHaveBeenCalledOnce();
   });
 
   it("corrects and undoes the latest persisted set from its focused dialog", async () => {

@@ -243,6 +243,15 @@ export interface TrainingPauseState {
   readonly wasChanged: boolean;
 }
 
+export type TrainingSessionSyncStatus =
+  "conflict" | "offline" | "pending" | "synced" | "syncing";
+
+export interface TrainingSessionSyncState {
+  readonly lastSyncedAt: string | null;
+  readonly pendingCount: number;
+  readonly status: TrainingSessionSyncStatus;
+}
+
 export type TrainingSessionFailure =
   "configuration" | "conflict" | "invalid" | "session" | "unexpected";
 export type TrainingSessionResult<T> =
@@ -278,4 +287,12 @@ export interface TrainingSessionGateway {
     runId: string,
     itemId: string,
   ): Promise<TrainingSessionResult<ExerciseStart>>;
+}
+
+export interface LocalFirstTrainingSessionGateway extends TrainingSessionGateway {
+  getSyncState(): TrainingSessionSyncState;
+  subscribeSyncState(
+    listener: (state: TrainingSessionSyncState) => void,
+  ): () => void;
+  synchronize(): Promise<void>;
 }

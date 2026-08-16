@@ -594,7 +594,12 @@ export function AuthScreen({
             ) : null}
           </div>
         ) : (
-          <form className="auth-form" noValidate onSubmit={handleSubmit}>
+          <form
+            className="auth-form"
+            method="post"
+            noValidate
+            onSubmit={handleSubmit}
+          >
             {mode !== "reset-password" ? (
               <Field
                 autoComplete="email"

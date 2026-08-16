@@ -4,16 +4,18 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type {
+  LocalFirstTrainingSessionGateway,
   PracticalTrainingExercise,
   PracticalTrainingSet,
   PracticalTrainingState,
-  SetCompletion,
   SetCompletionInput,
   SetRevisionInput,
   TrainingSessionGateway,
+  TrainingSessionSyncState,
 } from "@daygym/contracts";
 
-import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
+import { applyCompletedTrainingSet } from "../../lib/training-session-state";
 import {
   formatTrainingDuration,
   maximumExerciseDurationSeconds,
@@ -63,69 +65,6 @@ function suggestedSetWeight(
     exercise.plannedWeightKg +
       (exercise.setProgressionKg ?? 0) * (setNumber - 1),
   );
-}
-
-function applyCompletedSet(
-  state: PracticalTrainingState,
-  selectedIndex: number,
-  input: SetCompletionInput,
-  completion: SetCompletion,
-): PracticalTrainingState {
-  const activeRun = state.activeRun;
-  const exercise = activeRun?.session.items[selectedIndex];
-  if (
-    !activeRun ||
-    !exercise ||
-    activeRun.runId !== input.runId ||
-    exercise.itemId !== input.itemId
-  ) {
-    return state;
-  }
-
-  const previous = exercise.setExecutions.find(
-    (candidate) => candidate.setNumber === input.setNumber,
-  );
-  const completedSet: PracticalTrainingSet = {
-    actualDistanceMeters: input.actualDistanceMeters,
-    actualDurationSeconds: input.actualDurationSeconds,
-    actualReps: input.actualReps,
-    actualWeightKg: input.actualWeightKg,
-    completedAt: completion.completedAt,
-    plannedDistanceMeters: exercise.distanceMeters,
-    plannedDurationSeconds: exercise.durationSeconds,
-    plannedRepsMax: exercise.repsMax,
-    plannedRepsMin: exercise.repsMin,
-    plannedWeightKg: suggestedSetWeight(exercise, input.setNumber),
-    revision: previous?.revision ?? 1,
-    setExecutionId: completion.setExecutionId,
-    setNumber: input.setNumber,
-    updatedAt: completion.completedAt,
-  };
-  const setExecutions = exercise.setExecutions
-    .filter((candidate) => candidate.setNumber !== input.setNumber)
-    .concat(completedSet)
-    .sort((left, right) => left.setNumber - right.setNumber);
-  const items = activeRun.session.items.map((candidate, index) =>
-    index === selectedIndex
-      ? {
-          ...candidate,
-          completedAt: completion.exerciseCompleted
-            ? completion.completedAt
-            : candidate.completedAt,
-          setExecutions,
-        }
-      : candidate,
-  );
-  const session = { ...activeRun.session, items };
-
-  return {
-    ...state,
-    activeRun: { ...activeRun, session },
-    nextSession:
-      state.nextSession?.sessionId === session.sessionId
-        ? session
-        : state.nextSession,
-  };
 }
 
 function exerciseTarget(exercise: PracticalTrainingExercise) {
@@ -825,6 +764,45 @@ function sessionError(reason: string) {
   return "Não foi possível salvar agora.";
 }
 
+function isLocalFirstGateway(
+  candidate: TrainingSessionGateway,
+): candidate is LocalFirstTrainingSessionGateway {
+  return (
+    "getSyncState" in candidate &&
+    "subscribeSyncState" in candidate &&
+    "synchronize" in candidate
+  );
+}
+
+function syncStatusLabel(
+  syncState: TrainingSessionSyncState,
+  busy: boolean,
+  paused: boolean,
+) {
+  if (paused) {
+    return "Pausado";
+  }
+  if (busy) {
+    return "Salvando…";
+  }
+  if (syncState.status === "syncing") {
+    return "Sincronizando…";
+  }
+  if (syncState.status === "conflict") {
+    return "Sincronização bloqueada";
+  }
+  if (syncState.status === "offline" && syncState.pendingCount > 0) {
+    return "Salvo neste aparelho";
+  }
+  if (syncState.status === "offline") {
+    return "Offline";
+  }
+  if (syncState.status === "pending") {
+    return "Sincronização pendente";
+  }
+  return "Sincronizado";
+}
+
 function ElapsedTimer({
   pausedAt,
   pausedDurationSeconds,
@@ -1008,6 +986,12 @@ export function ActiveTrainingScreen({
     providedGateway,
   );
   const [state, setState] = useState<PracticalTrainingState>();
+  const [syncState, setSyncState] = useState<TrainingSessionSyncState>({
+    lastSyncedAt: null,
+    pendingCount: 0,
+    status: "synced",
+  });
+  const syncRefreshAtRef = useRef<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [dialogAction, setDialogAction] = useState<
@@ -1022,7 +1006,7 @@ export function ActiveTrainingScreen({
   const [finishedDuration, setFinishedDuration] = useState<number>();
 
   function gateway() {
-    gatewayRef.current ??= createWebTrainingSessionGateway();
+    gatewayRef.current ??= createLocalFirstTrainingSessionGateway();
     return gatewayRef.current;
   }
 
@@ -1072,6 +1056,47 @@ export function ActiveTrainingScreen({
       active = false;
     };
   }, [navigate, plannedSessionId]);
+
+  useEffect(() => {
+    const currentGateway = gateway();
+    if (!isLocalFirstGateway(currentGateway)) {
+      return;
+    }
+
+    let active = true;
+    let observedPendingWork = false;
+    const unsubscribe = currentGateway.subscribeSyncState((nextSyncState) => {
+      if (!active) {
+        return;
+      }
+      setSyncState(nextSyncState);
+      if (
+        nextSyncState.pendingCount > 0 ||
+        nextSyncState.status === "pending" ||
+        nextSyncState.status === "syncing"
+      ) {
+        observedPendingWork = true;
+      }
+      if (
+        observedPendingWork &&
+        nextSyncState.status === "synced" &&
+        nextSyncState.lastSyncedAt &&
+        syncRefreshAtRef.current !== nextSyncState.lastSyncedAt
+      ) {
+        observedPendingWork = false;
+        syncRefreshAtRef.current = nextSyncState.lastSyncedAt;
+        void currentGateway.load().then((result) => {
+          if (active && result.ok) {
+            setState(result.value);
+          }
+        });
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   async function startTraining() {
     if (!state?.nextSession || busy) {
@@ -1164,9 +1189,8 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
-    const nextState = applyCompletedSet(
+    const nextState = applyCompletedTrainingSet(
       state,
-      selectedIndex,
       completionInput,
       result.value,
     );
@@ -1201,6 +1225,13 @@ export function ActiveTrainingScreen({
     }
     setSelectedIndex(restState.nextExerciseIndex);
     setRestState(undefined);
+  }
+
+  async function synchronizeNow() {
+    const currentGateway = gateway();
+    if (isLocalFirstGateway(currentGateway)) {
+      await currentGateway.synchronize();
+    }
   }
 
   async function reviseCurrentSet(request: SetRevisionRequest) {
@@ -1502,9 +1533,26 @@ export function ActiveTrainingScreen({
           pausedDurationSeconds={run.pausedDurationSeconds}
           startedAt={run.startedAt}
         />
-        <span className="session-saved">
-          {run.pausedAt ? "Pausado" : busy ? "Salvando…" : "Salvo"}
-        </span>
+        {syncState.pendingCount > 0 && syncState.status !== "conflict" ? (
+          <button
+            aria-label={`Sincronizar ${syncState.pendingCount} ${
+              syncState.pendingCount === 1
+                ? "registro pendente"
+                : "registros pendentes"
+            }`}
+            className="session-saved"
+            data-sync-status={syncState.status}
+            disabled={syncState.status === "syncing"}
+            onClick={() => void synchronizeNow()}
+            type="button"
+          >
+            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
+          </button>
+        ) : (
+          <span className="session-saved" data-sync-status={syncState.status}>
+            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
+          </span>
+        )}
       </header>
 
       <section

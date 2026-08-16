@@ -40,3 +40,17 @@ Aceite funcional informado pelo owner. Uma futura rodada visual ainda deve compa
 - Conferir o descanso em tela cheia, contagem regressiva e saída antecipada.
 
 final result: US-008 accepted; non-blocking P2 visual follow-up
+
+## US-009A — estado local e sincronização
+
+- A top bar preserva o mesmo espaço do estado anterior e agora diferencia
+  `Sincronizado`, `Salvo neste aparelho`, `Sincronização pendente`,
+  `Sincronizando…` e `Sincronização bloqueada`.
+- Quando há fila recuperável, o próprio status é o controle de tentativa manual;
+  não foi adicionado banner, tutorial ou texto explicativo ao fluxo imersivo.
+- O feedback não depende apenas de cor: cada estado tem texto, e o controle
+  pendente possui nome acessível com a quantidade de registros.
+- Evidência visual em dispositivo e teste manual offline ainda são necessários
+  depois da publicação em staging; até lá, o corte permanece parcial.
+
+final result: US-009A structurally ready for staging; visual/device acceptance pending
