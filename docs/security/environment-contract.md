@@ -114,6 +114,21 @@ workflow manual não está na branch padrão e o environment `staging` não cont
 GitHub, nunca no Cloudflare ou no cliente. Até a sincronização e o E2E posterior,
 confirmação e recuperação continuam abertas em COR-001.
 
+Em 16 de agosto de 2026, um owner autenticado aplicou manualmente os dois
+templates versionados no Auth hospedado, sem criar PAT. Após salvar e recarregar,
+o template de confirmação manteve 2.520 caracteres e o de recuperação 2.574;
+ambos contêm `TokenHash`, apontam para as rotas intermediárias exatas e não
+contêm `ConfirmationURL`. O Resend permaneceu habilitado em `smtp.resend.com`,
+com limite hospedado de 30 e-mails por hora e intervalo de 60 segundos por
+destinatário. Uma nova recuperação respondeu `200`; COR-001 continua aberta
+somente até o link novo ser consumido no celular e receber o aceite do owner.
+Replay e revogação permanecem no escopo mais amplo de FND-013/AUTH-07.
+
+O owner confirmou em 16 de agosto de 2026 que o novo fluxo funcionou no celular
+e autorizou o fechamento de COR-001. Essa aceitação encerra o incidente do link
+inválido em staging; replay, revogação de sessões e o E2E do app nativo continuam
+como critérios mais amplos de FND-013 e AUTH-07.
+
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
 para declarar autenticação pronta: callbacks, sessão, não enumeração e
