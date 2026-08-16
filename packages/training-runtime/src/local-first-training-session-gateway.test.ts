@@ -2,14 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   PracticalTrainingState,
+  QueuedTrainingOperation,
   ReplayableTrainingSessionGateway,
+  TrainingSessionLocalStore,
 } from "@daygym/contracts";
 
-import { WebLocalFirstTrainingSessionGateway } from "./local-first-training-session-gateway";
-import type {
-  QueuedTrainingOperation,
-  TrainingSessionLocalStore,
-} from "./training-session-local-store";
+import { TrainingSessionLocalFirstRuntime } from "./local-first-training-session-gateway";
 
 const ownerId = "60000000-0000-4000-8000-000000000001";
 const runId = "60000000-0000-4000-8000-000000000002";
@@ -210,7 +208,7 @@ function localGateway(
   remote: ReplayableTrainingSessionGateway,
   options: { now?: () => Date; ownerId?: () => Promise<string | null> } = {},
 ) {
-  return new WebLocalFirstTrainingSessionGateway({
+  return new TrainingSessionLocalFirstRuntime({
     connectivity,
     now: options.now ?? (() => new Date("2026-08-15T20:02:00.000Z")),
     ownerId: options.ownerId ?? (async () => ownerId),
@@ -236,7 +234,7 @@ function successfulCompletion(wasCreated = true) {
   };
 }
 
-describe("WebLocalFirstTrainingSessionGateway", () => {
+describe("TrainingSessionLocalFirstRuntime", () => {
   let store: MemoryTrainingSessionStore;
 
   beforeEach(async () => {

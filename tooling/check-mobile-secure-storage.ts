@@ -9,6 +9,7 @@ const packageManifest = JSON.parse(
   dependencies?: Record<string, string>;
 };
 const requiredDependencies = [
+  "@react-native-community/netinfo",
   "expo-crypto",
   "expo-secure-store",
   "expo-sqlite",
@@ -123,6 +124,17 @@ if (!/database\.transaction\(/.test(trainingStore)) {
 }
 if (!/WHERE owner_id = \?/.test(trainingStore)) {
   findings.push("mobile training storage is not scoped by owner UUID");
+}
+
+const trainingGateway = readFileSync(
+  join(mobileRoot, "lib", "training", "mobile-training-session-gateway.ts"),
+  "utf8",
+);
+if (!/NetInfo\.addEventListener/.test(trainingGateway)) {
+  findings.push("mobile training sync does not observe connectivity changes");
+}
+if (!/mobileTrainingSessionLocalStore/.test(trainingGateway)) {
+  findings.push("mobile training journey is not connected to its local store");
 }
 
 if (findings.length > 0) {

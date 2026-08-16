@@ -4,8 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "build": "pnpm --filter @daygym/contracts build && expo export --platform all --output-dir dist",
-    "dev": "pnpm --filter @daygym/contracts build && expo start --dev-client",
+    "build": "pnpm --filter @daygym/contracts build && pnpm --filter @daygym/training-runtime build && expo export --platform all --output-dir dist",
+    "dev": "pnpm --filter @daygym/contracts build && pnpm --filter @daygym/training-runtime build && expo start --dev-client",
     "lint": "eslint app lib config app.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit"
@@ -14,8 +14,10 @@
     "@daygym/config": "workspace:*",
     "@daygym/contracts": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
+    "@daygym/training-runtime": "workspace:*",
     "@expo-google-fonts/nunito": "0.4.2",
     "@expo/metro-runtime": "55.0.12",
+    "@react-native-community/netinfo": "11.5.2",
     "@supabase/supabase-js": "2.112.3",
     "expo": "55.0.28",
     "expo-constants": "55.0.17",

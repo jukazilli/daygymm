@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @daygym/contracts build && next build",
+    "build": "pnpm --filter @daygym/contracts build && pnpm --filter @daygym/training-runtime build && next build",
     "dev": "next dev",
     "generate:training-template": "node scripts/generate-official-training-template.mjs",
     "lint": "eslint app lib next.config.ts",
@@ -16,6 +16,7 @@
     "@daygym/config": "workspace:*",
     "@daygym/contracts": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
+    "@daygym/training-runtime": "workspace:*",
     "@fontsource/nunito": "5.3.0",
     "@supabase/supabase-js": "2.112.3",
     "fflate": "0.8.3",

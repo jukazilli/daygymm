@@ -265,7 +265,7 @@ export function MobileAuthScreen({
         .then((result) => {
           setIsLoading(false);
           if (result.ok) {
-            router.replace("/conta");
+            router.replace("/treinos");
           } else {
             setFeedback(copyByFailure[result.reason]);
           }
@@ -357,7 +357,7 @@ export function MobileAuthScreen({
     }
 
     if (mode === "sign-in") {
-      router.replace("/conta");
+      router.replace("/treinos");
     } else if (mode === "sign-up" || mode === "recover") {
       setRecoveryRequested(true);
     } else {
@@ -394,6 +394,11 @@ export function MobileAuthScreen({
             <Text style={styles.support}>
               Seu acesso está ativo neste aparelho.
             </Text>
+            <PrimaryButton
+              label="Abrir treinos"
+              loading={false}
+              onPress={() => router.push("/treinos")}
+            />
             <PrimaryButton
               label="Sair neste aparelho"
               loading={isLoading}

@@ -27,6 +27,8 @@ repositório enquanto não houver uma fonte operacional privada.
 - `packages/contracts`: contratos públicos iniciais.
 - `packages/design-tokens`: tokens compartilhados de tema claro e contrato de
   tema escuro.
+- `packages/training-runtime`: regras de execução local-first e gateway remoto
+  compartilhados pela web e pelo app Expo.
 - `supabase`: migrations versionadas para o ambiente de staging e seed seguro.
 - `infra/terraform`: fundação isolada do DayGym no host temporário do Google
   Cloud.
