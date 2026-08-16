@@ -104,4 +104,9 @@ final result: mobile journey implemented in staging; physical-device proof pendi
 - O primeiro carregamento da versão continua necessariamente online; reaberturas
   posteriores podem começar já em modo avião.
 
-final result: cold-open regression covered in code; hosted staging smoke pending
+- Evidência hospedada em Chromium: após login e carga única online, o cache
+  continha as cinco rotas críticas. Com rede bloqueada e `navigator.onLine`
+  falso desde a navegação, `/comecar/` abriu `/hoje/` e `/treinos/` exibiu
+  `Meus treinos`, ambos em até 300 ms e sem o erro antigo.
+
+final result: cold-open offline verified in staging; 30-minute physical proof pending

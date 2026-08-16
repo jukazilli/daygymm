@@ -174,6 +174,11 @@ conta os restaure.
   `/comecar/` e `/entrar/`, além de apagar caches runtime obsoletos;
 - primeira instalação ou primeira carga ainda exige rede para obter código e
   dados; depois disso não existe requisito de abrir online no mesmo dia.
+- commits `af05afc`, `2ec03f5` e `b9fbe3c` promovidos somente para staging;
+- CI `31963010689` verde, com qualidade, segurança, banco, API e worker;
+- smoke hospedado confirmou `daygym-runtime-v2` e as cinco rotas críticas no
+  cache; com rede bloqueada e `navigator.onLine` falso, `/comecar/` recuperou
+  `/hoje/` e `/treinos/` exibiu `Meus treinos` em até 300 ms.
 
 ## Limites do corte seguinte
 
