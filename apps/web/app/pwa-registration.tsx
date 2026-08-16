@@ -3,6 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+const offlineAppRoutes = [
+  "/hoje/",
+  "/treinos/",
+  "/treinos/sessao/",
+  "/comecar/",
+  "/entrar/",
+];
+
 export function PwaRegistration() {
   const pathname = usePathname();
 
@@ -14,6 +22,15 @@ export function PwaRegistration() {
       return;
     }
 
+    const cacheAppShell = (worker?: ServiceWorker | null) => {
+      worker?.postMessage({
+        pathnames: [...new Set([pathname, ...offlineAppRoutes])],
+        type: "CACHE_APP_SHELL",
+      });
+    };
+    const cacheAfterControllerChange = () => {
+      cacheAppShell(navigator.serviceWorker.controller);
+    };
     const register = async () => {
       try {
         await navigator.serviceWorker.register("/sw.js", {
@@ -21,14 +38,16 @@ export function PwaRegistration() {
           updateViaCache: "none",
         });
         const registration = await navigator.serviceWorker.ready;
-        registration.active?.postMessage({
-          pathname,
-          type: "CACHE_ROUTE",
-        });
+        cacheAppShell(registration.active);
       } catch {
         // Installation remains best-effort; online usage must keep working.
       }
     };
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      cacheAfterControllerChange,
+    );
 
     if (document.readyState === "complete") {
       void register();
@@ -36,7 +55,13 @@ export function PwaRegistration() {
       window.addEventListener("load", register, { once: true });
     }
 
-    return () => window.removeEventListener("load", register);
+    return () => {
+      window.removeEventListener("load", register);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        cacheAfterControllerChange,
+      );
+    };
   }, [pathname]);
 
   return null;

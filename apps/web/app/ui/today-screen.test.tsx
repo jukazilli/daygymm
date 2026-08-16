@@ -105,4 +105,44 @@ describe("TodayScreen", () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/entrar/"));
     expect(screen.queryByText("Seu treino começa aqui.")).toBeNull();
   });
+
+  it("opens the saved workout from a cold offline start when source metadata is unavailable", async () => {
+    const gateway: PlanSourceGateway = {
+      load: vi.fn().mockResolvedValue({ ok: false, reason: "unexpected" }),
+      select: vi.fn(),
+    };
+    const trainingGateway = createTrainingGateway();
+    vi.mocked(trainingGateway.load).mockResolvedValue({
+      ok: true,
+      value: {
+        activeRun: null,
+        lastCompletedAt: null,
+        nextSession: {
+          dayOrder: 1,
+          items: [],
+          name: "Treino offline",
+          sessionId: "65000000-0000-4000-8000-000000000005",
+          weekday: 1,
+        },
+        plan: {
+          itemCount: 0,
+          name: "Plano local",
+          planId: "66000000-0000-4000-8000-000000000006",
+          sessionCount: 1,
+          version: 1,
+          versionId: "67000000-0000-4000-8000-000000000007",
+          wasCreated: false,
+        },
+        sessions: [],
+      },
+    });
+
+    render(createElement(TodayScreen, { gateway, trainingGateway }));
+
+    expect(await screen.findByText("Treino offline")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Abrir treino" }).getAttribute("href"),
+    ).toContain("/treinos/sessao");
+    expect(screen.queryByText("Não foi possível carregar.")).toBeNull();
+  });
 });

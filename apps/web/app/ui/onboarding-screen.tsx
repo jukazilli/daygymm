@@ -11,8 +11,12 @@ import type {
   OnboardingLimitationStatus,
   OnboardingSessionDuration,
   OnboardingStep,
+  PlanSourceGateway,
+  TrainingSessionGateway,
 } from "@daygym/contracts";
 
+import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
+import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
 import { createWebOnboardingGateway } from "../../lib/onboarding-gateway";
 import {
   AppLoadingSkeleton,
@@ -44,6 +48,8 @@ interface StepDefinition {
 interface OnboardingScreenProps {
   readonly gateway?: OnboardingGateway;
   readonly navigate?: (path: string) => void;
+  readonly sourceGateway?: PlanSourceGateway;
+  readonly trainingGateway?: TrainingSessionGateway;
 }
 
 const stepDefinitions: readonly StepDefinition[] = [
@@ -211,8 +217,16 @@ function completeDraft(context: OnboardingContext) {
 export function OnboardingScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  sourceGateway: providedSourceGateway,
+  trainingGateway: providedTrainingGateway,
 }: OnboardingScreenProps) {
   const gatewayRef = useRef<OnboardingGateway | undefined>(providedGateway);
+  const sourceGatewayRef = useRef<PlanSourceGateway | undefined>(
+    providedSourceGateway,
+  );
+  const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
+    providedTrainingGateway,
+  );
   const [context, setContext] = useState<OnboardingContext>();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [editingFromReview, setEditingFromReview] = useState(false);
@@ -224,17 +238,49 @@ export function OnboardingScreen({
     return gatewayRef.current;
   }
 
+  function sourceGateway() {
+    sourceGatewayRef.current ??= createWebPlanSourceGateway();
+    return sourceGatewayRef.current;
+  }
+
+  function trainingGateway() {
+    trainingGatewayRef.current ??= createLocalFirstTrainingSessionGateway();
+    return trainingGatewayRef.current;
+  }
+
   useEffect(() => {
     void gateway()
       .load()
-      .then((result) => {
+      .then(async (result) => {
         if (!result.ok) {
-          if (result.reason === "session") {
+          const [sourceResult, trainingResult] = await Promise.all([
+            sourceGateway().load(),
+            trainingGateway().load(),
+          ]);
+          if (
+            (sourceResult.ok && sourceResult.value.onboardingCompleted) ||
+            (trainingResult.ok &&
+              Boolean(
+                trainingResult.value.plan || trainingResult.value.activeRun,
+              ))
+          ) {
+            navigate("/hoje/");
+            return;
+          }
+          if (
+            result.reason === "session" &&
+            !sourceResult.ok &&
+            sourceResult.reason === "session" &&
+            !trainingResult.ok &&
+            trainingResult.reason === "session"
+          ) {
             navigate("/entrar/");
             return;
           }
           setFeedback(
-            "Não foi possível carregar suas respostas. Tente novamente.",
+            navigator.onLine
+              ? "Não foi possível abrir a configuração. Tente novamente."
+              : "Você está sem internet. Conecte-se para continuar.",
           );
           return;
         }

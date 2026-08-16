@@ -1,8 +1,10 @@
-const CACHE_NAME = "daygym-runtime-v1";
+const CACHE_NAME = "daygym-runtime-v2";
+const CACHE_PREFIX = "daygym-runtime-";
 const OFFLINE_ROUTE_FALLBACKS = [
-  "/treinos/sessao/",
-  "/treinos/",
   "/hoje/",
+  "/treinos/",
+  "/treinos/sessao/",
+  "/comecar/",
   "/entrar/",
 ];
 
@@ -11,7 +13,22 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches
+        .keys()
+        .then((names) =>
+          Promise.all(
+            names
+              .filter(
+                (name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME,
+              )
+              .map((name) => caches.delete(name)),
+          ),
+        ),
+    ]),
+  );
 });
 
 function canCache(request, response) {
@@ -122,6 +139,15 @@ async function cacheRoute(pathname) {
 }
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "CACHE_APP_SHELL") {
+    const pathnames = Array.isArray(event.data.pathnames)
+      ? event.data.pathnames
+      : OFFLINE_ROUTE_FALLBACKS;
+    event.waitUntil(
+      Promise.allSettled(pathnames.map((pathname) => cacheRoute(pathname))),
+    );
+    return;
+  }
   if (event.data?.type === "CACHE_ROUTE") {
     event.waitUntil(cacheRoute(event.data.pathname).catch(() => undefined));
   }

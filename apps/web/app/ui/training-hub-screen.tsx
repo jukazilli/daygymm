@@ -82,18 +82,6 @@ function TrainingState({
     );
   }
 
-  if (!sourceState.source) {
-    return (
-      <section className="app-state-card training-card">
-        <p className="eyebrow">Treinos</p>
-        <h1>Escolha seu caminho.</h1>
-        <Link className="button-primary" href="/escolher-plano/">
-          Escolher caminho
-        </Link>
-      </section>
-    );
-  }
-
   if (trainingState.plan) {
     return (
       <div className="training-plan-layout training-hub-layout">
@@ -147,6 +135,18 @@ function TrainingState({
           </div>
         </section>
       </div>
+    );
+  }
+
+  if (!sourceState.source) {
+    return (
+      <section className="app-state-card training-card">
+        <p className="eyebrow">Treinos</p>
+        <h1>Escolha seu caminho.</h1>
+        <Link className="button-primary" href="/escolher-plano/">
+          Escolher caminho
+        </Link>
+      </section>
     );
   }
 
@@ -231,7 +231,7 @@ export function TrainingHubScreen({
           setSourceState({
             onboardingCompleted: true,
             selectedAt: null,
-            source: "manual",
+            source: null,
           });
           setTrainingState(trainingResult.value);
           return;

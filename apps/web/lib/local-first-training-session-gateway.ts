@@ -5,8 +5,8 @@ import {
 } from "@daygym/training-runtime";
 
 import { createWebTrainingSessionGateway } from "./training-session-gateway";
-import { getWebSupabaseClient } from "./supabase-browser";
 import { IndexedDbTrainingSessionLocalStore } from "./training-session-local-store";
+import { currentWebOwnerId } from "./web-offline-owner";
 
 function browserConnectivity(): TrainingConnectivity {
   return {
@@ -24,11 +24,6 @@ function browserConnectivity(): TrainingConnectivity {
   };
 }
 
-async function currentOwnerId() {
-  const { data } = await getWebSupabaseClient().auth.getSession();
-  return data.session?.user.id ?? null;
-}
-
 export class WebLocalFirstTrainingSessionGateway extends TrainingSessionLocalFirstRuntime {
   constructor(
     dependencies: Partial<LocalFirstTrainingSessionDependencies> = {},
@@ -36,7 +31,7 @@ export class WebLocalFirstTrainingSessionGateway extends TrainingSessionLocalFir
     super({
       connectivity: dependencies.connectivity ?? browserConnectivity(),
       now: dependencies.now,
-      ownerId: dependencies.ownerId ?? currentOwnerId,
+      ownerId: dependencies.ownerId ?? currentWebOwnerId,
       random: dependencies.random,
       remote: dependencies.remote ?? createWebTrainingSessionGateway(),
       store: dependencies.store ?? new IndexedDbTrainingSessionLocalStore(),

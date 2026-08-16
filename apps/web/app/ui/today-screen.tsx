@@ -59,19 +59,6 @@ function TodayHero({
     );
   }
 
-  if (!sourceState.source) {
-    return (
-      <section className="today-hero">
-        <p className="eyebrow">Seu próximo passo</p>
-        <h1>Escolha como começar.</h1>
-        <p>Importe, crie ou receba seu plano.</p>
-        <Link className="button-primary" href="/escolher-plano/">
-          Escolher caminho
-        </Link>
-      </section>
-    );
-  }
-
   if (trainingState.activeRun) {
     const completed = trainingState.activeRun.session.items.filter(
       (item) => item.completedAt,
@@ -136,6 +123,19 @@ function TodayHero({
     );
   }
 
+  if (!sourceState.source) {
+    return (
+      <section className="today-hero">
+        <p className="eyebrow">Seu próximo passo</p>
+        <h1>Escolha como começar.</h1>
+        <p>Importe, crie ou receba seu plano.</p>
+        <Link className="button-primary" href="/escolher-plano/">
+          Escolher caminho
+        </Link>
+      </section>
+    );
+  }
+
   return (
     <section className="today-hero">
       <p className="eyebrow">{sourceLabels[sourceState.source]}</p>
@@ -175,6 +175,19 @@ export function TodayScreen({
     void Promise.all([gateway().load(), trainingGateway().load()]).then(
       ([sourceResult, trainingResult]) => {
         if (!active) {
+          return;
+        }
+        if (
+          trainingResult.ok &&
+          (trainingResult.value.plan || trainingResult.value.activeRun) &&
+          !sourceResult.ok
+        ) {
+          setSourceState({
+            onboardingCompleted: true,
+            selectedAt: null,
+            source: null,
+          });
+          setTrainingState(trainingResult.value);
           return;
         }
         if (!sourceResult.ok || !trainingResult.ok) {
