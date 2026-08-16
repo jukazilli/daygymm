@@ -1,7 +1,7 @@
 # Prova da US-009B2 em aparelho físico
 
-Status: roteiro pronto; execução pendente de development build e da jornada de
-treino móvel conectada ao gateway local-first.
+Status: jornada móvel conectada e verificada no CI de staging pelo commit
+`ad56772`; execução pendente de development build e aparelho físico.
 
 ## Objetivo
 

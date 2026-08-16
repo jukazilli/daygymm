@@ -71,3 +71,22 @@ final result: US-009A verified in staging; US-009B and physical-device acceptanc
   comparação visual em iPhone permanece na prova física da US-009B2.
 
 final result: US-009B1 verified in staging; physical-device visual evidence pending
+
+## US-009B2b — jornada Expo local-first
+
+- Login e sessão recuperada abrem diretamente o hub de treinos; `Minha conta`
+  continua disponível como ação secundária.
+- A execução móvel preserva os controles essenciais: iniciar exercício,
+  registrar ou ajustar a última série, pausar, retomar, concluir e cancelar.
+- O estado de sincronização permanece compacto no cabeçalho e usa linguagem do
+  produto: `Salvo neste aparelho`, `Sincronização pendente`, `Sincronizando…` e
+  `Sincronização bloqueada`.
+- Conflito apresenta somente as duas decisões necessárias: tentar novamente ou
+  adotar a versão online, com confirmação antes de descartar mudanças locais.
+- O tempo de treino deriva dos timestamps persistidos e não depende de a tela
+  permanecer aberta. O cronômetro de descanso continua fora deste corte.
+- Android, iOS e web foram empacotados pelo CI `31957510838`; a validação visual
+  e de comportamento após dois encerramentos do processo permanece no roteiro
+  físico da US-009B2b.
+
+final result: mobile journey implemented in staging; physical-device proof pending

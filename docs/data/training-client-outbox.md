@@ -1,8 +1,8 @@
 # Persistência local e outbox do treino
 
-Status: US-009A, US-009B1 e US-009B2a verificadas em staging. US-009 permanece
-parcial até a integração da jornada Expo e a prova física da US-009B2b, ainda
-rastreada na
+Status: US-009A, US-009B1 e US-009B2a verificadas em staging. A jornada Expo da
+US-009B2b também está implementada e passou no CI de staging; US-009 permanece
+parcial somente até a prova física, ainda rastreada na
 [issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
@@ -143,11 +143,28 @@ conta os restaure.
   conflito/retry e descarte seguro de linha inválida cobertos por teste;
 - nenhuma migration remota foi adicionada e produção permaneceu inalterada.
 
+### Implementação da US-009B2b — jornada móvel
+
+- commit funcional `ad56772` promovido somente para staging;
+- CI de staging `31957510838` aprovada: quality gates, 420 verificações de banco,
+  API e worker;
+- 55 testes mobile e 193 testes no monorepo aprovados;
+- exports Android, iOS e web do Expo concluídos;
+- login e retorno de sessão seguem para o hub de treinos;
+- início, conclusão e correção/desfazer de série, pausa/retomada,
+  cancelamento/finalização, sincronização manual e resolução de conflito usam o
+  mesmo runtime local-first da web;
+- conectividade nativa é observada pelo NetInfo, persistência Android/iOS usa
+  SQLCipher e o export web do Expo usa IndexedDB;
+- o cronômetro do treino é recalculado pelos timestamps persistidos, por isso o
+  tempo continua correto ao reabrir o app e desconta pausas;
+- produção permaneceu inalterada.
+
 ## Limites do corte seguinte
 
-US-009B2b ainda deve conectar a jornada de treino do Expo ao gateway local-first
-e executar o
-[roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md), com dois
-fechamentos/reaberturas e zero duplicação em pelo menos um aparelho. A segunda
-plataforma permanece no aceite abrangente da FND-017. O estado do cronômetro de
-descanso continua pertencendo à US-010.
+US-009B2b ainda deve executar o
+[roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md) sobre um
+development build do commit `ad56772`, com dois fechamentos/reaberturas e zero
+duplicação em pelo menos um aparelho. A segunda plataforma permanece no aceite
+abrangente da FND-017. O estado do cronômetro de descanso continua pertencendo à
+US-010.
