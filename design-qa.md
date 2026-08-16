@@ -110,3 +110,16 @@ final result: mobile journey implemented in staging; physical-device proof pendi
   `Meus treinos`, ambos em até 300 ms e sem o erro antigo.
 
 final result: cold-open offline verified in staging; 30-minute physical proof pending
+
+## US-009B1 — agenda e sinalização offline
+
+- O selo permanente `Prévia` foi removido do cabeçalho do produto.
+- `Modo offline` ocupa esse ponto apenas durante a indisponibilidade da rede e
+  desaparece automaticamente na reconexão; não foi adicionado banner ou texto
+  explicativo redundante.
+- `Meus treinos` integra o app shell offline para manter a sequência
+  `Treinos → Meus treinos → escolher sessão → iniciar` sem retorno indevido à
+  Home.
+- A implementação e a validação do owner permanecem rastreadas na issue #39.
+
+final result: offline agenda correction implemented; staging and owner verification pending

@@ -180,6 +180,19 @@ conta os restaure.
   cache; com rede bloqueada e `navigator.onLine` falso, `/comecar/` recuperou
   `/hoje/` e `/treinos/` exibiu `Meus treinos` em até 300 ms.
 
+### Correção da agenda offline — issue #39
+
+- a rota `/treinos/meus/`, onde a pessoa escolhe a sessão da agenda semanal,
+  passa a integrar o app shell antecipado pelo service worker;
+- `daygym-runtime-v3` prioriza um fallback da área de treinos para requisições
+  sob `/treinos/`, evitando o redirecionamento silencioso para Home;
+- o selo permanente `Prévia` do cabeçalho foi removido. `Modo offline` aparece
+  somente enquanto o navegador informa ausência de conectividade e desaparece
+  automaticamente após a reconexão;
+- a correção está rastreada na
+  [issue #39](https://github.com/jukazilli/daygymm/issues/39), vinculada à
+  US-009 e à prova física da issue #38.
+
 ## Limites do corte seguinte
 
 US-009B2b ainda deve executar o

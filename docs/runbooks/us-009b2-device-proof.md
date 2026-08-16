@@ -22,8 +22,10 @@ série, revisão, sessão ou evento duplicado.
    conectividade.
 6. Depois de uma carga online da versão candidata, feche o aplicativo sem
    encerrar a conta. Ative o modo avião antes de reabrir e confirme que Home e
-   Treinos aparecem pelo estado local. Não abra o aplicativo online novamente
-   entre esses passos.
+   Treinos aparecem pelo estado local. Em `Treinos`, abra `Meus treinos`,
+   escolha uma sessão salva e confirme que ela pode ser iniciada. O cabeçalho
+   deve exibir `Modo offline`; após a reconexão, o aviso deve desaparecer. Não
+   abra o aplicativo online novamente entre esses passos.
 
 ## Execução de 30 minutos
 
