@@ -11,6 +11,7 @@ import {
 } from "@daygym/contracts";
 
 import { getWebSupabaseClient } from "./supabase-browser";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 import type {
   TrainingPlanArchiveRpcRow,
   TrainingPlanImportRpcRow,
@@ -259,16 +260,15 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
           sessions,
         });
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc(
-          "publish_training_plan_version_v2",
-          {
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("publish_training_plan_version_v2", {
             p_change_summary: input.changeSummary,
             p_content_sha256: contentSha256,
             p_operation_id: input.operationId,
             p_plan_id: input.planId,
             p_plan_name: input.name,
             p_sessions: sessions,
-          },
+          }),
         );
         const row = data?.[0] as TrainingPlanImportRpcRow | undefined;
         if (error || !row) {
@@ -286,9 +286,11 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
     async restore(planId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("restore_training_plan", {
-          p_plan_id: planId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("restore_training_plan", {
+            p_plan_id: planId,
+          }),
+        );
         const row = data?.[0] as TrainingPlanRestoreRpcRow | undefined;
         if (error || !row) {
           return failure(error);

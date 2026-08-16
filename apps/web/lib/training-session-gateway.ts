@@ -17,6 +17,7 @@ import {
 } from "@daygym/contracts";
 
 import { getWebSupabaseClient } from "./supabase-browser";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 import type {
   CompletedTrainingSessionRow,
   ExerciseCompletionRpcRow,
@@ -407,16 +408,18 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       try {
         const parsed = setCompletionInputSchema.parse(input);
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("complete_training_set", {
-          p_actual_distance_meters: parsed.actualDistanceMeters,
-          p_actual_duration_seconds: parsed.actualDurationSeconds,
-          p_actual_reps: parsed.actualReps,
-          p_actual_weight_kg: parsed.actualWeightKg,
-          p_operation_id: `training-set:${parsed.runId}:${parsed.itemId}:${parsed.setNumber}`,
-          p_plan_item_id: parsed.itemId,
-          p_run_id: parsed.runId,
-          p_set_number: parsed.setNumber,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("complete_training_set", {
+            p_actual_distance_meters: parsed.actualDistanceMeters,
+            p_actual_duration_seconds: parsed.actualDurationSeconds,
+            p_actual_reps: parsed.actualReps,
+            p_actual_weight_kg: parsed.actualWeightKg,
+            p_operation_id: `training-set:${parsed.runId}:${parsed.itemId}:${parsed.setNumber}`,
+            p_plan_item_id: parsed.itemId,
+            p_run_id: parsed.runId,
+            p_set_number: parsed.setNumber,
+          }),
+        );
         const row = data?.[0] as SetCompletionRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -461,9 +464,11 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     async pause(runId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("pause_training_session", {
-          p_run_id: runId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("pause_training_session", {
+            p_run_id: runId,
+          }),
+        );
         const row = data?.[0] as TrainingPauseRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -484,9 +489,11 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     async resume(runId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("resume_training_session", {
-          p_run_id: runId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("resume_training_session", {
+            p_run_id: runId,
+          }),
+        );
         const row = data?.[0] as TrainingPauseRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -517,24 +524,26 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
                 actualReps: null,
                 actualWeightKg: null,
               };
-        const { data, error } = await client.rpc("revise_training_set", {
-          p_action: parsed.action,
-          p_actual_distance_meters: actualValues.actualDistanceMeters,
-          p_actual_duration_seconds: actualValues.actualDurationSeconds,
-          p_actual_reps: actualValues.actualReps,
-          p_actual_weight_kg: actualValues.actualWeightKg,
-          p_expected_revision: parsed.expectedRevision,
-          p_operation_id: revisionOperationId(
-            parsed.action,
-            parsed.setExecutionId,
-            parsed.expectedRevision,
-            actualValues,
-          ),
-          p_plan_item_id: parsed.itemId,
-          p_run_id: parsed.runId,
-          p_set_execution_id: parsed.setExecutionId,
-          p_set_number: parsed.setNumber,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("revise_training_set", {
+            p_action: parsed.action,
+            p_actual_distance_meters: actualValues.actualDistanceMeters,
+            p_actual_duration_seconds: actualValues.actualDurationSeconds,
+            p_actual_reps: actualValues.actualReps,
+            p_actual_weight_kg: actualValues.actualWeightKg,
+            p_expected_revision: parsed.expectedRevision,
+            p_operation_id: revisionOperationId(
+              parsed.action,
+              parsed.setExecutionId,
+              parsed.expectedRevision,
+              actualValues,
+            ),
+            p_plan_item_id: parsed.itemId,
+            p_run_id: parsed.runId,
+            p_set_execution_id: parsed.setExecutionId,
+            p_set_number: parsed.setNumber,
+          }),
+        );
         const row = data?.[0] as SetRevisionRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -564,11 +573,13 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       try {
         const client = getWebSupabaseClient();
         const runId = randomUuid();
-        const { data, error } = await client.rpc("start_training_session", {
-          p_operation_id: `training-start:${runId}`,
-          p_planned_session_id: plannedSessionId,
-          p_run_id: runId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("start_training_session", {
+            p_operation_id: `training-start:${runId}`,
+            p_planned_session_id: plannedSessionId,
+            p_run_id: runId,
+          }),
+        );
         const row = data?.[0] as TrainingStartRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -589,10 +600,12 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     async startExercise(runId, itemId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("start_training_exercise", {
-          p_plan_item_id: itemId,
-          p_run_id: runId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("start_training_exercise", {
+            p_plan_item_id: itemId,
+            p_run_id: runId,
+          }),
+        );
         const row = data?.[0] as ExerciseStartRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -617,10 +630,12 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     async completeExercise(runId, itemId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("complete_training_exercise", {
-          p_plan_item_id: itemId,
-          p_run_id: runId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("complete_training_exercise", {
+            p_plan_item_id: itemId,
+            p_run_id: runId,
+          }),
+        );
         const row = data?.[0] as ExerciseCompletionRpcRow | undefined;
         if (error || !row) {
           return failure(error);
@@ -644,13 +659,17 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     async finish(runId) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("finish_training_session", {
-          p_correlation_id: randomUuid(),
-          p_event_id: randomUuid(),
-          p_operation_id: `training-finish:${runId}`,
-          p_run_id: runId,
-          p_session_id: runId,
-        });
+        const correlationId = randomUuid();
+        const eventId = randomUuid();
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("finish_training_session", {
+            p_correlation_id: correlationId,
+            p_event_id: eventId,
+            p_operation_id: `training-finish:${runId}`,
+            p_run_id: runId,
+            p_session_id: runId,
+          }),
+        );
         const row = data?.[0] as TrainingFinishRpcRow | undefined;
         if (error || !row) {
           return failure(error);

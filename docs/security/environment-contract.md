@@ -105,6 +105,15 @@ superfície pública removida, respectivamente. Persistência da sessão, logout
 consumo completo do link ainda precisam das evidências previstas para fechar
 FND-013. O ambiente mobile EAS continua separado e não recebeu essas variáveis.
 
+Em 15 de agosto de 2026, uma nova recuperação respondeu `200`, foi entregue pelo
+Resend e atualizou o envio no Auth, mas o link aberto em outro dispositivo não
+forneceu TokenHash utilizável à rota intermediária. Os templates seguros estão
+versionados no staging, porém ainda não foram aplicados ao Auth hospedado: o
+workflow manual não está na branch padrão e o environment `staging` não contém o
+`SUPABASE_ACCESS_TOKEN` necessário. Essa credencial deve permanecer no Supabase/
+GitHub, nunca no Cloudflare ou no cliente. Até a sincronização e o E2E posterior,
+confirmação e recuperação continuam abertas em COR-001.
+
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
 para declarar autenticação pronta: callbacks, sessão, não enumeração e

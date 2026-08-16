@@ -13,6 +13,7 @@ import type {
   TrainingPlanRenameRpcRow,
   TrainingPlanRow,
 } from "./supabase-database";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 
 function failureFromError(error: unknown): TrainingPlanFailure {
   if (error && typeof error === "object") {
@@ -91,16 +92,15 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
       try {
         const proposal = officialXlsxPlanProposalSchema.parse(input);
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc(
-          "import_official_xlsx_plan_v2",
-          {
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("import_official_xlsx_plan_v2", {
             p_operation_id: proposal.operationId,
             p_plan_name: proposal.planName,
             p_sessions: rpcSessions(proposal),
             p_source_file_name: proposal.sourceFileName,
             p_source_sha256: proposal.sourceSha256,
             p_source_size_bytes: proposal.sourceSizeBytes,
-          },
+          }),
         );
         const row = data?.[0];
         if (error || !row) {
@@ -152,10 +152,12 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
           return { ok: false, reason: "invalid" };
         }
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("rename_training_plan", {
-          p_name: normalizedName,
-          p_plan_id: planId,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("rename_training_plan", {
+            p_name: normalizedName,
+            p_plan_id: planId,
+          }),
+        );
         const row = data?.[0] as TrainingPlanRenameRpcRow | undefined;
         if (error || !row) {
           return failure(error);

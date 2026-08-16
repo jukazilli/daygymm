@@ -7,6 +7,7 @@ import type {
   PracticalTrainingExercise,
   PracticalTrainingSet,
   PracticalTrainingState,
+  SetCompletion,
   SetCompletionInput,
   SetRevisionInput,
   TrainingSessionGateway,
@@ -62,6 +63,69 @@ function suggestedSetWeight(
     exercise.plannedWeightKg +
       (exercise.setProgressionKg ?? 0) * (setNumber - 1),
   );
+}
+
+function applyCompletedSet(
+  state: PracticalTrainingState,
+  selectedIndex: number,
+  input: SetCompletionInput,
+  completion: SetCompletion,
+): PracticalTrainingState {
+  const activeRun = state.activeRun;
+  const exercise = activeRun?.session.items[selectedIndex];
+  if (
+    !activeRun ||
+    !exercise ||
+    activeRun.runId !== input.runId ||
+    exercise.itemId !== input.itemId
+  ) {
+    return state;
+  }
+
+  const previous = exercise.setExecutions.find(
+    (candidate) => candidate.setNumber === input.setNumber,
+  );
+  const completedSet: PracticalTrainingSet = {
+    actualDistanceMeters: input.actualDistanceMeters,
+    actualDurationSeconds: input.actualDurationSeconds,
+    actualReps: input.actualReps,
+    actualWeightKg: input.actualWeightKg,
+    completedAt: completion.completedAt,
+    plannedDistanceMeters: exercise.distanceMeters,
+    plannedDurationSeconds: exercise.durationSeconds,
+    plannedRepsMax: exercise.repsMax,
+    plannedRepsMin: exercise.repsMin,
+    plannedWeightKg: suggestedSetWeight(exercise, input.setNumber),
+    revision: previous?.revision ?? 1,
+    setExecutionId: completion.setExecutionId,
+    setNumber: input.setNumber,
+    updatedAt: completion.completedAt,
+  };
+  const setExecutions = exercise.setExecutions
+    .filter((candidate) => candidate.setNumber !== input.setNumber)
+    .concat(completedSet)
+    .sort((left, right) => left.setNumber - right.setNumber);
+  const items = activeRun.session.items.map((candidate, index) =>
+    index === selectedIndex
+      ? {
+          ...candidate,
+          completedAt: completion.exerciseCompleted
+            ? completion.completedAt
+            : candidate.completedAt,
+          setExecutions,
+        }
+      : candidate,
+  );
+  const session = { ...activeRun.session, items };
+
+  return {
+    ...state,
+    activeRun: { ...activeRun, session },
+    nextSession:
+      state.nextSession?.sessionId === session.sessionId
+        ? session
+        : state.nextSession,
+  };
 }
 
 function exerciseTarget(exercise: PracticalTrainingExercise) {
@@ -1085,11 +1149,12 @@ export function ActiveTrainingScreen({
     }
     setBusy(true);
     setError(undefined);
-    const result = await gateway().completeSet({
+    const completionInput = {
       ...input,
       itemId: currentExercise.itemId,
       runId: run.runId,
-    });
+    };
+    const result = await gateway().completeSet(completionInput);
     if (!result.ok) {
       setBusy(false);
       if (result.reason === "session") {
@@ -1099,10 +1164,16 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
-    const refreshed = await refresh();
+    const nextState = applyCompletedSet(
+      state,
+      selectedIndex,
+      completionInput,
+      result.value,
+    );
+    setState(nextState);
     setBusy(false);
-    const refreshedItems = refreshed?.activeRun?.session.items;
-    const firstPending = refreshedItems?.findIndex((item) => !item.completedAt);
+    const nextItems = nextState.activeRun?.session.items;
+    const firstPending = nextItems?.findIndex((item) => !item.completedAt);
     const shouldRest =
       result.value.wasCreated &&
       currentExercise.restSeconds > 0 &&

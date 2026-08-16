@@ -77,6 +77,24 @@ pnpm db:deploy:staging
 Ele aplica as migrations pendentes e lista o histórico remoto. Não há reset,
 seed de dados reais, Docker ou acesso a projetos fora do staging.
 
+### Diagnóstico de identidade e persistência
+
+O inspetor de incidentes faz somente leituras no banco de staging. Ele confirma
+se uma identidade possui perfil e consentimentos, resume a saúde agregada das
+identidades e lista as gravações recentes de séries e versões de plano sem
+imprimir e-mail, senha, token ou conteúdo clínico. Informe o e-mail apenas na
+sessão atual:
+
+```powershell
+$env:DAYGYM_DIAGNOSTIC_EMAIL = "pessoa-sintetica@example.com"
+pnpm incident:inspect:staging
+Remove-Item Env:DAYGYM_DIAGNOSTIC_EMAIL
+```
+
+O comando carrega `SUPABASE_DB_URL_STAGING` do processo ou do `.env` local
+ignorado. Ele serve para distinguir falha de persistência, falha de leitura após
+a gravação e identidade realmente incompleta; não corrige nem remove dados.
+
 ## Templates do Supabase Auth
 
 Os e-mails de confirmação e recuperação ficam versionados em

@@ -8,6 +8,7 @@ import {
 
 import { getWebSupabaseClient } from "./supabase-browser";
 import type { OnboardingContextRow } from "./supabase-database";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 
 function mapRow(value: unknown): PlanSourceState {
   const row = value as OnboardingContextRow;
@@ -81,9 +82,11 @@ export function createWebPlanSourceGateway(): PlanSourceGateway {
     async select(source) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("select_plan_source", {
-          p_plan_source: source,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("select_plan_source", {
+            p_plan_source: source,
+          }),
+        );
 
         if (error || !data) {
           return failure(error);

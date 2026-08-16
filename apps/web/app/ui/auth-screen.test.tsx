@@ -186,6 +186,38 @@ describe("AuthScreen", () => {
     );
   });
 
+  it("reconciles the signup cooldown with elapsed wall-clock time", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-16T00:00:00.000Z"));
+    const gateway = createGateway();
+
+    render(createElement(AuthScreen, { gateway, mode: "sign-up" }));
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "pessoa@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.click(
+      screen.getByLabelText("Confirmo que tenho 18 anos ou mais."),
+    );
+    fireEvent.click(screen.getByLabelText("Li e aceito os Termos de teste."));
+    fireEvent.click(screen.getByLabelText("Li o Aviso de privacidade."));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    });
+
+    vi.setSystemTime(new Date("2026-08-16T00:01:21.000Z"));
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(screen.getByRole("button", { name: "Reenviar link" })).toBeTruthy();
+  });
+
   it("turns an ambiguous first failure into a recoverable pending state", async () => {
     const user = userEvent.setup();
     const gateway = createGateway({

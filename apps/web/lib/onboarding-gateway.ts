@@ -8,6 +8,7 @@ import {
 
 import { getWebSupabaseClient } from "./supabase-browser";
 import type { OnboardingContextRow } from "./supabase-database";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 
 const emptyContext: OnboardingContext = {
   completedAt: null,
@@ -88,16 +89,18 @@ export function createWebOnboardingGateway(): OnboardingGateway {
     async save(input) {
       try {
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("save_onboarding_context", {
-          p_confirmed: input.confirmed,
-          p_current_step: input.currentStep,
-          p_equipment_context: input.equipmentContext,
-          p_experience: input.experience,
-          p_goal: input.goal,
-          p_limitation_status: input.limitationStatus,
-          p_session_minutes: input.sessionMinutes,
-          p_weekly_days: input.weeklyDays,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("save_onboarding_context", {
+            p_confirmed: input.confirmed,
+            p_current_step: input.currentStep,
+            p_equipment_context: input.equipmentContext,
+            p_experience: input.experience,
+            p_goal: input.goal,
+            p_limitation_status: input.limitationStatus,
+            p_session_minutes: input.sessionMinutes,
+            p_weekly_days: input.weeklyDays,
+          }),
+        );
 
         if (error || !data) {
           return failure(error);

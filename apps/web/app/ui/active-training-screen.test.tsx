@@ -282,6 +282,64 @@ describe("ActiveTrainingScreen", () => {
     expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
   });
 
+  it("keeps a confirmed set successful without a full readback", async () => {
+    const user = userEvent.setup();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            startedAt: "2026-08-14T03:31:00.000+00:00",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.123456+00:00",
+    };
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, value: state(activeRun) })
+      .mockResolvedValue({ ok: false, reason: "unexpected" });
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          completedAt: "2026-08-14T03:32:00.000+00:00",
+          completedSetCount: 1,
+          exerciseCompleted: false,
+          setExecutionId: "76000000-0000-4000-8000-000000000006",
+          setNumber: 1,
+          totalSets: 2,
+          wasCreated: true,
+        },
+      }),
+      finish: vi.fn(),
+      load,
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+    await user.click(
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Concluir descanso" }),
+    );
+
+    expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
+    expect(screen.queryByText("Não foi possível salvar agora.")).toBeNull();
+    expect(load).toHaveBeenCalledOnce();
+  });
+
   it("corrects and undoes the latest persisted set from its focused dialog", async () => {
     const user = userEvent.setup();
     const performedSet = {
