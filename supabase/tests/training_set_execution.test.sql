@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(93);
+select plan(103);
 
 select has_table('api', 'training_session_run_sets', 'active performed sets exist');
 select has_table('api', 'training_session_sets', 'canonical performed sets exist');
@@ -65,6 +65,30 @@ select has_function(
   'resume_training_session',
   array['uuid'],
   'the authenticated training resume command exists'
+);
+select has_function(
+  'api', 'start_training_session_at',
+  array['uuid', 'uuid', 'text', 'timestamp with time zone'],
+  'the replayable training start command exists'
+);
+select has_function(
+  'api', 'pause_training_session_at',
+  array['uuid', 'timestamp with time zone'],
+  'the replayable training pause command exists'
+);
+select has_function(
+  'api', 'resume_training_session_at',
+  array['uuid', 'timestamp with time zone'],
+  'the replayable training resume command exists'
+);
+select has_function(
+  'api', 'cancel_training_session_once', array['uuid', 'text'],
+  'the idempotent training cancellation command exists'
+);
+select has_function(
+  'api', 'finish_training_session_at',
+  array['uuid', 'uuid', 'text', 'uuid', 'uuid', 'timestamp with time zone'],
+  'the replayable training finish command exists'
 );
 select has_function(
   'api',
@@ -149,6 +173,40 @@ select ok(
 select ok(
   not has_function_privilege('anon', 'api.resume_training_session(uuid)', 'execute'),
   'anonymous clients cannot resume a training'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'api.start_training_session_at(uuid,uuid,text,timestamp with time zone)',
+    'execute'
+  ),
+  'anonymous clients cannot replay a training start'
+);
+select ok(
+  not has_function_privilege(
+    'anon', 'api.pause_training_session_at(uuid,timestamp with time zone)', 'execute'
+  ),
+  'anonymous clients cannot replay a training pause'
+);
+select ok(
+  not has_function_privilege(
+    'anon', 'api.resume_training_session_at(uuid,timestamp with time zone)', 'execute'
+  ),
+  'anonymous clients cannot replay a training resume'
+);
+select ok(
+  not has_function_privilege(
+    'anon', 'api.cancel_training_session_once(uuid,text)', 'execute'
+  ),
+  'anonymous clients cannot replay a training cancellation'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'api.finish_training_session_at(uuid,uuid,text,uuid,uuid,timestamp with time zone)',
+    'execute'
+  ),
+  'anonymous clients cannot replay a training finish'
 );
 select ok(
   not has_function_privilege(
@@ -316,10 +374,11 @@ select is(
 select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
 
 select is(
-  (select was_created from api.start_training_session(
+  (select was_created from api.start_training_session_at(
     'b5000000-0000-4000-8000-000000000005',
     'b8000000-0000-4000-8000-000000000008',
-    'training-start:b8000000-0000-4000-8000-000000000008'
+    'training-start:b8000000-0000-4000-8000-000000000008',
+    statement_timestamp() - interval '2 minutes'
   )),
   true,
   'starting the session creates its active snapshot'
@@ -337,8 +396,9 @@ select is(
   'the active snapshot keeps progression between sets'
 );
 select is(
-  (select was_changed from api.pause_training_session(
-    'b8000000-0000-4000-8000-000000000008'
+  (select was_changed from api.pause_training_session_at(
+    'b8000000-0000-4000-8000-000000000008',
+    statement_timestamp() - interval '1 minute'
   )),
   true,
   'pausing changes an active run exactly once'
@@ -360,8 +420,9 @@ select throws_ok(
 
 select set_config('request.jwt.claim.sub', 'b2000000-0000-4000-8000-000000000002', true);
 select throws_ok(
-  $$select * from api.pause_training_session(
-    'b8000000-0000-4000-8000-000000000008'
+  $$select * from api.pause_training_session_at(
+    'b8000000-0000-4000-8000-000000000008',
+    statement_timestamp() - interval '1 minute'
   )$$,
   '23514',
   'Active training was not found.',
@@ -370,8 +431,9 @@ select throws_ok(
 
 select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000001', true);
 select is(
-  (select was_changed from api.resume_training_session(
-    'b8000000-0000-4000-8000-000000000008'
+  (select was_changed from api.resume_training_session_at(
+    'b8000000-0000-4000-8000-000000000008',
+    statement_timestamp() - interval '50 seconds'
   )),
   true,
   'the owner can resume the paused run'
@@ -382,8 +444,9 @@ select ok(
   'resuming clears the paused instant'
 );
 select is(
-  (select was_changed from api.resume_training_session(
-    'b8000000-0000-4000-8000-000000000008'
+  (select was_changed from api.resume_training_session_at(
+    'b8000000-0000-4000-8000-000000000008',
+    statement_timestamp() - interval '50 seconds'
   )),
   false,
   'repeated resume is idempotent'
@@ -704,12 +767,13 @@ where run_id = 'b8000000-0000-4000-8000-000000000008';
 set local role authenticated;
 
 select is(
-  (select was_created from api.finish_training_session(
+  (select was_created from api.finish_training_session_at(
     'b8000000-0000-4000-8000-000000000008',
     'b8000000-0000-4000-8000-000000000008',
     'training-finish:b8000000-0000-4000-8000-000000000008',
     'b9000000-0000-4000-8000-000000000009',
-    'ba000000-0000-4000-8000-000000000010'
+    'ba000000-0000-4000-8000-000000000010',
+    statement_timestamp()
   )),
   true,
   'finishing persists the canonical session'

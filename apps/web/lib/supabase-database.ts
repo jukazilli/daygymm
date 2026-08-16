@@ -318,6 +318,13 @@ export interface WebDatabase {
         };
         Returns: TrainingCancelRpcRow[];
       };
+      cancel_training_session_once: {
+        Args: {
+          p_operation_id: string;
+          p_run_id: string;
+        };
+        Returns: TrainingCancelRpcRow[];
+      };
       import_official_xlsx_plan: {
         Args: {
           p_operation_id: string;
@@ -331,6 +338,13 @@ export interface WebDatabase {
       };
       pause_training_session: {
         Args: {
+          p_run_id: string;
+        };
+        Returns: TrainingPauseRpcRow[];
+      };
+      pause_training_session_at: {
+        Args: {
+          p_paused_at: string;
           p_run_id: string;
         };
         Returns: TrainingPauseRpcRow[];
@@ -377,6 +391,13 @@ export interface WebDatabase {
       };
       resume_training_session: {
         Args: {
+          p_run_id: string;
+        };
+        Returns: TrainingPauseRpcRow[];
+      };
+      resume_training_session_at: {
+        Args: {
+          p_resumed_at: string;
           p_run_id: string;
         };
         Returns: TrainingPauseRpcRow[];
@@ -439,6 +460,17 @@ export interface WebDatabase {
         };
         Returns: TrainingFinishRpcRow[];
       };
+      finish_training_session_at: {
+        Args: {
+          p_completed_at: string;
+          p_correlation_id: string;
+          p_event_id: string;
+          p_operation_id: string;
+          p_run_id: string;
+          p_session_id: string;
+        };
+        Returns: TrainingFinishRpcRow[];
+      };
       select_plan_source: {
         Args: {
           p_plan_source: string;
@@ -463,6 +495,15 @@ export interface WebDatabase {
           p_operation_id: string;
           p_planned_session_id: string;
           p_run_id: string;
+        };
+        Returns: TrainingStartRpcRow[];
+      };
+      start_training_session_at: {
+        Args: {
+          p_operation_id: string;
+          p_planned_session_id: string;
+          p_run_id: string;
+          p_started_at: string;
         };
         Returns: TrainingStartRpcRow[];
       };

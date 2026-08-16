@@ -8,7 +8,7 @@ import type {
   TrainingSessionGateway,
 } from "@daygym/contracts";
 
-import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
 import {
   currentTrainingWeekday,
   trainingSessionHref,
@@ -38,7 +38,7 @@ export function MyTrainingsScreen({
   const today = currentTrainingWeekday();
 
   function gateway() {
-    gatewayRef.current ??= createWebTrainingSessionGateway();
+    gatewayRef.current ??= createLocalFirstTrainingSessionGateway();
     return gatewayRef.current;
   }
 

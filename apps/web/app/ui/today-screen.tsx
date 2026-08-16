@@ -12,7 +12,7 @@ import type {
 } from "@daygym/contracts";
 
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
-import { createWebTrainingSessionGateway } from "../../lib/training-session-gateway";
+import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
 import { trainingSessionHref } from "../../lib/training-weekdays";
 import { AppIcon } from "./app-icon";
 import { AppLoadingSkeleton, AppShell } from "./app-shell";
@@ -166,7 +166,7 @@ export function TodayScreen({
   }
 
   function trainingGateway() {
-    trainingGatewayRef.current ??= createWebTrainingSessionGateway();
+    trainingGatewayRef.current ??= createLocalFirstTrainingSessionGateway();
     return trainingGatewayRef.current;
   }
 

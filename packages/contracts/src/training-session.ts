@@ -289,10 +289,39 @@ export interface TrainingSessionGateway {
   ): Promise<TrainingSessionResult<ExerciseStart>>;
 }
 
+export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway {
+  cancelOnce(
+    runId: string,
+    operationId: string,
+  ): Promise<TrainingSessionResult<CancelledTrainingSession>>;
+  finishAt(
+    runId: string,
+    completedAt: string,
+  ): Promise<TrainingSessionResult<CompletedTrainingSession>>;
+  pauseAt(
+    runId: string,
+    pausedAt: string,
+  ): Promise<TrainingSessionResult<TrainingPauseState>>;
+  resumeAt(
+    runId: string,
+    resumedAt: string,
+  ): Promise<TrainingSessionResult<TrainingPauseState>>;
+  startWithIdentity(input: {
+    readonly plannedSessionId: string;
+    readonly runId: string;
+    readonly startedAt: string;
+  }): Promise<TrainingSessionResult<ActiveTrainingRun>>;
+}
+
+export type TrainingSessionConflictResolution = "retry" | "use-server";
+
 export interface LocalFirstTrainingSessionGateway extends TrainingSessionGateway {
   getSyncState(): TrainingSessionSyncState;
   subscribeSyncState(
     listener: (state: TrainingSessionSyncState) => void,
   ): () => void;
+  resolveConflict(
+    resolution: TrainingSessionConflictResolution,
+  ): Promise<TrainingSessionResult<PracticalTrainingState>>;
   synchronize(): Promise<void>;
 }

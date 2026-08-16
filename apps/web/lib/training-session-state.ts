@@ -1,8 +1,12 @@
 import type {
+  ActiveTrainingRun,
   PracticalTrainingSet,
   PracticalTrainingState,
   SetCompletion,
   SetCompletionInput,
+  SetRevision,
+  SetRevisionInput,
+  TrainingPauseState,
 } from "@daygym/contracts";
 
 function roundedWeight(value: number) {
@@ -89,4 +93,130 @@ export function applyCompletedTrainingSet(
         ? session
         : state.nextSession,
   };
+}
+
+export function applyStartedTraining(
+  state: PracticalTrainingState,
+  run: ActiveTrainingRun,
+): PracticalTrainingState {
+  return { ...state, activeRun: run, nextSession: run.session };
+}
+
+export function applyStartedExercise(
+  state: PracticalTrainingState,
+  runId: string,
+  itemId: string,
+  startedAt: string,
+): PracticalTrainingState {
+  const activeRun = state.activeRun;
+  if (!activeRun || activeRun.runId !== runId) {
+    return state;
+  }
+  const items = activeRun.session.items.map((item) =>
+    item.itemId === itemId && !item.completedAt
+      ? { ...item, startedAt: item.startedAt ?? startedAt }
+      : item,
+  );
+  const session = { ...activeRun.session, items };
+  return {
+    ...state,
+    activeRun: { ...activeRun, session },
+    nextSession:
+      state.nextSession?.sessionId === session.sessionId
+        ? session
+        : state.nextSession,
+  };
+}
+
+export function applyTrainingPauseState(
+  state: PracticalTrainingState,
+  pause: TrainingPauseState,
+): PracticalTrainingState {
+  return state.activeRun?.runId === pause.runId
+    ? {
+        ...state,
+        activeRun: {
+          ...state.activeRun,
+          pausedAt: pause.pausedAt,
+          pausedDurationSeconds: pause.pausedDurationSeconds,
+        },
+      }
+    : state;
+}
+
+export function applyRevisedTrainingSet(
+  state: PracticalTrainingState,
+  input: SetRevisionInput,
+  revision: SetRevision,
+): PracticalTrainingState {
+  const activeRun = state.activeRun;
+  const exercise = activeRun?.session.items.find(
+    (item) => item.itemId === input.itemId,
+  );
+  if (!activeRun || activeRun.runId !== input.runId || !exercise) {
+    return state;
+  }
+
+  const setExecutions =
+    input.action === "undo"
+      ? exercise.setExecutions.filter(
+          (set) => set.setNumber !== input.setNumber,
+        )
+      : exercise.setExecutions.map((set) =>
+          set.setNumber === input.setNumber
+            ? {
+                ...set,
+                actualDistanceMeters: input.actualDistanceMeters,
+                actualDurationSeconds: input.actualDurationSeconds,
+                actualReps: input.actualReps,
+                actualWeightKg: input.actualWeightKg,
+                revision: revision.revision ?? set.revision + 1,
+                updatedAt: revision.changedAt,
+              }
+            : set,
+        );
+  const items = activeRun.session.items.map((item) =>
+    item.itemId === input.itemId
+      ? {
+          ...item,
+          completedAt: revision.exerciseCompleted
+            ? (item.completedAt ?? revision.changedAt)
+            : null,
+          setExecutions,
+        }
+      : item,
+  );
+  const session = { ...activeRun.session, items };
+  return {
+    ...state,
+    activeRun: { ...activeRun, session },
+    nextSession:
+      state.nextSession?.sessionId === session.sessionId
+        ? session
+        : state.nextSession,
+  };
+}
+
+export function applyCancelledTraining(
+  state: PracticalTrainingState,
+  runId: string,
+): PracticalTrainingState {
+  if (state.activeRun?.runId !== runId) {
+    return state;
+  }
+  const planned =
+    state.sessions.find(
+      (session) => session.sessionId === state.activeRun?.session.sessionId,
+    ) ?? state.nextSession;
+  return { ...state, activeRun: null, nextSession: planned };
+}
+
+export function applyFinishedTraining(
+  state: PracticalTrainingState,
+  runId: string,
+  completedAt: string,
+): PracticalTrainingState {
+  return state.activeRun?.runId === runId
+    ? { ...state, activeRun: null, lastCompletedAt: completedAt }
+    : state;
 }

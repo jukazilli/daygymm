@@ -392,6 +392,7 @@ describe("ActiveTrainingScreen", () => {
       }),
       load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
       pause: vi.fn(),
+      resolveConflict: vi.fn(),
       reviseSet: vi.fn(),
       resume: vi.fn(),
       start: vi.fn(),
@@ -418,6 +419,61 @@ describe("ActiveTrainingScreen", () => {
       }),
     );
     expect(synchronize).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a blocked sync visible until the user chooses a recovery", async () => {
+    const user = userEvent.setup();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: plannedSession,
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const canonical = state(activeRun);
+    const resolveConflict = vi.fn().mockResolvedValue({
+      ok: true,
+      value: canonical,
+    });
+    const gateway: LocalFirstTrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      getSyncState: () => ({
+        lastSyncedAt: null,
+        pendingCount: 1,
+        status: "conflict",
+      }),
+      load: vi.fn().mockResolvedValue({ ok: true, value: canonical }),
+      pause: vi.fn(),
+      resolveConflict,
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+      subscribeSyncState(listener) {
+        listener(this.getSyncState());
+        return () => undefined;
+      },
+      synchronize: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Resolver sincronização bloqueada",
+      }),
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "Não foi possível sincronizar.",
+      }),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Usar versão online" }),
+    );
+    expect(resolveConflict).toHaveBeenCalledWith("use-server");
   });
 
   it("corrects and undoes the latest persisted set from its focused dialog", async () => {

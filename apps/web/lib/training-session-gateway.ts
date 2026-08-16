@@ -11,6 +11,7 @@ import {
   type PracticalTrainingExercise,
   type PracticalTrainingSet,
   type PracticalTrainingPlanSession,
+  type ReplayableTrainingSessionGateway,
   type TrainingSessionFailure,
   type TrainingSessionGateway,
   type TrainingSessionResult,
@@ -229,7 +230,7 @@ function selectedSession(
   return sessions.find((session) => session.weekday === weekday) ?? null;
 }
 
-export function createWebTrainingSessionGateway(): TrainingSessionGateway {
+export function createWebTrainingSessionGateway(): ReplayableTrainingSessionGateway {
   const load: TrainingSessionGateway["load"] = async (preferredSessionId) => {
     try {
       const client = getWebSupabaseClient();
@@ -402,7 +403,159 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
     }
   };
 
+  const startWithIdentity: ReplayableTrainingSessionGateway["startWithIdentity"] =
+    async ({ plannedSessionId, runId, startedAt }) => {
+      try {
+        const client = getWebSupabaseClient();
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("start_training_session_at", {
+            p_operation_id: `training-start:${runId}`,
+            p_planned_session_id: plannedSessionId,
+            p_run_id: runId,
+            p_started_at: startedAt,
+          }),
+        );
+        const row = data?.[0] as TrainingStartRpcRow | undefined;
+        if (error || !row || row.run_id !== runId) {
+          return error ? failure(error) : { ok: false, reason: "conflict" };
+        }
+        const state = await load();
+        if (!state.ok) {
+          return state;
+        }
+        if (!state.value.activeRun || state.value.activeRun.runId !== runId) {
+          return { ok: false, reason: "conflict" };
+        }
+        return { ok: true, value: state.value.activeRun };
+      } catch {
+        return { ok: false, reason: "configuration" };
+      }
+    };
+
+  const pauseAt: ReplayableTrainingSessionGateway["pauseAt"] = async (
+    runId,
+    pausedAt,
+  ) => {
+    try {
+      const client = getWebSupabaseClient();
+      const { data, error } = await retryIdempotentSupabaseRequest(() =>
+        client.rpc("pause_training_session_at", {
+          p_paused_at: pausedAt,
+          p_run_id: runId,
+        }),
+      );
+      const row = data?.[0] as TrainingPauseRpcRow | undefined;
+      if (error || !row) {
+        return failure(error);
+      }
+      return {
+        ok: true,
+        value: {
+          pausedAt: row.paused_at,
+          pausedDurationSeconds: row.paused_duration_seconds,
+          runId: row.run_id,
+          wasChanged: row.was_changed,
+        },
+      };
+    } catch {
+      return { ok: false, reason: "configuration" };
+    }
+  };
+
+  const resumeAt: ReplayableTrainingSessionGateway["resumeAt"] = async (
+    runId,
+    resumedAt,
+  ) => {
+    try {
+      const client = getWebSupabaseClient();
+      const { data, error } = await retryIdempotentSupabaseRequest(() =>
+        client.rpc("resume_training_session_at", {
+          p_resumed_at: resumedAt,
+          p_run_id: runId,
+        }),
+      );
+      const row = data?.[0] as TrainingPauseRpcRow | undefined;
+      if (error || !row) {
+        return failure(error);
+      }
+      return {
+        ok: true,
+        value: {
+          pausedAt: row.paused_at,
+          pausedDurationSeconds: row.paused_duration_seconds,
+          runId: row.run_id,
+          wasChanged: row.was_changed,
+        },
+      };
+    } catch {
+      return { ok: false, reason: "configuration" };
+    }
+  };
+
+  const cancelOnce: ReplayableTrainingSessionGateway["cancelOnce"] = async (
+    runId,
+    operationId,
+  ) => {
+    try {
+      const client = getWebSupabaseClient();
+      const { data, error } = await retryIdempotentSupabaseRequest(() =>
+        client.rpc("cancel_training_session_once", {
+          p_operation_id: operationId,
+          p_run_id: runId,
+        }),
+      );
+      const row = data?.[0] as TrainingCancelRpcRow | undefined;
+      if (error || !row) {
+        return failure(error);
+      }
+      return {
+        ok: true,
+        value: { runId: row.run_id, wasCancelled: row.was_cancelled },
+      };
+    } catch {
+      return { ok: false, reason: "configuration" };
+    }
+  };
+
+  const finishAt: ReplayableTrainingSessionGateway["finishAt"] = async (
+    runId,
+    completedAt,
+  ) => {
+    try {
+      const client = getWebSupabaseClient();
+      const { data, error } = await retryIdempotentSupabaseRequest(() =>
+        client.rpc("finish_training_session_at", {
+          p_completed_at: completedAt,
+          p_correlation_id: randomUuid(),
+          p_event_id: randomUuid(),
+          p_operation_id: `training-finish:${runId}`,
+          p_run_id: runId,
+          p_session_id: runId,
+        }),
+      );
+      const row = data?.[0] as TrainingFinishRpcRow | undefined;
+      if (error || !row) {
+        return failure(error);
+      }
+      return {
+        ok: true,
+        value: completedTrainingSessionSchema.parse({
+          completedAt: row.completed_at,
+          durationSeconds: row.duration_seconds,
+          sessionId: row.session_id,
+          wasCreated: row.was_created,
+        }),
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === "ZodError") {
+        return failure(error);
+      }
+      return { ok: false, reason: "configuration" };
+    }
+  };
+
   return {
+    cancelOnce,
     load,
     async completeSet(input) {
       try {
@@ -443,74 +596,11 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         return { ok: false, reason: "configuration" };
       }
     },
-    async cancel(runId) {
-      try {
-        const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("cancel_training_session", {
-          p_run_id: runId,
-        });
-        const row = data?.[0] as TrainingCancelRpcRow | undefined;
-        if (error || !row) {
-          return failure(error);
-        }
-        return {
-          ok: true,
-          value: { runId: row.run_id, wasCancelled: row.was_cancelled },
-        };
-      } catch {
-        return { ok: false, reason: "configuration" };
-      }
-    },
-    async pause(runId) {
-      try {
-        const client = getWebSupabaseClient();
-        const { data, error } = await retryIdempotentSupabaseRequest(() =>
-          client.rpc("pause_training_session", {
-            p_run_id: runId,
-          }),
-        );
-        const row = data?.[0] as TrainingPauseRpcRow | undefined;
-        if (error || !row) {
-          return failure(error);
-        }
-        return {
-          ok: true,
-          value: {
-            pausedAt: row.paused_at,
-            pausedDurationSeconds: row.paused_duration_seconds,
-            runId: row.run_id,
-            wasChanged: row.was_changed,
-          },
-        };
-      } catch {
-        return { ok: false, reason: "configuration" };
-      }
-    },
-    async resume(runId) {
-      try {
-        const client = getWebSupabaseClient();
-        const { data, error } = await retryIdempotentSupabaseRequest(() =>
-          client.rpc("resume_training_session", {
-            p_run_id: runId,
-          }),
-        );
-        const row = data?.[0] as TrainingPauseRpcRow | undefined;
-        if (error || !row) {
-          return failure(error);
-        }
-        return {
-          ok: true,
-          value: {
-            pausedAt: row.paused_at,
-            pausedDurationSeconds: row.paused_duration_seconds,
-            runId: row.run_id,
-            wasChanged: row.was_changed,
-          },
-        };
-      } catch {
-        return { ok: false, reason: "configuration" };
-      }
-    },
+    cancel: (runId) => cancelOnce(runId, `training-cancel:${runId}`),
+    pause: (runId) => pauseAt(runId, new Date().toISOString()),
+    pauseAt,
+    resume: (runId) => resumeAt(runId, new Date().toISOString()),
+    resumeAt,
     async reviseSet(input) {
       try {
         const parsed = setRevisionInputSchema.parse(input);
@@ -569,33 +659,13 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
         return { ok: false, reason: "configuration" };
       }
     },
-    async start(plannedSessionId) {
-      try {
-        const client = getWebSupabaseClient();
-        const runId = randomUuid();
-        const { data, error } = await retryIdempotentSupabaseRequest(() =>
-          client.rpc("start_training_session", {
-            p_operation_id: `training-start:${runId}`,
-            p_planned_session_id: plannedSessionId,
-            p_run_id: runId,
-          }),
-        );
-        const row = data?.[0] as TrainingStartRpcRow | undefined;
-        if (error || !row) {
-          return failure(error);
-        }
-        const state = await load();
-        if (!state.ok) {
-          return state;
-        }
-        if (!state.value.activeRun) {
-          return { ok: false, reason: "unexpected" };
-        }
-        return { ok: true, value: state.value.activeRun };
-      } catch {
-        return { ok: false, reason: "configuration" };
-      }
-    },
+    start: (plannedSessionId) =>
+      startWithIdentity({
+        plannedSessionId,
+        runId: randomUuid(),
+        startedAt: new Date().toISOString(),
+      }),
+    startWithIdentity,
 
     async startExercise(runId, itemId) {
       try {
@@ -656,39 +726,7 @@ export function createWebTrainingSessionGateway(): TrainingSessionGateway {
       }
     },
 
-    async finish(runId) {
-      try {
-        const client = getWebSupabaseClient();
-        const correlationId = randomUuid();
-        const eventId = randomUuid();
-        const { data, error } = await retryIdempotentSupabaseRequest(() =>
-          client.rpc("finish_training_session", {
-            p_correlation_id: correlationId,
-            p_event_id: eventId,
-            p_operation_id: `training-finish:${runId}`,
-            p_run_id: runId,
-            p_session_id: runId,
-          }),
-        );
-        const row = data?.[0] as TrainingFinishRpcRow | undefined;
-        if (error || !row) {
-          return failure(error);
-        }
-        return {
-          ok: true,
-          value: completedTrainingSessionSchema.parse({
-            completedAt: row.completed_at,
-            durationSeconds: row.duration_seconds,
-            sessionId: row.session_id,
-            wasCreated: row.was_created,
-          }),
-        };
-      } catch (error) {
-        if (error instanceof Error && error.name === "ZodError") {
-          return failure(error);
-        }
-        return { ok: false, reason: "configuration" };
-      }
-    },
+    finish: (runId) => finishAt(runId, new Date().toISOString()),
+    finishAt,
   };
 }

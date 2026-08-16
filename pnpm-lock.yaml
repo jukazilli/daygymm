@@ -166,6 +166,9 @@ importers:
       read-excel-file:
         specifier: 9.3.10
         version: 9.3.10
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       "@testing-library/react":
         specifier: 16.3.2

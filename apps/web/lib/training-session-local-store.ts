@@ -1,34 +1,95 @@
+import { z } from "zod";
+
 import {
   practicalTrainingStateSchema,
   setCompletionInputSchema,
+  setRevisionInputSchema,
   type PracticalTrainingState,
-  type SetCompletionInput,
 } from "@daygym/contracts";
 
-export interface QueuedTrainingSetCompletion {
-  readonly attempts: number;
-  readonly createdAt: string;
-  readonly input: SetCompletionInput;
-  readonly kind: "complete-set";
-  readonly operationId: string;
-  readonly retryAt: string;
-  readonly sequence: number;
-  readonly status: "conflict" | "pending";
-}
+const operationBaseSchema = z.object({
+  attempts: z.number().int().nonnegative(),
+  createdAt: z.string().datetime({ offset: true }),
+  operationId: z.string().min(16).max(128),
+  retryAt: z.string().datetime({ offset: true }),
+  sequence: z.number().int().nonnegative(),
+  status: z.enum(["conflict", "pending"]),
+});
+
+const timedRunInputSchema = z
+  .object({
+    occurredAt: z.string().datetime({ offset: true }),
+    runId: z.string().uuid(),
+  })
+  .strict();
+
+export const queuedTrainingOperationSchema = z.discriminatedUnion("kind", [
+  operationBaseSchema.extend({
+    input: z
+      .object({
+        plannedSessionId: z.string().uuid(),
+        runId: z.string().uuid(),
+        startedAt: z.string().datetime({ offset: true }),
+      })
+      .strict(),
+    kind: z.literal("start-session"),
+  }),
+  operationBaseSchema.extend({
+    input: z
+      .object({
+        itemId: z.string().uuid(),
+        runId: z.string().uuid(),
+        startedAt: z.string().datetime({ offset: true }),
+      })
+      .strict(),
+    kind: z.literal("start-exercise"),
+  }),
+  operationBaseSchema.extend({
+    input: setCompletionInputSchema,
+    kind: z.literal("complete-set"),
+  }),
+  operationBaseSchema.extend({
+    changedAt: z.string().datetime({ offset: true }),
+    input: setRevisionInputSchema,
+    kind: z.literal("revise-set"),
+  }),
+  operationBaseSchema.extend({
+    input: timedRunInputSchema,
+    kind: z.literal("pause-session"),
+  }),
+  operationBaseSchema.extend({
+    input: timedRunInputSchema,
+    kind: z.literal("resume-session"),
+  }),
+  operationBaseSchema.extend({
+    input: timedRunInputSchema,
+    kind: z.literal("cancel-session"),
+  }),
+  operationBaseSchema.extend({
+    input: timedRunInputSchema,
+    kind: z.literal("finish-session"),
+  }),
+]);
+
+export type QueuedTrainingOperation = z.infer<
+  typeof queuedTrainingOperationSchema
+>;
 
 export interface TrainingSessionLocalStore {
-  confirmCompletion(
+  confirmOperation(
     ownerId: string,
     operationId: string,
     state: PracticalTrainingState,
+    replacements?: readonly QueuedTrainingOperation[],
   ): Promise<void>;
-  enqueueCompletion(
+  enqueueOperation(
     ownerId: string,
-    operation: QueuedTrainingSetCompletion,
+    operation: QueuedTrainingOperation,
     state: PracticalTrainingState,
   ): Promise<void>;
-  listCompletions(ownerId: string): Promise<QueuedTrainingSetCompletion[]>;
+  listOperations(ownerId: string): Promise<QueuedTrainingOperation[]>;
   markConflict(ownerId: string, operationId: string): Promise<void>;
+  markPending(ownerId: string, operationId: string): Promise<void>;
   markRetry(
     ownerId: string,
     operationId: string,
@@ -36,6 +97,10 @@ export interface TrainingSessionLocalStore {
     retryAt: string,
   ): Promise<void>;
   readSnapshot(ownerId: string): Promise<PracticalTrainingState | null>;
+  replaceWithCanonical(
+    ownerId: string,
+    state: PracticalTrainingState,
+  ): Promise<void>;
   saveSnapshot(ownerId: string, state: PracticalTrainingState): Promise<void>;
 }
 
@@ -45,10 +110,10 @@ interface SnapshotRecord {
   readonly updatedAt: string;
 }
 
-interface OperationRecord extends QueuedTrainingSetCompletion {
+type OperationRecord = QueuedTrainingOperation & {
   readonly id: string;
   readonly ownerId: string;
-}
+};
 
 const DATABASE_NAME = "daygym-training-local";
 const DATABASE_VERSION = 1;
@@ -88,6 +153,17 @@ function snapshotRecord(ownerId: string, state: PracticalTrainingState) {
   } satisfies SnapshotRecord;
 }
 
+function operationRecord(
+  ownerId: string,
+  operation: QueuedTrainingOperation,
+): OperationRecord {
+  return {
+    ...queuedTrainingOperationSchema.parse(operation),
+    id: operationRecordId(ownerId, operation.operationId),
+    ownerId,
+  };
+}
+
 export class IndexedDbTrainingSessionLocalStore implements TrainingSessionLocalStore {
   private databasePromise: Promise<IDBDatabase> | undefined;
 
@@ -117,7 +193,7 @@ export class IndexedDbTrainingSessionLocalStore implements TrainingSessionLocalS
     await transactionDone(transaction);
   }
 
-  async listCompletions(ownerId: string) {
+  async listOperations(ownerId: string) {
     const database = await this.open();
     const transaction = database.transaction(OPERATION_STORE, "readonly");
     const index = transaction.objectStore(OPERATION_STORE).index("ownerId");
@@ -128,53 +204,18 @@ export class IndexedDbTrainingSessionLocalStore implements TrainingSessionLocalS
 
     return records
       .map((record) => {
-        const input = setCompletionInputSchema.safeParse(record.input);
-        if (!input.success || record.kind !== "complete-set") {
-          return null;
-        }
-        return {
-          attempts: record.attempts,
-          createdAt: record.createdAt,
-          input: input.data,
-          kind: record.kind,
-          operationId: record.operationId,
-          retryAt: record.retryAt,
-          sequence:
-            typeof record.sequence === "number"
-              ? record.sequence
-              : new Date(record.createdAt).getTime(),
-          status: record.status,
-        } satisfies QueuedTrainingSetCompletion;
+        const parsed = queuedTrainingOperationSchema.safeParse(record);
+        return parsed.success ? parsed.data : null;
       })
       .filter(
-        (operation): operation is QueuedTrainingSetCompletion =>
-          operation !== null,
+        (operation): operation is QueuedTrainingOperation => operation !== null,
       )
       .sort((left, right) => left.sequence - right.sequence);
   }
 
-  async enqueueCompletion(
+  async enqueueOperation(
     ownerId: string,
-    operation: QueuedTrainingSetCompletion,
-    state: PracticalTrainingState,
-  ) {
-    const database = await this.open();
-    const transaction = database.transaction(
-      [SNAPSHOT_STORE, OPERATION_STORE],
-      "readwrite",
-    );
-    transaction.objectStore(SNAPSHOT_STORE).put(snapshotRecord(ownerId, state));
-    transaction.objectStore(OPERATION_STORE).put({
-      ...operation,
-      id: operationRecordId(ownerId, operation.operationId),
-      ownerId,
-    } satisfies OperationRecord);
-    await transactionDone(transaction);
-  }
-
-  async confirmCompletion(
-    ownerId: string,
-    operationId: string,
+    operation: QueuedTrainingOperation,
     state: PracticalTrainingState,
   ) {
     const database = await this.open();
@@ -185,7 +226,44 @@ export class IndexedDbTrainingSessionLocalStore implements TrainingSessionLocalS
     transaction.objectStore(SNAPSHOT_STORE).put(snapshotRecord(ownerId, state));
     transaction
       .objectStore(OPERATION_STORE)
-      .delete(operationRecordId(ownerId, operationId));
+      .put(operationRecord(ownerId, operation));
+    await transactionDone(transaction);
+  }
+
+  async confirmOperation(
+    ownerId: string,
+    operationId: string,
+    state: PracticalTrainingState,
+    replacements: readonly QueuedTrainingOperation[] = [],
+  ) {
+    const database = await this.open();
+    const transaction = database.transaction(
+      [SNAPSHOT_STORE, OPERATION_STORE],
+      "readwrite",
+    );
+    transaction.objectStore(SNAPSHOT_STORE).put(snapshotRecord(ownerId, state));
+    const operations = transaction.objectStore(OPERATION_STORE);
+    operations.delete(operationRecordId(ownerId, operationId));
+    for (const replacement of replacements) {
+      operations.put(operationRecord(ownerId, replacement));
+    }
+    await transactionDone(transaction);
+  }
+
+  async replaceWithCanonical(ownerId: string, state: PracticalTrainingState) {
+    const database = await this.open();
+    const transaction = database.transaction(
+      [SNAPSHOT_STORE, OPERATION_STORE],
+      "readwrite",
+    );
+    transaction.objectStore(SNAPSHOT_STORE).put(snapshotRecord(ownerId, state));
+    const operations = transaction.objectStore(OPERATION_STORE);
+    const keys = await requestResult(
+      operations.index("ownerId").getAllKeys(IDBKeyRange.only(ownerId)),
+    );
+    for (const key of keys) {
+      operations.delete(key);
+    }
     await transactionDone(transaction);
   }
 
@@ -193,6 +271,14 @@ export class IndexedDbTrainingSessionLocalStore implements TrainingSessionLocalS
     await this.updateOperation(ownerId, operationId, (record) => ({
       ...record,
       status: "conflict",
+    }));
+  }
+
+  async markPending(ownerId: string, operationId: string) {
+    await this.updateOperation(ownerId, operationId, (record) => ({
+      ...record,
+      retryAt: new Date(0).toISOString(),
+      status: "pending",
     }));
   }
 

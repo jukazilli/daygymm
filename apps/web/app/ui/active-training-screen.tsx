@@ -769,8 +769,89 @@ function isLocalFirstGateway(
 ): candidate is LocalFirstTrainingSessionGateway {
   return (
     "getSyncState" in candidate &&
+    "resolveConflict" in candidate &&
     "subscribeSyncState" in candidate &&
     "synchronize" in candidate
+  );
+}
+
+function SyncConflictDialog({
+  onClose,
+  onRetry,
+  onUseServer,
+  pendingAction,
+}: Readonly<{
+  onClose: () => void;
+  onRetry: () => void;
+  onUseServer: () => void;
+  pendingAction?: "retry" | "use-server";
+}>) {
+  const retryRef = useRef<HTMLButtonElement>(null);
+  const busy = pendingAction !== undefined;
+
+  useEffect(() => {
+    retryRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  return (
+    <div
+      className="session-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="sync-conflict-title"
+        aria-modal="true"
+        className="session-dialog"
+        role="dialog"
+      >
+        <h2 id="sync-conflict-title">Não foi possível sincronizar.</h2>
+        <p>
+          Seu treino continua salvo neste aparelho. Usar a versão online
+          descarta as alterações pendentes.
+        </p>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            disabled={busy}
+            onClick={onRetry}
+            ref={retryRef}
+            type="button"
+          >
+            {pendingAction === "retry" ? "Tentando…" : "Tentar novamente"}
+          </button>
+          <button
+            className="button-danger"
+            disabled={busy}
+            onClick={onUseServer}
+            type="button"
+          >
+            {pendingAction === "use-server"
+              ? "Carregando…"
+              : "Usar versão online"}
+          </button>
+          <button
+            className="button-text"
+            disabled={busy}
+            onClick={onClose}
+            type="button"
+          >
+            Voltar ao treino
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -991,6 +1072,10 @@ export function ActiveTrainingScreen({
     pendingCount: 0,
     status: "synced",
   });
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflictAction, setConflictAction] = useState<
+    "retry" | "use-server"
+  >();
   const syncRefreshAtRef = useRef<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -1232,6 +1317,27 @@ export function ActiveTrainingScreen({
     if (isLocalFirstGateway(currentGateway)) {
       await currentGateway.synchronize();
     }
+  }
+
+  async function resolveSyncConflict(resolution: "retry" | "use-server") {
+    const currentGateway = gateway();
+    if (!isLocalFirstGateway(currentGateway)) {
+      return;
+    }
+    setConflictAction(resolution);
+    setError(undefined);
+    const result = await currentGateway.resolveConflict(resolution);
+    setConflictAction(undefined);
+    if (!result.ok) {
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return;
+      }
+      setError(sessionError(result.reason));
+      return;
+    }
+    setState(result.value);
+    setConflictDialogOpen(false);
   }
 
   async function reviseCurrentSet(request: SetRevisionRequest) {
@@ -1533,7 +1639,17 @@ export function ActiveTrainingScreen({
           pausedDurationSeconds={run.pausedDurationSeconds}
           startedAt={run.startedAt}
         />
-        {syncState.pendingCount > 0 && syncState.status !== "conflict" ? (
+        {syncState.status === "conflict" ? (
+          <button
+            aria-label="Resolver sincronização bloqueada"
+            className="session-saved"
+            data-sync-status={syncState.status}
+            onClick={() => setConflictDialogOpen(true)}
+            type="button"
+          >
+            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
+          </button>
+        ) : syncState.pendingCount > 0 ? (
           <button
             aria-label={`Sincronizar ${syncState.pendingCount} ${
               syncState.pendingCount === 1
@@ -1661,6 +1777,14 @@ export function ActiveTrainingScreen({
           onConfirm={() => void pauseTraining()}
           onRestart={() => void restartTraining()}
           pendingAction={dialogAction}
+        />
+      ) : null}
+      {conflictDialogOpen ? (
+        <SyncConflictDialog
+          onClose={() => setConflictDialogOpen(false)}
+          onRetry={() => void resolveSyncConflict("retry")}
+          onUseServer={() => void resolveSyncConflict("use-server")}
+          pendingAction={conflictAction}
         />
       ) : null}
       {restState ? (
