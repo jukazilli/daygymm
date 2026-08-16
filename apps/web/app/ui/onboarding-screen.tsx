@@ -249,50 +249,56 @@ export function OnboardingScreen({
   }
 
   useEffect(() => {
-    void gateway()
-      .load()
-      .then(async (result) => {
-        if (!result.ok) {
-          const [sourceResult, trainingResult] = await Promise.all([
-            sourceGateway().load(),
-            trainingGateway().load(),
-          ]);
-          if (
-            (sourceResult.ok && sourceResult.value.onboardingCompleted) ||
-            (trainingResult.ok &&
-              Boolean(
-                trainingResult.value.plan || trainingResult.value.activeRun,
-              ))
-          ) {
-            navigate("/hoje/");
-            return;
-          }
-          if (
-            result.reason === "session" &&
-            !sourceResult.ok &&
-            sourceResult.reason === "session" &&
-            !trainingResult.ok &&
-            trainingResult.reason === "session"
-          ) {
-            navigate("/entrar/");
-            return;
-          }
-          setFeedback(
-            navigator.onLine
-              ? "Não foi possível abrir a configuração. Tente novamente."
-              : "Você está sem internet. Conecte-se para continuar.",
-          );
-          return;
-        }
+    const localFallback = () =>
+      Promise.all([sourceGateway().load(), trainingGateway().load()]);
+    const opensSavedTraining = ([sourceResult, trainingResult]: Awaited<
+      ReturnType<typeof localFallback>
+    >) =>
+      (sourceResult.ok && sourceResult.value.onboardingCompleted) ||
+      (trainingResult.ok &&
+        Boolean(trainingResult.value.plan || trainingResult.value.activeRun));
 
-        if (result.value.completedAt) {
+    void (async () => {
+      if (!navigator.onLine) {
+        const localResults = await localFallback();
+        if (opensSavedTraining(localResults)) {
           navigate("/hoje/");
           return;
         }
+        setFeedback("Você está sem internet. Conecte-se para continuar.");
+        return;
+      }
 
-        setContext(result.value);
-        setActiveStep(result.value.currentStep);
-      });
+      const result = await gateway().load();
+      if (!result.ok) {
+        const localResults = await localFallback();
+        const [sourceResult, trainingResult] = localResults;
+        if (opensSavedTraining(localResults)) {
+          navigate("/hoje/");
+          return;
+        }
+        if (
+          result.reason === "session" &&
+          !sourceResult.ok &&
+          sourceResult.reason === "session" &&
+          !trainingResult.ok &&
+          trainingResult.reason === "session"
+        ) {
+          navigate("/entrar/");
+          return;
+        }
+        setFeedback("Não foi possível abrir a configuração. Tente novamente.");
+        return;
+      }
+
+      if (result.value.completedAt) {
+        navigate("/hoje/");
+        return;
+      }
+
+      setContext(result.value);
+      setActiveStep(result.value.currentStep);
+    })();
   }, [navigate]);
 
   useEffect(() => {

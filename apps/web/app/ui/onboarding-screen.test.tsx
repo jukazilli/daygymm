@@ -54,9 +54,14 @@ afterEach(() => {
 describe("OnboardingScreen offline bootstrap", () => {
   it("leaves a stale onboarding route when the local checkpoint is complete", async () => {
     const navigate = vi.fn();
+    const onboarding = unavailableOnboarding();
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value: false,
+    });
     render(
       createElement(OnboardingScreen, {
-        gateway: unavailableOnboarding(),
+        gateway: onboarding,
         navigate,
         sourceGateway: sourceGateway({
           ok: true,
@@ -74,6 +79,7 @@ describe("OnboardingScreen offline bootstrap", () => {
     );
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/hoje/"));
+    expect(onboarding.load).not.toHaveBeenCalled();
     expect(
       screen.queryByText(/Não foi possível abrir a configuração/),
     ).toBeNull();
@@ -114,13 +120,14 @@ describe("OnboardingScreen offline bootstrap", () => {
   });
 
   it("states that connectivity is required only for unfinished setup", async () => {
+    const onboarding = unavailableOnboarding();
     Object.defineProperty(navigator, "onLine", {
       configurable: true,
       value: false,
     });
     render(
       createElement(OnboardingScreen, {
-        gateway: unavailableOnboarding(),
+        gateway: onboarding,
         sourceGateway: sourceGateway({
           ok: false,
           reason: "unexpected",
@@ -137,5 +144,6 @@ describe("OnboardingScreen offline bootstrap", () => {
         "Você está sem internet. Conecte-se para continuar.",
       ),
     ).toBeTruthy();
+    expect(onboarding.load).not.toHaveBeenCalled();
   });
 });
