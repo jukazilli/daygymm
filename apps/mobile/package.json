@@ -4,8 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "build": "expo export --platform all --output-dir dist",
-    "dev": "expo start --dev-client",
+    "build": "pnpm --filter @daygym/contracts build && expo export --platform all --output-dir dist",
+    "dev": "pnpm --filter @daygym/contracts build && expo start --dev-client",
     "lint": "eslint app lib config app.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit"

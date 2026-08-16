@@ -5,10 +5,20 @@ export interface SqlExecutor {
   exec(source: string): Promise<void>;
 }
 
-export interface EncryptedDatabase extends SqlExecutor {
+export type SqlParameter = string | number | null;
+
+export interface SqlSession extends SqlExecutor {
+  getAll<T>(source: string, parameters?: readonly SqlParameter[]): Promise<T[]>;
+  getFirst<T>(
+    source: string,
+    parameters?: readonly SqlParameter[],
+  ): Promise<T | null>;
+  run(source: string, parameters?: readonly SqlParameter[]): Promise<void>;
+}
+
+export interface EncryptedDatabase extends SqlSession {
   close(): Promise<void>;
-  getFirst<T>(source: string): Promise<T | null>;
-  transaction(task: (transaction: SqlExecutor) => Promise<void>): Promise<void>;
+  transaction(task: (transaction: SqlSession) => Promise<void>): Promise<void>;
 }
 
 export interface EncryptedDatabaseDriver {

@@ -5,6 +5,8 @@ import {
   LocalDatabaseBootstrap,
   LocalDatabaseWriteBlockedError,
   type EncryptedDatabase,
+  type SqlParameter,
+  type SqlSession,
 } from "./local-database-bootstrap";
 
 class FakeDatabase implements EncryptedDatabase {
@@ -29,7 +31,19 @@ class FakeDatabase implements EncryptedDatabase {
     }
   }
 
-  async getFirst<T>(source: string): Promise<T | null> {
+  async getAll<T>(
+    _source: string,
+    _parameters: readonly SqlParameter[] = [],
+  ): Promise<T[]> {
+    void _parameters;
+    return [];
+  }
+
+  async getFirst<T>(
+    source: string,
+    _parameters: readonly SqlParameter[] = [],
+  ): Promise<T | null> {
+    void _parameters;
     if (source === "PRAGMA cipher_version") {
       return { cipher_version: this.cipherVersion } as T;
     }
@@ -39,7 +53,15 @@ class FakeDatabase implements EncryptedDatabase {
     return { count: 0 } as T;
   }
 
-  async transaction(task: (transaction: FakeDatabase) => Promise<void>) {
+  async run(
+    source: string,
+    _parameters: readonly SqlParameter[] = [],
+  ): Promise<void> {
+    void _parameters;
+    await this.exec(source);
+  }
+
+  async transaction(task: (transaction: SqlSession) => Promise<void>) {
     const executedBefore = [...this.executed];
     const versionBefore = this.userVersion;
     try {

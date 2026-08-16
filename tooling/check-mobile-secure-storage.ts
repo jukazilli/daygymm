@@ -96,6 +96,35 @@ if (!/PRAGMA cipher_version/.test(databaseBootstrap)) {
   );
 }
 
+const localMigrations = readFileSync(
+  join(mobileRoot, "lib", "database", "local-migrations.ts"),
+  "utf8",
+);
+for (const requiredTable of [
+  "training_session_snapshots",
+  "training_outbox_operations",
+]) {
+  if (!localMigrations.includes(requiredTable)) {
+    findings.push(`mobile SQLCipher schema is missing ${requiredTable}`);
+  }
+}
+
+const trainingStore = readFileSync(
+  join(
+    mobileRoot,
+    "lib",
+    "training",
+    "sqlcipher-training-session-local-store.ts",
+  ),
+  "utf8",
+);
+if (!/database\.transaction\(/.test(trainingStore)) {
+  findings.push("mobile training outbox does not use atomic transactions");
+}
+if (!/WHERE owner_id = \?/.test(trainingStore)) {
+  findings.push("mobile training storage is not scoped by owner UUID");
+}
+
 if (findings.length > 0) {
   console.error("Unsafe mobile storage contract:");
   for (const finding of findings) {

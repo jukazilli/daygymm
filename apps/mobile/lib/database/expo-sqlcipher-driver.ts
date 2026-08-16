@@ -4,15 +4,24 @@ import { isValidDatabaseKey } from "./database-key";
 import type {
   EncryptedDatabase,
   EncryptedDatabaseDriver,
-  SqlExecutor,
+  SqlSession,
 } from "./local-database-bootstrap";
 
 const databaseName = "daygym-training.db";
 
-function executor(database: SQLite.SQLiteDatabase): SqlExecutor {
+function executor(database: SQLite.SQLiteDatabase): SqlSession {
   return {
     exec(source) {
       return database.execAsync(source);
+    },
+    getAll<T>(source: string, parameters = []) {
+      return database.getAllAsync<T>(source, ...parameters);
+    },
+    getFirst<T>(source: string, parameters = []) {
+      return database.getFirstAsync<T>(source, ...parameters);
+    },
+    async run(source, parameters = []) {
+      await database.runAsync(source, ...parameters);
     },
   };
 }
@@ -25,8 +34,14 @@ function encryptedDatabase(database: SQLite.SQLiteDatabase): EncryptedDatabase {
     close() {
       return database.closeAsync();
     },
-    getFirst<T>(source: string) {
-      return database.getFirstAsync<T>(source);
+    getAll<T>(source: string, parameters = []) {
+      return database.getAllAsync<T>(source, ...parameters);
+    },
+    getFirst<T>(source: string, parameters = []) {
+      return database.getFirstAsync<T>(source, ...parameters);
+    },
+    async run(source, parameters = []) {
+      await database.runAsync(source, ...parameters);
     },
     transaction(task) {
       return database.withExclusiveTransactionAsync((transaction) =>

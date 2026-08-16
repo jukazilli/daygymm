@@ -1,8 +1,8 @@
 # Persistência local e outbox do treino
 
-Status: US-009A e US-009B1 verificadas em staging para a execução web/PWA.
-US-009 permanece parcial até a prova SQLCipher em aparelho físico da US-009B2 e
-continua rastreada na
+Status: US-009A e US-009B1 verificadas em staging para a execução web/PWA;
+US-009B2a implementa o adapter SQLCipher do Expo e aguarda promoção. US-009
+permanece parcial até a prova física da US-009B2b e continua rastreada na
 [issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
@@ -80,6 +80,22 @@ Os testes do gateway local-first cobrem:
 9. hub de treinos disponível pelo snapshot local quando apenas os metadados de
    origem do plano estão indisponíveis.
 
+## Modelo no app móvel
+
+O schema SQLCipher v2 contém:
+
+- `training_session_snapshots`, com um snapshot validado por UUID do titular;
+- `training_outbox_operations`, com chave composta titular/operação, sequência
+  causal única por titular, estado, tentativas e payload validado pelo mesmo
+  contrato usado na web.
+
+O repositório móvel implementa o contrato `TrainingSessionLocalStore`. Gravar
+snapshot + operação, confirmar + substituir operações e adotar o estado
+canônico são transações exclusivas. Alterações de retry/conflito ficam em
+colunas próprias e prevalecem sobre o JSON original. Linhas inválidas não são
+reproduzidas. Logout preserva os dados criptografados e o UUID impede que outra
+conta os restaure.
+
 ## Evidência hospedada — 16/08/2026
 
 - commit funcional `cd6b486`; documentação/rastreabilidade `88aa648`;
@@ -117,6 +133,9 @@ Os testes do gateway local-first cobrem:
 
 ## Limites do corte seguinte
 
-US-009B2 ainda deve materializar o contrato nas tabelas SQLCipher do app Expo e
-provar 30 minutos offline, fechamento/reabertura e zero duplicação em aparelho
-físico. O estado do cronômetro de descanso continua pertencendo à US-010.
+US-009B2b ainda deve conectar a jornada de treino do Expo ao gateway local-first
+e executar o
+[roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md), com dois
+fechamentos/reaberturas e zero duplicação em pelo menos um aparelho. A segunda
+plataforma permanece no aceite abrangente da FND-017. O estado do cronômetro de
+descanso continua pertencendo à US-010.

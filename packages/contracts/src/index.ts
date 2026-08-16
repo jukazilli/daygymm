@@ -8,6 +8,7 @@ export * from "./plan-source.js";
 export * from "./training-plan-import.js";
 export * from "./training-plan-editor.js";
 export * from "./training-session.js";
+export * from "./training-outbox.js";
 export * from "./openapi.js";
 
 /** A transport-safe identifier without binding a future storage implementation. */
