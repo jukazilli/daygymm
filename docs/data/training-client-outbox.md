@@ -186,6 +186,8 @@ conta os restaure.
   passa a integrar o app shell antecipado pelo service worker;
 - `daygym-runtime-v3` prioriza um fallback da área de treinos para requisições
   sob `/treinos/`, evitando o redirecionamento silencioso para Home;
+- ao abrir `sessao=<id>` sem rede, o runtime escolhe a sessão solicitada entre
+  as sessões do plano persistido, mesmo quando o dia atual é de descanso;
 - o selo permanente `Prévia` do cabeçalho foi removido. `Modo offline` aparece
   somente enquanto o navegador informa ausência de conectividade e desaparece
   automaticamente após a reconexão;
