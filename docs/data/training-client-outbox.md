@@ -1,6 +1,7 @@
 # Persistência local e outbox do treino
 
-Status: US-009A implementada para a execução web/PWA; US-009 permanece parcial.
+Status: US-009A implementada para a execução web/PWA; US-009 permanece parcial
+e rastreada na [issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
 
