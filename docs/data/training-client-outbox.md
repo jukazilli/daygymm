@@ -1,8 +1,8 @@
 # Persistência local e outbox do treino
 
-Status: US-009A e US-009B1 verificadas em staging para a execução web/PWA;
-US-009B2a implementa o adapter SQLCipher do Expo e aguarda promoção. US-009
-permanece parcial até a prova física da US-009B2b e continua rastreada na
+Status: US-009A, US-009B1 e US-009B2a verificadas em staging. US-009 permanece
+parcial até a integração da jornada Expo e a prova física da US-009B2b, ainda
+rastreada na
 [issue #38](https://github.com/jukazilli/daygymm/issues/38).
 
 ## Contrato do corte
@@ -130,6 +130,18 @@ conta os restaure.
   continua disponível offline;
 - a execução sintética foi cancelada ao final e a inspeção confirmou outbox
   vazia e nenhum treino ativo.
+
+### Fechamento da US-009B2a — persistência móvel
+
+- commit funcional `6acc907` promovido somente para staging;
+- CI de staging `31955501372` aprovada: quality gates, banco, API, worker e
+  smoke público;
+- Cloudflare Pages publicou o mesmo commit no deploy `d7ba3221`;
+- 49 testes mobile e 187 testes no monorepo aprovados;
+- exports Android, iOS e web do Expo concluídos pelo mesmo gate;
+- schema SQLCipher v2, atomicidade, rollback, ordem causal, isolamento por UUID,
+  conflito/retry e descarte seguro de linha inválida cobertos por teste;
+- nenhuma migration remota foi adicionada e produção permaneceu inalterada.
 
 ## Limites do corte seguinte
 
