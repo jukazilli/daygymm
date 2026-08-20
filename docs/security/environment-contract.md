@@ -149,8 +149,12 @@ Senha, token, consentimentos e respostas do provedor não são persistidos. O
 estado é removido ao expirar, na confirmação concluída ou depois de um login
 bem-sucedido; se o PWA estiver fechado no instante da expiração, a remoção física
 ocorre na próxima abertura de uma tela de autenticação. O limite hospedado do
-Supabase continua autoritativo. A correção aguarda prova em staging e aceite do
-owner antes do fechamento de COR-005.
+Supabase continua autoritativo. O commit `660d192` foi publicado em staging pelo
+run `32413909771`; quality/security, banco, API/worker e health checks passaram,
+e o Cloudflare Pages publicou o mesmo SHA no deployment `2db5f4ef`. Em navegador
+isolado, o contexto sintético mínimo foi restaurado após reload com o contador
+recalculado. A correção aguarda apenas o aceite do owner antes do fechamento de
+COR-005.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
