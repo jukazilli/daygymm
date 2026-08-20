@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -78,10 +79,16 @@ function state(activeRun: ActiveTrainingRun | null): PracticalTrainingState {
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("ActiveTrainingScreen", () => {
   it("runs the imported session from start through completion", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-08-14T03:32:00.000Z").getTime(),
+    );
     const user = userEvent.setup();
     const activeRun: ActiveTrainingRun = {
       pausedAt: null,
@@ -285,6 +292,9 @@ describe("ActiveTrainingScreen", () => {
   });
 
   it("keeps a confirmed set successful without a full readback", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-08-14T03:32:00.000Z").getTime(),
+    );
     const user = userEvent.setup();
     const activeRun: ActiveTrainingRun = {
       pausedAt: null,
@@ -384,6 +394,10 @@ describe("ActiveTrainingScreen", () => {
           },
         };
       }),
+      dismissRest: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { ...state(activeRun), activeRest: null },
+      }),
       finish: vi.fn(),
       getSyncState: () => ({
         lastSyncedAt: null,
@@ -439,6 +453,10 @@ describe("ActiveTrainingScreen", () => {
       cancel: vi.fn(),
       completeExercise: vi.fn(),
       completeSet: vi.fn(),
+      dismissRest: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { ...canonical, activeRest: null },
+      }),
       finish: vi.fn(),
       getSyncState: () => ({
         lastSyncedAt: null,
@@ -474,6 +492,81 @@ describe("ActiveTrainingScreen", () => {
       screen.getByRole("button", { name: "Usar versão online" }),
     );
     expect(resolveConflict).toHaveBeenCalledWith("use-server");
+  });
+
+  it("reconciles the rest and training clocks immediately after foregrounding", async () => {
+    const initialNow = new Date("2026-08-14T03:32:00.000Z").getTime();
+    const now = vi.spyOn(Date, "now").mockReturnValue(initialNow);
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            setExecutions: [
+              {
+                actualDistanceMeters: null,
+                actualDurationSeconds: null,
+                actualReps: 10,
+                actualWeightKg: 40,
+                completedAt: "2026-08-14T03:32:00.000Z",
+                plannedDistanceMeters: null,
+                plannedDurationSeconds: null,
+                plannedRepsMax: 12,
+                plannedRepsMin: 8,
+                plannedWeightKg: 40,
+                revision: 1,
+                setExecutionId: "76000000-0000-4000-8000-000000000006",
+                setNumber: 1,
+                updatedAt: "2026-08-14T03:32:00.000Z",
+              },
+            ],
+            startedAt: "2026-08-14T03:30:00.000Z",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.000Z",
+    };
+    const restored = {
+      ...state(activeRun),
+      activeRest: {
+        durationSeconds: 90,
+        endsAt: "2026-08-14T03:33:30.000Z",
+        nextItemId: plannedSession.items[0]!.itemId,
+        runId: activeRun.runId,
+        setNumber: 1,
+        sourceItemId: plannedSession.items[0]!.itemId,
+      },
+    } satisfies PracticalTrainingState;
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: restored }),
+      pause: vi.fn(),
+      resolveConflict: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    } as TrainingSessionGateway;
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    expect(await screen.findByText("01:30")).toBeTruthy();
+    expect(await screen.findByLabelText("Tempo de treino 02:00")).toBeTruthy();
+
+    now.mockReturnValue(initialNow + 60_000);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(await screen.findByText("00:30")).toBeTruthy();
+    expect(await screen.findByLabelText("Tempo de treino 03:00")).toBeTruthy();
   });
 
   it("corrects and undoes the latest persisted set from its focused dialog", async () => {

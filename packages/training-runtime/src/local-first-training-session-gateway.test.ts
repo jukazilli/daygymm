@@ -260,9 +260,90 @@ describe("TrainingSessionLocalFirstRuntime", () => {
         expect.objectContaining({ setNumber: 2 }),
       ],
     });
+    expect(restored.ok && restored.value.activeRest).toBeNull();
     expect(reopened.getSyncState()).toMatchObject({
       pendingCount: 2,
       status: "offline",
+    });
+  });
+
+  it("restores an absolute rest deadline after reopening and removes it when dismissed", async () => {
+    const connectivity = new MutableConnectivity(false);
+    const remote = remoteGateway();
+    const first = localGateway(store, connectivity, remote, {
+      now: () => new Date("2026-08-15T20:02:00.000Z"),
+    });
+
+    await first.completeSet(setInput);
+
+    const reopened = localGateway(store, connectivity, remote, {
+      now: () => new Date("2026-08-15T20:03:00.000Z"),
+    });
+    const restored = await reopened.load();
+
+    expect(restored).toMatchObject({
+      ok: true,
+      value: {
+        activeRest: {
+          durationSeconds: 90,
+          endsAt: "2026-08-15T20:03:30.000Z",
+          nextItemId: itemId,
+          runId,
+          setNumber: 1,
+          sourceItemId: itemId,
+        },
+      },
+    });
+
+    await reopened.dismissRest(runId);
+    const afterDismiss = await reopened.load();
+    expect(afterDismiss.ok && afterDismiss.value.activeRest).toBeNull();
+  });
+
+  it("drops a finished rest period when the app reopens", async () => {
+    const connectivity = new MutableConnectivity(false);
+    const remote = remoteGateway();
+    const first = localGateway(store, connectivity, remote, {
+      now: () => new Date("2026-08-15T20:02:00.000Z"),
+    });
+    await first.completeSet(setInput);
+
+    const reopened = localGateway(store, connectivity, remote, {
+      now: () => new Date("2026-08-15T20:04:00.000Z"),
+    });
+    const restored = await reopened.load();
+
+    expect(restored.ok && restored.value.activeRest).toBeNull();
+  });
+
+  it("keeps an active local rest deadline when refreshing canonical data", async () => {
+    const offline = new MutableConnectivity(false);
+    const first = localGateway(store, offline, remoteGateway(), {
+      now: () => new Date("2026-08-15T20:02:00.000Z"),
+    });
+    await first.completeSet(setInput);
+    store.operations.clear();
+
+    const canonical = structuredClone(store.snapshots.get(ownerId)!);
+    delete canonical.activeRest;
+    const online = new MutableConnectivity(true);
+    const reopened = localGateway(
+      store,
+      online,
+      remoteGateway({
+        load: vi.fn().mockResolvedValue({ ok: true, value: canonical }),
+      }),
+      { now: () => new Date("2026-08-15T20:03:00.000Z") },
+    );
+
+    const refreshed = await reopened.load();
+
+    expect(refreshed).toMatchObject({
+      ok: true,
+      value: { activeRest: { endsAt: "2026-08-15T20:03:30.000Z" } },
+    });
+    expect(store.snapshots.get(ownerId)?.activeRest).toMatchObject({
+      endsAt: "2026-08-15T20:03:30.000Z",
     });
   });
 

@@ -93,8 +93,20 @@ export const activeTrainingRunSchema = z
   })
   .strict();
 
+export const activeTrainingRestSchema = z
+  .object({
+    durationSeconds: z.number().int().min(1).max(1_800),
+    endsAt: z.string().datetime({ offset: true }),
+    nextItemId: uuidSchema,
+    runId: uuidSchema,
+    setNumber: z.number().int().min(1).max(20),
+    sourceItemId: uuidSchema,
+  })
+  .strict();
+
 export const practicalTrainingStateSchema = z
   .object({
+    activeRest: activeTrainingRestSchema.nullable().optional(),
     activeRun: activeTrainingRunSchema.nullable(),
     lastCompletedAt: z.string().datetime({ offset: true }).nullable(),
     nextSession: practicalTrainingPlanSessionSchema.nullable(),
@@ -219,6 +231,7 @@ export type PracticalTrainingPlanSession = z.infer<
   typeof practicalTrainingPlanSessionSchema
 >;
 export type ActiveTrainingRun = z.infer<typeof activeTrainingRunSchema>;
+export type ActiveTrainingRest = z.infer<typeof activeTrainingRestSchema>;
 export type PracticalTrainingState = z.infer<
   typeof practicalTrainingStateSchema
 >;
@@ -316,6 +329,9 @@ export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway
 export type TrainingSessionConflictResolution = "retry" | "use-server";
 
 export interface LocalFirstTrainingSessionGateway extends TrainingSessionGateway {
+  dismissRest(
+    runId: string,
+  ): Promise<TrainingSessionResult<PracticalTrainingState>>;
   getSyncState(): TrainingSessionSyncState;
   subscribeSyncState(
     listener: (state: TrainingSessionSyncState) => void,

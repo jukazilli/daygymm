@@ -379,7 +379,15 @@ export function MobileActiveTrainingScreen({
 
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date()), 1_000);
-    return () => clearInterval(timer);
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        setClock(new Date());
+      }
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
   }, []);
 
   const refresh = useCallback(async () => {

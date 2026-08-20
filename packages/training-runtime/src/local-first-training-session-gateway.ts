@@ -19,7 +19,7 @@ import {
 
 import {
   applyCancelledTraining,
-  applyCompletedTrainingSet,
+  applyCompletedTrainingSetWithRest,
   applyFinishedTraining,
   applyRevisedTrainingSet,
   applyStartedExercise,
@@ -177,6 +177,52 @@ function selectLocalSession(
   return selected ? { ...state, nextSession: selected } : state;
 }
 
+function activeRestIsValid(state: PracticalTrainingState, now: Date) {
+  const rest = state.activeRest;
+  const run = state.activeRun;
+  if (
+    !rest ||
+    !run ||
+    rest.runId !== run.runId ||
+    new Date(rest.endsAt).getTime() <= now.getTime()
+  ) {
+    return false;
+  }
+  const source = run.session.items.find(
+    (item) => item.itemId === rest.sourceItemId,
+  );
+  const next = run.session.items.find(
+    (item) => item.itemId === rest.nextItemId,
+  );
+  return Boolean(
+    source?.setExecutions.some(
+      (execution) => execution.setNumber === rest.setNumber,
+    ) &&
+    next &&
+    !next.completedAt,
+  );
+}
+
+function withoutExpiredRest(state: PracticalTrainingState, now: Date) {
+  return state.activeRest && !activeRestIsValid(state, now)
+    ? { ...state, activeRest: null }
+    : state;
+}
+
+function preserveActiveRest(
+  local: PracticalTrainingState | null,
+  canonical: PracticalTrainingState,
+  now: Date,
+) {
+  if (!local?.activeRest) {
+    return { ...canonical, activeRest: null };
+  }
+  const merged = { ...canonical, activeRest: local.activeRest };
+  return activeRestIsValid(merged, now)
+    ? merged
+    : { ...canonical, activeRest: null };
+}
+
 export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessionGateway {
   private activeOwnerId: string | null = null;
   private connectivitySubscription: (() => void) | undefined;
@@ -243,10 +289,16 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
       return this.remote.load(preferredSessionId);
     }
     try {
-      const [snapshot, operations] = await Promise.all([
+      const [storedSnapshot, operations] = await Promise.all([
         this.store.readSnapshot(ownerId),
         this.store.listOperations(ownerId),
       ]);
+      const snapshot = storedSnapshot
+        ? withoutExpiredRest(storedSnapshot, this.now())
+        : null;
+      if (snapshot && snapshot !== storedSnapshot) {
+        await this.store.saveSnapshot(ownerId, snapshot);
+      }
       this.reflectOperations(operations);
       if (operations.length > 0) {
         if (this.connectivity.isOnline()) {
@@ -268,13 +320,17 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
       }
       const remote = await this.remote.load(preferredSessionId);
       if (remote.ok) {
-        await this.store.saveSnapshot(ownerId, remote.value);
+        const merged = preserveActiveRest(snapshot, remote.value, this.now());
+        await this.store.saveSnapshot(ownerId, merged);
         this.updateSyncState({
           lastSyncedAt: this.now().toISOString(),
           pendingCount: 0,
           status: this.connectivity.isOnline() ? "synced" : "offline",
         });
-        return remote;
+        return {
+          ok: true,
+          value: selectLocalSession(merged, preferredSessionId),
+        } as const;
       }
       return snapshot
         ? ({
@@ -410,7 +466,7 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
       parsed,
       completionOperationId(parsed),
     );
-    const next = applyCompletedTrainingSet(
+    const next = applyCompletedTrainingSetWithRest(
       context.snapshot,
       parsed,
       completion.value,
@@ -419,6 +475,25 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
       return this.remote.completeSet(parsed);
     }
     return completion;
+  }
+
+  async dismissRest(runId: string) {
+    const ownerId = await this.resolveOwnerId();
+    if (!ownerId) {
+      return { ok: false, reason: "session" } as const;
+    }
+    try {
+      const snapshot = await this.store.readSnapshot(ownerId);
+      if (!snapshot || snapshot.activeRun?.runId !== runId) {
+        return { ok: false, reason: "invalid" } as const;
+      }
+      const next = { ...snapshot, activeRest: null };
+      await this.store.saveSnapshot(ownerId, next);
+      return { ok: true, value: next } as const;
+    } catch {
+      this.blockLocalPersistence();
+      return { ok: false, reason: "unexpected" } as const;
+    }
   }
 
   async reviseSet(input: Parameters<TrainingSessionGateway["reviseSet"]>[0]) {
@@ -668,7 +743,13 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
       return null;
     }
     try {
-      const snapshot = await this.store.readSnapshot(ownerId);
+      const storedSnapshot = await this.store.readSnapshot(ownerId);
+      const snapshot = storedSnapshot
+        ? withoutExpiredRest(storedSnapshot, this.now())
+        : null;
+      if (snapshot && snapshot !== storedSnapshot) {
+        await this.store.saveSnapshot(ownerId, snapshot);
+      }
       return snapshot ? { ownerId, snapshot } : null;
     } catch {
       this.blockLocalPersistence();
@@ -777,7 +858,11 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
     const remote = await this.remote.load();
     if (remote.ok) {
       try {
-        await this.store.saveSnapshot(ownerId, remote.value);
+        const local = await this.store.readSnapshot(ownerId);
+        await this.store.saveSnapshot(
+          ownerId,
+          preserveActiveRest(local, remote.value, this.now()),
+        );
       } catch {
         this.blockLocalPersistence();
       }
@@ -888,7 +973,11 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
 
     const canonical = await this.remote.load();
     if (canonical.ok) {
-      await this.store.replaceWithCanonical(ownerId, canonical.value);
+      const local = await this.store.readSnapshot(ownerId);
+      await this.store.replaceWithCanonical(
+        ownerId,
+        preserveActiveRest(local, canonical.value, this.now()),
+      );
     }
     operations = await this.store.listOperations(ownerId);
     this.updateSyncState({

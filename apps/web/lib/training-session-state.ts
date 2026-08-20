@@ -1,6 +1,7 @@
 export {
   applyCancelledTraining,
   applyCompletedTrainingSet,
+  applyCompletedTrainingSetWithRest,
   applyFinishedTraining,
   applyRevisedTrainingSet,
   applyStartedExercise,

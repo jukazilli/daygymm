@@ -15,7 +15,7 @@ import type {
 } from "@daygym/contracts";
 
 import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
-import { applyCompletedTrainingSet } from "../../lib/training-session-state";
+import { applyCompletedTrainingSetWithRest } from "../../lib/training-session-state";
 import {
   formatTrainingDuration,
   maximumExerciseDurationSeconds,
@@ -768,11 +768,23 @@ function isLocalFirstGateway(
   candidate: TrainingSessionGateway,
 ): candidate is LocalFirstTrainingSessionGateway {
   return (
+    "dismissRest" in candidate &&
     "getSyncState" in candidate &&
     "resolveConflict" in candidate &&
     "subscribeSyncState" in candidate &&
     "synchronize" in candidate
   );
+}
+
+function subscribeToForegroundClock(update: () => void) {
+  document.addEventListener("visibilitychange", update);
+  window.addEventListener("focus", update);
+  window.addEventListener("pageshow", update);
+  return () => {
+    document.removeEventListener("visibilitychange", update);
+    window.removeEventListener("focus", update);
+    window.removeEventListener("pageshow", update);
+  };
 }
 
 function SyncConflictDialog({
@@ -913,7 +925,11 @@ function ElapsedTimer({
       return;
     }
     const timer = window.setInterval(updateElapsed, 1_000);
-    return () => window.clearInterval(timer);
+    const unsubscribe = subscribeToForegroundClock(updateElapsed);
+    return () => {
+      window.clearInterval(timer);
+      unsubscribe();
+    };
   }, [pausedAt, pausedDurationSeconds, startedAt]);
 
   const formatted = formatClock(elapsedSeconds);
@@ -921,28 +937,40 @@ function ElapsedTimer({
 }
 
 function RestScreen({
-  durationSeconds,
+  endsAt,
   onComplete,
 }: Readonly<{
-  durationSeconds: number;
+  endsAt: string;
   onComplete: () => void;
 }>) {
-  const [remainingSeconds, setRemainingSeconds] = useState(durationSeconds);
+  function currentRemainingSeconds() {
+    return Math.max(
+      0,
+      Math.ceil((new Date(endsAt).getTime() - Date.now()) / 1_000),
+    );
+  }
+
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    currentRemainingSeconds,
+  );
 
   useEffect(() => {
-    setRemainingSeconds(durationSeconds);
-  }, [durationSeconds]);
+    function updateRemaining() {
+      setRemainingSeconds(currentRemainingSeconds());
+    }
+    updateRemaining();
+    const timer = window.setInterval(updateRemaining, 1_000);
+    const unsubscribe = subscribeToForegroundClock(updateRemaining);
+    return () => {
+      window.clearInterval(timer);
+      unsubscribe();
+    };
+  }, [endsAt]);
 
   useEffect(() => {
     if (remainingSeconds <= 0) {
       onComplete();
-      return;
     }
-    const timer = window.setTimeout(
-      () => setRemainingSeconds((current) => Math.max(0, current - 1)),
-      1_000,
-    );
-    return () => window.clearTimeout(timer);
   }, [onComplete, remainingSeconds]);
 
   const formatted = formatClock(remainingSeconds);
@@ -1083,10 +1111,6 @@ export function ActiveTrainingScreen({
     "cancel" | "pause" | "restart"
   >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
-  const [restState, setRestState] = useState<{
-    durationSeconds: number;
-    nextExerciseIndex: number;
-  }>();
   const [error, setError] = useState<string>();
   const [finishedDuration, setFinishedDuration] = useState<number>();
 
@@ -1274,7 +1298,7 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
-    const nextState = applyCompletedTrainingSet(
+    const nextState = applyCompletedTrainingSetWithRest(
       state,
       completionInput,
       result.value,
@@ -1283,18 +1307,7 @@ export function ActiveTrainingScreen({
     setBusy(false);
     const nextItems = nextState.activeRun?.session.items;
     const firstPending = nextItems?.findIndex((item) => !item.completedAt);
-    const shouldRest =
-      result.value.wasCreated &&
-      currentExercise.restSeconds > 0 &&
-      firstPending !== undefined &&
-      firstPending >= 0;
-    if (shouldRest) {
-      setRestState({
-        durationSeconds: currentExercise.restSeconds,
-        nextExerciseIndex: result.value.exerciseCompleted
-          ? firstPending
-          : selectedIndex,
-      });
+    if (nextState.activeRest) {
       return;
     }
     if (result.value.exerciseCompleted) {
@@ -1304,12 +1317,27 @@ export function ActiveTrainingScreen({
     }
   }
 
-  function completeRest() {
+  async function completeRest() {
+    const restState = state?.activeRest;
     if (!restState) {
       return;
     }
-    setSelectedIndex(restState.nextExerciseIndex);
-    setRestState(undefined);
+    const nextExerciseIndex = state.activeRun?.session.items.findIndex(
+      (item) => item.itemId === restState.nextItemId,
+    );
+    if (nextExerciseIndex !== undefined && nextExerciseIndex >= 0) {
+      setSelectedIndex(nextExerciseIndex);
+    }
+    setState((current) =>
+      current ? { ...current, activeRest: null } : current,
+    );
+    const currentGateway = gateway();
+    if (isLocalFirstGateway(currentGateway)) {
+      const result = await currentGateway.dismissRest(restState.runId);
+      if (!result.ok) {
+        setError(sessionError(result.reason));
+      }
+    }
   }
 
   async function synchronizeNow() {
@@ -1787,10 +1815,10 @@ export function ActiveTrainingScreen({
           pendingAction={conflictAction}
         />
       ) : null}
-      {restState ? (
+      {state?.activeRest ? (
         <RestScreen
-          durationSeconds={restState.durationSeconds}
-          onComplete={completeRest}
+          endsAt={state.activeRest.endsAt}
+          onComplete={() => void completeRest()}
         />
       ) : null}
     </main>

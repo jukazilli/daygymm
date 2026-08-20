@@ -160,6 +160,27 @@ conta os restaure.
   tempo continua correto ao reabrir o app e desconta pausas;
 - produção permaneceu inalterada.
 
+### COR-006 — relógios após suspensão ou encerramento
+
+- o descanso ativo deixa de acumular callbacks de um segundo e passa a guardar
+  `endsAt`, duração e identidades da execução no snapshot local isolado pelo UUID;
+- bloquear a tela ou colocar o app em segundo plano não altera o prazo: ao voltar,
+  o valor visível é recalculado pela diferença entre `endsAt` e o relógio atual;
+- fechar e reabrir restaura um descanso ainda vigente; um prazo expirado é
+  removido durante a leitura e não reabre a tela;
+- a leitura e a substituição por estado canônico preservam o descanso local
+  somente quando a sessão, a série concluída e o próximo exercício ainda são
+  válidos;
+- concluir o descanso remove o estado do snapshot, sem criar comando remoto;
+- o tempo total do treino continua derivado de `startedAt`, `pausedAt` e
+  `pausedDurationSeconds`, mas agora redesenha imediatamente em `focus`,
+  `visibilitychange`, `pageshow` e no retorno ativo do app nativo.
+
+Os testes automatizados cobrem retorno após 60 segundos sem callbacks, reabertura
+com prazo vigente, expiração durante o encerramento, descarte manual e preservação
+durante refresh canônico. A correção está rastreada na
+[issue #42](https://github.com/jukazilli/daygymm/issues/42).
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
@@ -211,5 +232,6 @@ US-009B2b ainda deve executar o
 [roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md) sobre um
 development build do commit `ad56772`, com dois fechamentos/reaberturas e zero
 duplicação em pelo menos um aparelho. A segunda plataforma permanece no aceite
-abrangente da FND-017. O estado do cronômetro de descanso continua pertencendo à
-US-010.
+abrangente da FND-017. Adicionar tempo, vibração, substituição e resumo continuam
+pertencendo à US-010; a persistência e a recomposição temporal do descanso foram
+antecipadas pela COR-006.

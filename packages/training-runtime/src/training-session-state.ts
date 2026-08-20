@@ -95,11 +95,59 @@ export function applyCompletedTrainingSet(
   };
 }
 
+export function applyCompletedTrainingSetWithRest(
+  state: PracticalTrainingState,
+  input: SetCompletionInput,
+  completion: SetCompletion,
+): PracticalTrainingState {
+  const next = applyCompletedTrainingSet(state, input, completion);
+  const run = next.activeRun;
+  const source = run?.session.items.find(
+    (item) => item.itemId === input.itemId,
+  );
+  const firstPending = run?.session.items.find((item) => !item.completedAt);
+
+  if (!completion.wasCreated) {
+    return next;
+  }
+
+  if (
+    !run ||
+    run.runId !== input.runId ||
+    !source ||
+    source.restSeconds <= 0 ||
+    !firstPending
+  ) {
+    return { ...next, activeRest: null };
+  }
+
+  return {
+    ...next,
+    activeRest: {
+      durationSeconds: source.restSeconds,
+      endsAt: new Date(
+        new Date(completion.completedAt).getTime() + source.restSeconds * 1_000,
+      ).toISOString(),
+      nextItemId: completion.exerciseCompleted
+        ? firstPending.itemId
+        : source.itemId,
+      runId: run.runId,
+      setNumber: completion.setNumber,
+      sourceItemId: source.itemId,
+    },
+  };
+}
+
 export function applyStartedTraining(
   state: PracticalTrainingState,
   run: ActiveTrainingRun,
 ): PracticalTrainingState {
-  return { ...state, activeRun: run, nextSession: run.session };
+  return {
+    ...state,
+    activeRest: null,
+    activeRun: run,
+    nextSession: run.session,
+  };
 }
 
 export function applyStartedExercise(
@@ -189,6 +237,8 @@ export function applyRevisedTrainingSet(
   const session = { ...activeRun.session, items };
   return {
     ...state,
+    activeRest:
+      state.activeRest?.runId === input.runId ? null : state.activeRest,
     activeRun: { ...activeRun, session },
     nextSession:
       state.nextSession?.sessionId === session.sessionId
@@ -208,7 +258,12 @@ export function applyCancelledTraining(
     state.sessions.find(
       (session) => session.sessionId === state.activeRun?.session.sessionId,
     ) ?? state.nextSession;
-  return { ...state, activeRun: null, nextSession: planned };
+  return {
+    ...state,
+    activeRest: null,
+    activeRun: null,
+    nextSession: planned,
+  };
 }
 
 export function applyFinishedTraining(
@@ -217,6 +272,11 @@ export function applyFinishedTraining(
   completedAt: string,
 ): PracticalTrainingState {
   return state.activeRun?.runId === runId
-    ? { ...state, activeRun: null, lastCompletedAt: completedAt }
+    ? {
+        ...state,
+        activeRest: null,
+        activeRun: null,
+        lastCompletedAt: completedAt,
+      }
     : state;
 }
