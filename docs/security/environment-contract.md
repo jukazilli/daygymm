@@ -135,8 +135,10 @@ real: o grant de senha respondeu `200`, `consents` respondeu `200`, mas
 funcionou. A conta tinha perfil, dois consentimentos e sessão renovável íntegros;
 portanto, a causa não era credencial, identidade incompleta ou SMTP. COR-004
 passa a tratar somente essa rejeição temporal antes que ela alcance as telas,
-em web e mobile. Outros JWTs inválidos não recebem retry. A prova hospedada do
-novo bundle ainda é obrigatória.
+em web e mobile. Outros JWTs inválidos não recebem retry. O commit `4dd4140` foi
+publicado em staging pelo run `32402356258`: no primeiro clique, o grant de senha
+respondeu `200`, a primeira leitura de `consents` recebeu `401`, a repetição
+automática recebeu `200` e a navegação chegou a `/hoje/` sem erro no console.
 
 A mesma auditoria encontrou uma divergência em AUTH-02: o cooldown web usa
 instante absoluto e corrige suspensão enquanto o processo permanece vivo, mas o
