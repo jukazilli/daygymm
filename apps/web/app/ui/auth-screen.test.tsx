@@ -11,6 +11,10 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthGateway } from "../../lib/auth-gateway";
+import {
+  readPendingSignUpResend,
+  savePendingSignUpResend,
+} from "../../lib/auth-resend-state";
 import { AuthScreen } from "./auth-screen";
 
 function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
@@ -49,6 +53,7 @@ function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  window.localStorage.clear();
   window.history.replaceState({}, "", "/");
 });
 
@@ -192,9 +197,102 @@ describe("AuthScreen", () => {
     expect(gateway.resendSignUpConfirmation).toHaveBeenCalledWith(
       "pessoa@example.com",
     );
+    expect(readPendingSignUpResend()).not.toBeNull();
     expect(screen.getByRole("status").textContent).toContain(
       "Enviamos um novo link.",
     );
+  });
+
+  it("restores the signup cooldown after the screen is closed and reopened", async () => {
+    vi.useFakeTimers();
+    const startedAt = new Date("2026-08-20T12:00:00.000Z");
+    vi.setSystemTime(startedAt);
+    const gateway = createGateway();
+
+    render(createElement(AuthScreen, { gateway, mode: "sign-up" }));
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "pessoa@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), {
+      target: { value: "senha-segura" },
+    });
+    fireEvent.click(
+      screen.getByLabelText("Confirmo que tenho 18 anos ou mais."),
+    );
+    fireEvent.click(screen.getByLabelText("Li e aceito os Termos de teste."));
+    fireEvent.click(screen.getByLabelText("Li o Aviso de privacidade."));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    });
+    expect(
+      screen.getByRole("button", { name: "Reenviar em 01:20" }),
+    ).toBeTruthy();
+
+    cleanup();
+    vi.setSystemTime(new Date(startedAt.getTime() + 20_000));
+    render(createElement(AuthScreen, { gateway, mode: "sign-up" }));
+
+    expect(screen.getByRole("status").textContent).toContain(
+      "Confira seu e-mail.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Reenviar em 01:00" }),
+    ).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByRole("button", { name: "Reenviar link" })).toBeTruthy();
+    expect(readPendingSignUpResend()).toBeNull();
+  });
+
+  it("clears a pending signup cooldown after a successful login", async () => {
+    const now = Date.now();
+    savePendingSignUpResend({
+      deliveryUncertain: false,
+      email: "pessoa@example.com",
+      resendAvailableAt: now + 80_000,
+    });
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      createElement(AuthScreen, {
+        gateway: createGateway(),
+        mode: "sign-in",
+        navigate,
+      }),
+    );
+    await user.type(screen.getByLabelText("E-mail"), "pessoa@example.com");
+    await user.type(screen.getByLabelText("Senha"), "senha-segura");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(navigate).toHaveBeenCalledWith("/hoje/");
+    expect(readPendingSignUpResend()).toBeNull();
+  });
+
+  it("removes an expired signup cooldown when an auth screen opens", () => {
+    vi.useFakeTimers();
+    const startedAt = new Date("2026-08-20T12:00:00.000Z");
+    vi.setSystemTime(startedAt);
+    savePendingSignUpResend({
+      deliveryUncertain: true,
+      email: "pessoa@example.com",
+      resendAvailableAt: startedAt.getTime() + 80_000,
+    });
+
+    vi.setSystemTime(new Date(startedAt.getTime() + 81_000));
+    render(
+      createElement(AuthScreen, {
+        gateway: createGateway(),
+        mode: "sign-in",
+      }),
+    );
+
+    expect(readPendingSignUpResend()).toBeNull();
   });
 
   it("reconciles the signup cooldown with elapsed wall-clock time", async () => {

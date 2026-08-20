@@ -139,11 +139,18 @@ em web e mobile. Outros JWTs inválidos não recebem retry. O commit `4dd4140` f
 publicado em staging pelo run `32402356258`: no primeiro clique, o grant de senha
 respondeu `200`, a primeira leitura de `consents` recebeu `401`, a repetição
 automática recebeu `200` e a navegação chegou a `/hoje/` sem erro no console.
+O owner aprovou a correção em 20 de agosto de 2026 e a issue #40 foi encerrada.
 
 A mesma auditoria encontrou uma divergência em AUTH-02: o cooldown web usa
 instante absoluto e corrige suspensão enquanto o processo permanece vivo, mas o
-estado não sobrevive ao encerramento do PWA. COR-005 permanece aberta para
-persistir apenas o contexto mínimo e temporário, sem senha ou token.
+estado não sobrevivia ao encerramento do PWA. COR-005 agora persiste localmente
+somente e-mail, prazo absoluto e incerteza de entrega, por no máximo 80 segundos.
+Senha, token, consentimentos e respostas do provedor não são persistidos. O
+estado é removido ao expirar, na confirmação concluída ou depois de um login
+bem-sucedido; se o PWA estiver fechado no instante da expiração, a remoção física
+ocorre na próxima abertura de uma tela de autenticação. O limite hospedado do
+Supabase continua autoritativo. A correção aguarda prova em staging e aceite do
+owner antes do fechamento de COR-005.
 
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
