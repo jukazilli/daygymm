@@ -181,6 +181,10 @@ com prazo vigente, expiração durante o encerramento, descarte manual e preserv
 durante refresh canônico. A correção está rastreada na
 [issue #42](https://github.com/jukazilli/daygymm/issues/42).
 
+Aceite do owner em 20/08/2026: a correção publicada no commit `bce2f15` foi
+aprovada após o teste em staging. A issue #42 foi encerrada; produção permanece
+inalterada.
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
