@@ -99,10 +99,39 @@ try {
       order by completed_at desc
       limit 10
     `;
+    const authSessions = await sql`
+      select
+        session.created_at,
+        session.updated_at,
+        to_jsonb(session) ->> 'not_after' as not_after,
+        to_jsonb(session) ->> 'refreshed_at' as refreshed_at
+      from auth.sessions as session
+      where session.user_id = ${identity.id}
+      order by session.updated_at desc
+      limit 10
+    `;
     const planVersions = await sql`
-      select version_number, origin, change_summary, created_at
-      from api.training_plan_versions
-      where user_id = ${identity.id}
+      with version_history as (
+        select
+          version_number,
+          origin,
+          change_summary,
+          created_at,
+          operation_id,
+          content_sha256,
+          lag(operation_id) over (order by created_at) as previous_operation_id,
+          lag(content_sha256) over (order by created_at) as previous_content_sha256
+        from api.training_plan_versions
+        where user_id = ${identity.id}
+      )
+      select
+        version_number,
+        origin,
+        change_summary,
+        created_at,
+        operation_id = previous_operation_id as repeated_operation,
+        content_sha256 = previous_content_sha256 as repeated_content
+      from version_history
       order by created_at desc
       limit 10
     `;
@@ -111,6 +140,7 @@ try {
       JSON.stringify({
         audit,
         auditKeys,
+        authSessions,
         completedSets,
         eligibility,
         identityHealth,

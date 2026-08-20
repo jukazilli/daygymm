@@ -129,6 +129,20 @@ e autorizou o fechamento de COR-001. Essa aceitação encerra o incidente do lin
 inválido em staging; replay, revogação de sessões e o E2E do app nativo continuam
 como critérios mais amplos de FND-013 e AUTH-07.
 
+Em 20 de agosto de 2026, a primeira tentativa de login foi reproduzida com rede
+real: o grant de senha respondeu `200`, `consents` respondeu `200`, mas
+`profiles` recebeu `401/PGRST303` com `JWT issued at future`. O segundo clique
+funcionou. A conta tinha perfil, dois consentimentos e sessão renovável íntegros;
+portanto, a causa não era credencial, identidade incompleta ou SMTP. COR-004
+passa a tratar somente essa rejeição temporal antes que ela alcance as telas,
+em web e mobile. Outros JWTs inválidos não recebem retry. A prova hospedada do
+novo bundle ainda é obrigatória.
+
+A mesma auditoria encontrou uma divergência em AUTH-02: o cooldown web usa
+instante absoluto e corrige suspensão enquanto o processo permanece vivo, mas o
+estado não sobrevive ao encerramento do PWA. COR-005 permanece aberta para
+persistir apenas o contexto mínimo e temporário, sem senha ou token.
+
 Os riscos e testes obrigatórios desse fluxo estão em
 [`auth-threat-model.md`](./auth-threat-model.md). Ativar as variáveis não basta
 para declarar autenticação pronta: callbacks, sessão, não enumeração e

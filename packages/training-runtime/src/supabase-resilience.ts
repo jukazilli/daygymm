@@ -8,6 +8,10 @@ interface RetryOptions {
   readonly wait?: (milliseconds: number) => Promise<void>;
 }
 
+interface ClockSkewRecoveryOptions extends RetryOptions {
+  readonly fetch?: typeof globalThis.fetch;
+}
+
 const defaultDelaysMs = [250, 750] as const;
 
 function errorProperty(error: unknown, property: "code" | "status") {
@@ -17,8 +21,23 @@ function errorProperty(error: unknown, property: "code" | "status") {
   return (error as Record<string, unknown>)[property];
 }
 
+function errorMessage(error: unknown) {
+  if (!error || typeof error !== "object" || !("message" in error)) {
+    return undefined;
+  }
+  return (error as Record<string, unknown>).message;
+}
+
+function isJwtIssuedAtFutureError(error: unknown) {
+  return (
+    errorProperty(error, "code") === "PGRST303" &&
+    errorMessage(error) === "JWT issued at future"
+  );
+}
+
 export function isTransientSupabaseError(error: unknown): boolean {
   if (error instanceof TypeError) return true;
+  if (isJwtIssuedAtFutureError(error)) return true;
   const status = errorProperty(error, "status");
   if (
     typeof status === "number" &&
@@ -35,6 +54,46 @@ export function isTransientSupabaseError(error: unknown): boolean {
       code === "PGRST002" ||
       code === "PGRST003")
   );
+}
+
+async function isJwtIssuedAtFutureResponse(response: Response) {
+  if (response.status !== 401) {
+    return false;
+  }
+  try {
+    return isJwtIssuedAtFutureError(await response.clone().json());
+  } catch {
+    return false;
+  }
+}
+
+export function createSupabaseFetchWithClockSkewRecovery(
+  options: ClockSkewRecoveryOptions = {},
+): typeof globalThis.fetch {
+  const fetchRequest = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const delaysMs = options.delaysMs ?? defaultDelaysMs;
+  const wait = options.wait ?? defaultWait;
+
+  return async (input, init) => {
+    const reusableRequest =
+      typeof Request !== "undefined" && input instanceof Request
+        ? input
+        : undefined;
+
+    for (let attempt = 0; ; attempt += 1) {
+      const response = await fetchRequest(
+        reusableRequest ? reusableRequest.clone() : input,
+        init,
+      );
+      if (
+        !(await isJwtIssuedAtFutureResponse(response)) ||
+        attempt >= delaysMs.length
+      ) {
+        return response;
+      }
+      await wait(delaysMs[attempt]!);
+    }
+  };
 }
 
 function defaultWait(milliseconds: number) {
