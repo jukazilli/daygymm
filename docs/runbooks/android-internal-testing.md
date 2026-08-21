@@ -58,8 +58,9 @@ passar depois de uma compilação anterior.
 5. Revogar a permissão de instalar apps desconhecidos após a instalação.
 6. Entrar somente com uma conta sintética autorizada de staging.
 
-A URL interna permite baixar o APK e deve ser compartilhada somente com quem
-participa do teste. Não publicar o link em issue pública, commit ou captura.
+A página do build pode ser registrada para rastreabilidade, mas deve ser
+compartilhada somente com quem participa do teste. Não registrar nem publicar a
+URL direta e assinada do arquivo APK em issue, commit, captura ou log.
 
 ## Smoke mínimo
 
