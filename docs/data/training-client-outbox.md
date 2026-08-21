@@ -285,6 +285,13 @@ US-010A acrescentou ajuste, vibração opcional e resumo essencial.
 - ocultar o cronômetro total, o nome do treino e o texto de sincronização não
   altera o runtime: tempo e estado de sync continuam derivados dos mesmos
   timestamps e recibos persistidos; o ponto visual mantém rótulo acessível;
+- o detalhe usa título compacto no cabeçalho e reserva sua maior superfície para
+  futura demonstração neutra do movimento. As medidas realizadas ficam
+  editáveis logo abaixo, sem alterar payloads ou inventar um contrato de mídia;
+- concluir a série pelo controle compacto envia os valores visíveis ao mesmo
+  comando idempotente e inicia o descanso na própria tela. O prazo absoluto,
+  `+30 s`, vibração e retomada continuam usando o snapshot local; a lista mantém
+  um mini timer em vez de abrir uma tela adicional;
 - histórico anterior, orientação e correção/desfazer ficam sob divulgação
   progressiva. Cardio e circuitos preservam duração e distância no mesmo popup;
 - testes da tela cobrem a sequência

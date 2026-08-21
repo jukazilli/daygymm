@@ -8,6 +8,7 @@ import {
 } from "../../lib/training-duration";
 
 export function DurationInput({
+  ariaLabel,
   describedBy,
   maximum,
   minimum,
@@ -15,6 +16,7 @@ export function DurationInput({
   required = false,
   seconds,
 }: Readonly<{
+  ariaLabel?: string;
   describedBy?: string;
   maximum: number;
   minimum: number;
@@ -50,6 +52,7 @@ export function DurationInput({
     <input
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
+      aria-label={ariaLabel}
       inputMode="numeric"
       onBlur={(event) => {
         updateValidity(event.currentTarget, invalid);

@@ -251,14 +251,9 @@ describe("ActiveTrainingScreen", () => {
     expect(await screen.findByText("Executando agora…")).toBeTruthy();
     expect(screen.queryByLabelText(/Tempo de treino/)).toBeNull();
     expect(screen.queryByText("Treino A")).toBeNull();
-    expect(await screen.findByText("8–12 repetições · 40 kg")).toBeTruthy();
-    expect(screen.queryByRole("spinbutton", { name: "Carga kg" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Concluir série" }));
-    expect(
-      await screen.findByRole("dialog", { name: "Série 1 de 2" }),
-    ).toBeTruthy();
+    expect(await screen.findByText("Série e repetições")).toBeTruthy();
     expect(await screen.findByText(/Última vez/)).toBeTruthy();
-    expect(screen.getByText("37,5 kg × 10 repetições")).toBeTruthy();
+    expect(screen.getByText(/37,5 kg × 10 repetições/)).toBeTruthy();
     expect(
       (
         await screen.findByRole("spinbutton", { name: "Repetições" })
@@ -269,45 +264,42 @@ describe("ActiveTrainingScreen", () => {
         .getByRole("spinbutton", { name: "Carga kg" })
         .getAttribute("value"),
     ).toBe("40");
-    await user.click(screen.getByRole("button", { name: "Salvar série" }));
-    expect(
-      await screen.findByRole("dialog", { name: "Descanso" }),
-    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Concluir série e iniciar descanso",
+      }),
+    );
     expect(screen.getByText("01:30")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Voltar ao treino" })).toBe(
-      document.activeElement,
+    await user.click(
+      screen.getByRole("button", { name: "Adicionar 30 segundos" }),
     );
-    await user.tab({ shift: true });
-    expect(screen.getByRole("button", { name: "+30 segundos" })).toBe(
-      document.activeElement,
-    );
-    await user.click(screen.getByRole("button", { name: "+30 segundos" }));
     expect(await screen.findByText("02:00")).toBeTruthy();
-    await user.keyboard("{Escape}");
-    const miniTimer = screen.getByRole("button", {
-      name: "Abrir descanso, 02:00 restantes",
-    });
-    expect(miniTimer).toBe(document.activeElement);
-    await user.click(miniTimer);
-    await user.click(screen.getByRole("button", { name: "Concluir descanso" }));
-    expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Concluir descanso e continuar",
+      }),
+    );
+    expect(await screen.findByText("2 de 2")).toBeTruthy();
     expect(screen.queryByText("Planejado")).toBeNull();
     expect(screen.queryByText("Realizado")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Concluir série" }));
     expect(
       screen
         .getByRole("spinbutton", { name: "Carga kg" })
         .getAttribute("value"),
     ).toBe("42.5");
-    await user.click(
-      screen.getByRole("button", { name: "Reduzir carga em 2,5 kg" }),
-    );
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Carga kg" }), {
+      target: { value: "40" },
+    });
     expect(
       screen
         .getByRole("spinbutton", { name: "Carga kg" })
         .getAttribute("value"),
     ).toBe("40");
-    await user.click(screen.getByRole("button", { name: "Salvar série" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Concluir série e iniciar descanso",
+      }),
+    );
     await user.click(
       await screen.findByRole("button", { name: "Finalizar treino" }),
     );
@@ -381,14 +373,17 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
     await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
+      await screen.findByRole("button", {
+        name: "Concluir série e iniciar descanso",
+      }),
     );
-    await user.click(screen.getByRole("button", { name: "Salvar série" }));
     await user.click(
-      await screen.findByRole("button", { name: "Concluir descanso" }),
+      await screen.findByRole("button", {
+        name: "Concluir descanso e continuar",
+      }),
     );
 
-    expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
+    expect(await screen.findByText("2 de 2")).toBeTruthy();
     expect(screen.queryByText("Não foi possível salvar agora.")).toBeNull();
     expect(load).toHaveBeenCalledOnce();
   });
@@ -466,9 +461,10 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
     await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
+      await screen.findByRole("button", {
+        name: "Concluir série e iniciar descanso",
+      }),
     );
-    await user.click(screen.getByRole("button", { name: "Salvar série" }));
 
     expect(await screen.findByLabelText(/Salvo neste aparelho/)).toBeTruthy();
     await user.click(
@@ -530,11 +526,9 @@ describe("ActiveTrainingScreen", () => {
     ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Entendi" }));
 
-    const firstHeading = await screen.findByRole("heading", {
-      name: "Agachamento",
+    const exerciseSurface = await screen.findByRole("region", {
+      name: /Agachamento, série 1 de 2/,
     });
-    const exerciseSurface = firstHeading.closest("section");
-    expect(exerciseSurface).toBeTruthy();
     fireEvent.touchStart(exerciseSurface!, {
       touches: [{ clientX: 280, clientY: 320 }],
     });
@@ -827,9 +821,6 @@ describe("ActiveTrainingScreen", () => {
     await openActiveExercise(user);
 
     await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
-    );
-    await user.click(
       screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
     expect(
@@ -854,9 +845,6 @@ describe("ActiveTrainingScreen", () => {
       ),
     );
     await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
-    );
-    await user.click(
       screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
     await user.click(screen.getByRole("button", { name: "Continuar" }));
@@ -873,7 +861,7 @@ describe("ActiveTrainingScreen", () => {
         }),
       ),
     );
-    expect(await screen.findByText("Série 1 de 2")).toBeTruthy();
+    expect(await screen.findByText("1 de 2")).toBeTruthy();
   });
 
   it("lets the user choose an older set without offering an unsafe undo", async () => {
@@ -937,9 +925,6 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
-    );
     await user.click(
       screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
@@ -1155,9 +1140,6 @@ describe("ActiveTrainingScreen", () => {
 
     await openActiveExercise(user, "Prancha lateral");
 
-    await user.click(
-      await screen.findByRole("button", { name: "Concluir série" }),
-    );
     const duration = await screen.findByRole("textbox", {
       name: "Tempo",
     });
