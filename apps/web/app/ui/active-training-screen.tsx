@@ -878,7 +878,9 @@ function ExerciseExecution({
   resting: boolean;
 }>) {
   const revisionTriggerRef = useRef<HTMLButtonElement>(null);
+  const revisionMenuRef = useRef<HTMLDivElement>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionMenuOpen, setRevisionMenuOpen] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const nextSet = exercise.setExecutions.length + 1;
   const lastSet = exercise.setExecutions.at(-1);
@@ -931,9 +933,83 @@ function ExerciseExecution({
     (!needsDuration || actualDurationSeconds !== null) &&
     (!needsDistance || actualDistanceMeters !== null);
 
+  useEffect(() => {
+    if (!revisionMenuOpen) {
+      return;
+    }
+
+    revisionMenuRef.current
+      ?.querySelector<HTMLButtonElement>('button[role="menuitem"]')
+      ?.focus();
+
+    function closeMenu(event: MouseEvent | KeyboardEvent) {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") {
+        return;
+      }
+      if (
+        event instanceof MouseEvent &&
+        (revisionMenuRef.current?.contains(event.target as Node) ||
+          revisionTriggerRef.current?.contains(event.target as Node))
+      ) {
+        return;
+      }
+      setRevisionMenuOpen(false);
+      if (event instanceof KeyboardEvent) {
+        revisionTriggerRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("mousedown", closeMenu);
+    window.addEventListener("keydown", closeMenu);
+    return () => {
+      document.removeEventListener("mousedown", closeMenu);
+      window.removeEventListener("keydown", closeMenu);
+    };
+  }, [revisionMenuOpen]);
+
   function closeRevisionFlow() {
     setRevisionOpen(false);
     window.requestAnimationFrame(() => revisionTriggerRef.current?.focus());
+  }
+
+  function openRevisionFlow() {
+    setRevisionMenuOpen(false);
+    setRevisionOpen(true);
+  }
+
+  function revisionMenu() {
+    if (exercise.setExecutions.length === 0 || resting) {
+      return null;
+    }
+
+    return (
+      <div className="exercise-more-actions">
+        <button
+          aria-expanded={revisionMenuOpen}
+          aria-haspopup="menu"
+          aria-label="Mais ações"
+          className="exercise-more-actions-trigger"
+          disabled={busy}
+          onClick={() => setRevisionMenuOpen((open) => !open)}
+          ref={revisionTriggerRef}
+          type="button"
+        >
+          <AppIcon name="more" size={25} />
+        </button>
+        {revisionMenuOpen ? (
+          <div
+            aria-label="Mais ações da série"
+            className="exercise-more-actions-menu"
+            ref={revisionMenuRef}
+            role="menu"
+          >
+            <button onClick={openRevisionFlow} role="menuitem" type="button">
+              Ajustar série anterior
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   async function saveSetAndStartRest() {
@@ -956,22 +1032,13 @@ function ExerciseExecution({
   if (exercise.completedAt) {
     return (
       <>
-        <div className="exercise-completed-summary">
+        <div className="exercise-completed-summary exercise-summary-with-actions">
+          {revisionMenu()}
           <strong>Exercício concluído</strong>
           {exercise.setExecutions.length === 0 ? (
             <p>{exerciseTarget(exercise)}</p>
           ) : null}
         </div>
-        {exercise.setExecutions.length > 0 ? (
-          <button
-            className="button-text set-adjustment-trigger"
-            onClick={() => setRevisionOpen(true)}
-            ref={revisionTriggerRef}
-            type="button"
-          >
-            Ajustar ou desfazer
-          </button>
-        ) : null}
         {revisionOpen ? (
           <SetRevisionFlow
             busy={busy}
@@ -1019,11 +1086,14 @@ function ExerciseExecution({
 
   return (
     <div className="exercise-active-state">
-      <div
-        className="exercise-media-placeholder exercise-executing-placeholder"
-        role="status"
-      >
-        <span>{resting ? "Descanso" : "Executando agora…"}</span>
+      <div className="exercise-media-stage">
+        <div
+          className="exercise-media-placeholder exercise-executing-placeholder"
+          role="status"
+        >
+          <span>{resting ? "Descanso" : "Executando agora…"}</span>
+        </div>
+        {revisionMenu()}
       </div>
       {!resting ? (
         <>
@@ -1131,16 +1201,6 @@ function ExerciseExecution({
             </span>
           </button>
         </>
-      ) : null}
-      {exercise.setExecutions.length > 0 && !resting ? (
-        <button
-          className="button-text set-adjustment-trigger"
-          onClick={() => setRevisionOpen(true)}
-          ref={revisionTriggerRef}
-          type="button"
-        >
-          Ajustar série anterior
-        </button>
       ) : null}
       {revisionOpen ? (
         <SetRevisionFlow
@@ -2540,12 +2600,14 @@ export function ActiveTrainingScreen({
             </button>
           ) : skipIndex >= 0 ? (
             <button
-              className="button-secondary skip-exercise-button"
+              aria-label="Pular para o próximo exercício"
+              className="skip-exercise-button"
               disabled={busy}
               onClick={() => setSelectedIndex(skipIndex)}
+              title="Pular por agora"
               type="button"
             >
-              Pular por agora
+              <AppIcon name="skip" size={27} />
             </button>
           ) : null}
         </section>

@@ -293,7 +293,10 @@ US-010A acrescentou ajuste, vibração opcional e resumo essencial.
   `+30 s`, vibração e retomada continuam usando o snapshot local; a lista mantém
   um mini timer em vez de abrir uma tela adicional;
 - histórico anterior, orientação e correção/desfazer ficam sob divulgação
-  progressiva. Cardio e circuitos preservam duração e distância no mesmo popup;
+  progressiva no menu `Mais ações` sobre a área de mídia. `Pular por agora`
+  usa um controle circular de avançar com rótulo acessível, mas continua apenas
+  selecionando o próximo exercício no cliente. Cardio e circuitos preservam
+  duração e distância no mesmo popup;
 - testes da tela cobrem a sequência
   `iniciar → concluir → revisar valores → salvar → descansar`, navegação por
   gesto/controles, valores sugeridos por série, estado offline e medidas por

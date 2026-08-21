@@ -1700,18 +1700,29 @@ button.session-sync-indicator {
   margin-top: var(--space-5);
 }
 
-.exercise-active-state .set-adjustment-trigger {
-  width: auto;
-  min-height: 44px;
-  margin-top: var(--space-2);
-  padding-inline: var(--space-3);
+.skip-exercise-button {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin: var(--space-3) max(0px, calc((100% - 30rem) / 2)) 0 auto;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-action-soft);
+  color: var(--color-action-pressed);
+  cursor: pointer;
 }
 
-.skip-exercise-button {
-  width: min(100%, 30rem);
-  min-height: 52px;
-  margin: var(--space-3) auto 0;
-  flex: 0 0 auto;
+.skip-exercise-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-action) 35%, transparent);
+  outline-offset: 3px;
+}
+
+.skip-exercise-button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .finish-training-button {
@@ -1732,6 +1743,80 @@ button.session-sync-indicator {
     radial-gradient(circle at center, var(--color-card), transparent 68%),
     var(--color-action-soft);
   color: var(--color-text-secondary);
+}
+
+.exercise-media-stage {
+  position: relative;
+  width: min(100%, 30rem);
+  margin: 0 auto;
+}
+
+.exercise-media-stage .exercise-media-placeholder {
+  width: 100%;
+}
+
+.exercise-more-actions {
+  position: absolute;
+  z-index: 4;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.exercise-more-actions-trigger {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-card) 82%, transparent);
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgb(25 18 14 / 12%);
+}
+
+.exercise-more-actions-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-action) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.exercise-more-actions-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: max-content;
+  min-width: 13rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  box-shadow: 0 12px 32px rgb(16 24 40 / 18%);
+}
+
+.exercise-more-actions-menu button {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exercise-more-actions-menu button:hover,
+.exercise-more-actions-menu button:focus-visible {
+  outline: 0;
+  background: var(--color-action-soft);
+}
+
+.exercise-summary-with-actions {
+  position: relative;
+  width: min(100%, 30rem);
+  padding-top: calc(var(--space-8) + 44px);
 }
 
 .exercise-media-ready {

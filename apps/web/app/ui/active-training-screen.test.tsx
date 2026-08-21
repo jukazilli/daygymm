@@ -89,6 +89,13 @@ async function openActiveExercise(
   );
 }
 
+async function openSetAdjustment(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Mais ações" }));
+  await user.click(
+    screen.getByRole("menuitem", { name: "Ajustar série anterior" }),
+  );
+}
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
@@ -549,7 +556,9 @@ describe("ActiveTrainingScreen", () => {
     expect(
       await screen.findByRole("heading", { name: "Agachamento" }),
     ).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Pular por agora" }));
+    await user.click(
+      screen.getByRole("button", { name: "Pular para o próximo exercício" }),
+    );
     expect(
       await screen.findByRole("heading", { name: "Mesa flexora" }),
     ).toBeTruthy();
@@ -820,9 +829,10 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
 
-    await user.click(
-      screen.getByRole("button", { name: "Ajustar série anterior" }),
-    );
+    expect(
+      screen.queryByRole("menuitem", { name: "Ajustar série anterior" }),
+    ).toBeNull();
+    await openSetAdjustment(user);
     expect(
       screen.getByRole("dialog", { name: "Escolha uma série" }),
     ).toBeTruthy();
@@ -844,9 +854,7 @@ describe("ActiveTrainingScreen", () => {
         }),
       ),
     );
-    await user.click(
-      screen.getByRole("button", { name: "Ajustar série anterior" }),
-    );
+    await openSetAdjustment(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     await user.click(
       screen.getByRole("button", { name: "Desfazer esta série" }),
@@ -925,9 +933,7 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
 
-    await user.click(
-      screen.getByRole("button", { name: "Ajustar série anterior" }),
-    );
+    await openSetAdjustment(user);
     const firstSetOption = screen.getByRole("radio", { name: /Série 1/ });
     const secondSetOption = screen.getByRole("radio", { name: /Série 2/ });
     expect((secondSetOption as HTMLInputElement).checked).toBe(true);
