@@ -19,6 +19,23 @@ pela verificação de identidade da Apple.
 O perfil `preview` é nativo e inclui SQLCipher, SecureStore e NetInfo. Ele não é
 Expo Go e não precisa de Metro após a instalação.
 
+## Bloqueio temporário da Play Store
+
+Em 21 de agosto de 2026, o owner adiou a criação da conta Google Play Console
+porque não pode financiar agora a taxa única de US$ 25. A previsão informada
+para pagamento e reavaliação é 3 de setembro de 2026.
+
+O bloqueio alcança somente o registro definitivo do app no Play Console, Play
+App Signing, upload do AAB, criação da faixa de teste e instalação pela Play
+Store. Ele não bloqueia o PWA em staging, novos builds EAS nem este fluxo de
+instalação direta do APK `preview`. Antes de executar qualquer etapa dependente
+da loja, confirmar com o owner se a conta está ativa e alertar que a taxa passou
+a ser necessária; não iniciar pagamento ou contratação implicitamente.
+
+Condição de retomada: owner confirma a conta Google Play ativa e o pagamento da
+taxa. Até lá, usar este runbook para teste Android físico e priorizar o
+desenvolvimento e a homologação do PWA.
+
 ## Candidato atual
 
 - Commit: `71572f8814254453358d398664a7f879c3380eff`.

@@ -104,6 +104,15 @@ de agosto de 2026 e produziu o APK interno de `preview`. A prova funcional em
 Android físico continua pendente; o bloqueio externo da Apple e a prova em
 iPhone permanecem abertos até a resposta do Apple Developer Support.
 
+Em 21 de agosto de 2026, a distribuição Android pela Google Play foi adiada por
+decisão financeira do owner: a taxa única de US$ 25 da conta Play Console não
+será paga agora, com previsão de reavaliação em 3 de setembro de 2026. O bloqueio
+é restrito ao cadastro do app, Play App Signing, upload de AAB, faixas de teste e
+instalação pela Play Store. PWA, staging, EAS e instalação direta do APK
+`preview` continuam autorizados. Antes de qualquer dependência real do Play
+Console, o owner deve ser alertado e confirmar conta ativa e pagamento; nenhuma
+contratação é implícita.
+
 ## Estado do subcorte de autenticação
 
 ### Continuidade de sessão
