@@ -45,6 +45,11 @@ function formatClock(totalSeconds: number) {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function setDocumentScrollTop(top: number) {
+  document.documentElement.scrollTop = top;
+  document.body.scrollTop = top;
+}
+
 function roundedWeight(value: number) {
   return Math.round(value * 100) / 100;
 }
@@ -1480,6 +1485,7 @@ export function ActiveTrainingScreen({
   >();
   const syncRefreshAtRef = useRef<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [sessionView, setSessionView] = useState<"list" | "exercise">("list");
   const [busy, setBusy] = useState(false);
   const [dialogAction, setDialogAction] = useState<
     "cancel" | "pause" | "restart"
@@ -1490,6 +1496,8 @@ export function ActiveTrainingScreen({
   const [error, setError] = useState<string>();
   const [finishedSummary, setFinishedSummary] =
     useState<FinishedTrainingSummary>();
+  const listScrollYRef = useRef(0);
+  const restoreListScrollRef = useRef(false);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const tutorialRunRef = useRef<string | null>(null);
 
@@ -1549,6 +1557,7 @@ export function ActiveTrainingScreen({
     const activeRun = state?.activeRun;
     if (
       !activeRun ||
+      sessionView !== "exercise" ||
       activeRun.session.items.length < 2 ||
       tutorialRunRef.current === activeRun.runId
     ) {
@@ -1563,7 +1572,7 @@ export function ActiveTrainingScreen({
       // The tutorial still works when storage is unavailable.
     }
     setNavigationTutorialOpen(true);
-  }, [state?.activeRun]);
+  }, [sessionView, state?.activeRun]);
 
   function closeNavigationTutorial() {
     try {
@@ -1615,7 +1624,7 @@ export function ActiveTrainingScreen({
     };
   }, []);
 
-  async function startTraining() {
+  async function startTraining(exerciseIndex: number) {
     if (!state?.nextSession || busy) {
       return;
     }
@@ -1640,8 +1649,36 @@ export function ActiveTrainingScreen({
           }
         : current,
     );
-    setSelectedIndex(0);
+    setSelectedIndex(exerciseIndex);
+    setSessionView("exercise");
   }
+
+  function openExercise(exerciseIndex: number) {
+    listScrollYRef.current =
+      window.scrollY || document.documentElement.scrollTop;
+    if (state?.activeRun) {
+      setSelectedIndex(exerciseIndex);
+      setSessionView("exercise");
+      return;
+    }
+    void startTraining(exerciseIndex);
+  }
+
+  function returnToExerciseList() {
+    restoreListScrollRef.current = true;
+    setSessionView("list");
+  }
+
+  useEffect(() => {
+    if (sessionView === "exercise") {
+      setDocumentScrollTop(0);
+      return;
+    }
+    if (restoreListScrollRef.current) {
+      restoreListScrollRef.current = false;
+      setDocumentScrollTop(listScrollYRef.current);
+    }
+  }, [sessionView]);
 
   async function startCurrentExercise() {
     const run = state?.activeRun;
@@ -1947,6 +1984,7 @@ export function ActiveTrainingScreen({
         : current,
     );
     setSelectedIndex(0);
+    setSessionView("list");
   }
 
   async function cancelTraining() {
@@ -2071,8 +2109,12 @@ export function ActiveTrainingScreen({
   }
 
   if (!state.activeRun) {
+    const plannedSetCount = state.nextSession.items.reduce(
+      (total, item) => total + item.sets,
+      0,
+    );
     return (
-      <main className="session-shell session-overview">
+      <main className="session-shell session-overview session-workout-list">
         <header className="session-topbar">
           <Link
             aria-label="Voltar"
@@ -2081,35 +2123,43 @@ export function ActiveTrainingScreen({
           >
             <AppIcon name="back" size={30} />
           </Link>
-          <span>Versão {state.plan.version}</span>
         </header>
-        <section className="session-intro">
-          <p className="eyebrow">{state.plan.name}</p>
-          <h1>{state.nextSession.name}</h1>
-          <p>
-            {trainingWeekdayName(state.nextSession.weekday)} ·{" "}
-            {state.nextSession.items.length} exercícios
+        <section className="workout-list-heading">
+          <p className="eyebrow">
+            {trainingWeekdayName(state.nextSession.weekday)}
           </p>
+          <h1>{state.nextSession.name}</h1>
+          <progress
+            aria-label={`Progresso do treino: 0 de ${plannedSetCount} séries`}
+            max={Math.max(1, plannedSetCount)}
+            value={0}
+          />
         </section>
-        <button
-          className="button-primary session-primary-action"
-          disabled={busy}
-          onClick={startTraining}
-          type="button"
-        >
-          {busy ? "Iniciando…" : "Iniciar treino"}
-        </button>
-        <ol className="session-exercise-preview">
-          {state.nextSession.items.map((exercise) => (
+        <ol className="workout-exercise-list" aria-label="Exercícios do treino">
+          {state.nextSession.items.map((exercise, index) => (
             <li key={exercise.itemId}>
-              <span>{exercise.order}</span>
-              <div>
-                <strong>{exercise.exerciseName}</strong>
-                <small>{exerciseTarget(exercise)}</small>
-              </div>
+              <button
+                aria-label={`Começar por ${exercise.exerciseName}`}
+                disabled={busy}
+                onClick={() => openExercise(index)}
+                type="button"
+              >
+                <span className="workout-exercise-order">{exercise.order}</span>
+                <span className="workout-exercise-copy">
+                  <strong>{exercise.exerciseName}</strong>
+                  <small>{exerciseTarget(exercise)}</small>
+                  <small>{formatClock(exercise.restSeconds)} de descanso</small>
+                </span>
+                <AppIcon name="forward" size={22} />
+              </button>
             </li>
           ))}
         </ol>
+        {busy ? (
+          <p className="workout-list-status" role="status">
+            Iniciando treino…
+          </p>
+        ) : null}
         {error ? (
           <p className="status-message status-error" role="alert">
             {error}
@@ -2157,9 +2207,25 @@ export function ActiveTrainingScreen({
   }
 
   return (
-    <main className="session-shell session-active">
+    <main
+      className={`session-shell session-active ${
+        sessionView === "list"
+          ? "session-workout-list"
+          : "session-exercise-detail"
+      }`}
+    >
       <header className="session-topbar">
-        {run.pausedAt ? (
+        {sessionView === "exercise" && !run.pausedAt ? (
+          <button
+            aria-label="Voltar para a lista de exercícios"
+            className="session-pause-action"
+            disabled={busy}
+            onClick={returnToExerciseList}
+            type="button"
+          >
+            <AppIcon name="back" size={30} />
+          </button>
+        ) : run.pausedAt ? (
           <Link
             aria-label="Voltar"
             className="session-back-action"
@@ -2209,24 +2275,84 @@ export function ActiveTrainingScreen({
         )}
       </header>
 
-      {run.pausedAt ? (
-        <section className="resume-training" aria-labelledby="resume-title">
-          <div>
-            <p className="eyebrow">Treino pausado</p>
-            <h2 id="resume-title">Continue de onde parou.</h2>
+      {sessionView === "list" ? (
+        <section className="workout-list-content">
+          {run.pausedAt ? (
+            <section className="resume-training" aria-labelledby="resume-title">
+              <div>
+                <p className="eyebrow">Treino pausado</p>
+                <h2 id="resume-title">Continue de onde parou.</h2>
+              </div>
+              <button
+                className="button-primary"
+                disabled={busy}
+                onClick={() => void resumeTraining()}
+                type="button"
+              >
+                {busy ? "Retomando…" : "Retomar treino"}
+              </button>
+            </section>
+          ) : null}
+          <div className="workout-list-heading">
+            <p className="eyebrow">Treino em andamento</p>
+            <h1>{run.session.name}</h1>
+            <progress
+              aria-label={`Progresso do treino: ${progressValue} de ${plannedSetCount} séries`}
+              max={progressMax}
+              value={progressValue}
+            />
           </div>
-          <button
-            className="button-primary"
-            disabled={busy}
-            onClick={() => void resumeTraining()}
-            type="button"
+          <ol
+            className="workout-exercise-list"
+            aria-label="Exercícios do treino"
           >
-            {busy ? "Retomando…" : "Retomar treino"}
-          </button>
+            {run.session.items.map((exercise, index) => (
+              <li
+                data-completed={exercise.completedAt ? "true" : undefined}
+                key={exercise.itemId}
+              >
+                <button
+                  aria-label={`Abrir ${exercise.exerciseName}`}
+                  disabled={busy || Boolean(run.pausedAt)}
+                  onClick={() => openExercise(index)}
+                  type="button"
+                >
+                  <span className="workout-exercise-order">
+                    {exercise.completedAt ? (
+                      <AppIcon name="check" size={20} />
+                    ) : (
+                      exercise.order
+                    )}
+                  </span>
+                  <span className="workout-exercise-copy">
+                    <strong>{exercise.exerciseName}</strong>
+                    <small>{exerciseTarget(exercise)}</small>
+                    <small>
+                      {formatClock(exercise.restSeconds)} de descanso
+                    </small>
+                  </span>
+                  <span className="workout-exercise-progress">
+                    {exercise.setExecutions.length}/{exercise.sets}
+                  </span>
+                  <AppIcon name="forward" size={22} />
+                </button>
+              </li>
+            ))}
+          </ol>
+          {allCompleted && !run.pausedAt ? (
+            <button
+              className="button-primary workout-list-finish"
+              disabled={busy}
+              onClick={finishTraining}
+              type="button"
+            >
+              {busy ? "Finalizando…" : "Finalizar treino"}
+            </button>
+          ) : null}
         </section>
       ) : null}
 
-      {!run.pausedAt && currentExercise ? (
+      {sessionView === "exercise" && !run.pausedAt && currentExercise ? (
         <section
           aria-label={`${currentExercise.exerciseName}, série ${Math.min(
             currentExercise.setExecutions.length + 1,

@@ -79,9 +79,6 @@ export function MyTrainingsScreen({
               <h1>Meus treinos</h1>
             </div>
           </header>
-          <p className="page-guidance">
-            Escolha a sessão que você quer realizar.
-          </p>
           <ol className="weekly-training-list" aria-label="Agenda semanal">
             {[1, 2, 3, 4, 5, 6, 7].map((weekday) => {
               const sessions = state.sessions.filter(

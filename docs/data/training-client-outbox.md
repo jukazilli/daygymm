@@ -264,6 +264,11 @@ US-010A acrescentou ajuste, vibração opcional e resumo essencial.
 
 ### Refinamento da execução focada — US-008/US-010
 
+- a rota de sessão adota navegação progressiva `lista → exercício`: Hoje e Meus
+  treinos abrem a lista da sessão, tocar em uma linha inicia a execução quando
+  necessário e abre o exercício escolhido, e voltar do detalhe retorna à lista;
+- a lista concentra nome do treino, progresso, alvo, descanso e séries concluídas.
+  O detalhe preserva apenas o contexto necessário para executar a série;
 - a reorganização é exclusivamente de interação: os comandos `startExercise`,
   `completeSet` e `reviseSet` continuam passando pelo mesmo gateway local-first,
   com a mesma chave idempotente, ordem causal e recuperação após suspensão;

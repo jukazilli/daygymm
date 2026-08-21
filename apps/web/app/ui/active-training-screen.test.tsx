@@ -80,6 +80,15 @@ function state(activeRun: ActiveTrainingRun | null): PracticalTrainingState {
   };
 }
 
+async function openActiveExercise(
+  user: ReturnType<typeof userEvent.setup>,
+  exerciseName = "Agachamento",
+) {
+  await user.click(
+    await screen.findByRole("button", { name: `Abrir ${exerciseName}` }),
+  );
+}
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
@@ -231,7 +240,7 @@ describe("ActiveTrainingScreen", () => {
     );
 
     await user.click(
-      await screen.findByRole("button", { name: "Iniciar treino" }),
+      await screen.findByRole("button", { name: "Começar por Agachamento" }),
     );
     expect(
       await screen.findByRole("heading", { name: "Agachamento" }),
@@ -370,6 +379,7 @@ describe("ActiveTrainingScreen", () => {
     };
 
     render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
     );
@@ -454,6 +464,7 @@ describe("ActiveTrainingScreen", () => {
     };
 
     render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
     );
@@ -512,6 +523,8 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
+    await openActiveExercise(user);
+
     expect(
       await screen.findByRole("dialog", { name: "Navegue com um gesto." }),
     ).toBeTruthy();
@@ -548,6 +561,18 @@ describe("ActiveTrainingScreen", () => {
     ).toBeTruthy();
     expect(gateway.startExercise).not.toHaveBeenCalled();
     expect(gateway.completeExercise).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Voltar para a lista de exercícios",
+      }),
+    );
+    expect(
+      screen.getByRole("list", { name: "Exercícios do treino" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("dialog", { name: "O que fazer com este treino?" }),
+    ).toBeNull();
   });
 
   it("keeps a blocked sync visible until the user chooses a recovery", async () => {
@@ -799,6 +824,7 @@ describe("ActiveTrainingScreen", () => {
     };
 
     render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
 
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
@@ -909,6 +935,7 @@ describe("ActiveTrainingScreen", () => {
     };
 
     render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
 
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
@@ -1076,6 +1103,7 @@ describe("ActiveTrainingScreen", () => {
   });
 
   it("uses duration for a circuit exercise without rendering null repetitions", async () => {
+    const user = userEvent.setup();
     const timedSession = {
       ...plannedSession,
       items: [
@@ -1125,9 +1153,11 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
-    await userEvent
-      .setup()
-      .click(await screen.findByRole("button", { name: "Concluir série" }));
+    await openActiveExercise(user, "Prancha lateral");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
     const duration = await screen.findByRole("textbox", {
       name: "Tempo",
     });
