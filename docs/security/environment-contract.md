@@ -98,6 +98,12 @@ gerado `dist`. O mobile agora possui `postinstall` explícito para compilar
 pacotes Expo também seguem os patches esperados pelo SDK 55; `expo install
 --check` é gate operacional antes de novos builds hospedados.
 
+O build corretivo `ffbaec61-aeca-4fbb-a90b-292cb8f122a2`, associado ao commit
+`71572f8814254453358d398664a7f879c3380eff`, terminou com sucesso no EAS em 20
+de agosto de 2026 e produziu o APK interno de `preview`. A prova funcional em
+Android físico continua pendente; o bloqueio externo da Apple e a prova em
+iPhone permanecem abertos até a resposta do Apple Developer Support.
+
 ## Estado do subcorte de autenticação
 
 ### Continuidade de sessão

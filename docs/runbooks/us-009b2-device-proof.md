@@ -1,8 +1,9 @@
 # Prova da US-009B2 em aparelho físico
 
-Status: jornada móvel conectada e verificada no CI de staging pelo commit
-`ad56772`; prova física priorizada no Android enquanto a validação de identidade
-da conta Apple bloqueia a emissão das credenciais iOS.
+Status: jornada móvel conectada e verificada no CI; APK candidato gerado pelo
+EAS no commit `71572f8`, build `ffbaec61-aeca-4fbb-a90b-292cb8f122a2`; prova
+física priorizada no Android enquanto a validação de identidade da conta Apple
+bloqueia a emissão das credenciais iOS.
 
 ## Objetivo
 

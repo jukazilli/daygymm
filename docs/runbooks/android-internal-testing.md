@@ -19,6 +19,17 @@ pela verificação de identidade da Apple.
 O perfil `preview` é nativo e inclui SQLCipher, SecureStore e NetInfo. Ele não é
 Expo Go e não precisa de Metro após a instalação.
 
+## Candidato atual
+
+- Commit: `71572f8814254453358d398664a7f879c3380eff`.
+- Build EAS: `ffbaec61-aeca-4fbb-a90b-292cb8f122a2`.
+- Resultado remoto: `FINISHED` em 20 de agosto de 2026.
+- Instalação interna:
+  `https://expo.dev/accounts/soberania-tech/projects/daygym/builds/ffbaec61-aeca-4fbb-a90b-292cb8f122a2`.
+
+Esse candidato está liberado para a prova em Android físico. O build bem-sucedido
+não substitui o smoke nem a prova de 30 minutos deste runbook.
+
 ## Gerar
 
 Na raiz do repositório:
