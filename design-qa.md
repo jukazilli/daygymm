@@ -155,9 +155,10 @@ final result: local mobile viewport verified; staging and owner acceptance pendi
   objetivo transplantado foi hierarquia e baixa densidade, sem copiar marca ou
   alterar contratos do domínio.
 - Viewports inspecionados: Chromium em 390 × 844 e 320 × 568 CSS px.
-- A execução ativa ocupa um único card em tela cheia. Tempo total, nome do
-  treino e contagens duplicadas foram removidos; a top bar mantém apenas voltar
-  e um ponto de sincronização verde, laranja ou vermelho com nome acessível.
+- A execução ativa ocupa uma única superfície laranja-clara em tela cheia, sem
+  card externo, borda ou recuo lateral duplicado. Tempo total, nome do treino e
+  contagens duplicadas foram removidos; a top bar mantém apenas voltar e um
+  ponto de sincronização verde, laranja ou vermelho com nome acessível.
 - Antes do play, a tela apresenta nome, série, meta, play e `Pular por agora`.
   Depois do play, o centro muda para o placeholder `Executando agora…` e mostra
   somente `Concluir série` e `Pular por agora`.
@@ -171,11 +172,12 @@ final result: local mobile viewport verified; staging and owner acceptance pendi
   estado fictício de conclusão, não altera o plano e permite retornar depois.
 - Correção/desfazer aparece apenas quando existe série registrada e continua em
   fluxo progressivo separado.
-- A barra de progresso foi integrada à borda superior do card e representa
+- A barra de progresso foi integrada ao topo da superfície e representa
   séries confirmadas, sem repetir `0 de N` e `1 de N` na tela.
-- Comparação visual local: o nome e a série dominam o card; os dois CTAs cabem
-  inclusive em 320 × 568; o bottom sheet preserva rolagem para teclado virtual.
-  Console da aplicação sem erros ou avisos.
+- Comparação visual local: o canvas contínuo eliminou a aparência de caixa
+  espremida e ampliou a largura útil; os dois CTAs cabem inclusive em 320 × 568;
+  o bottom sheet preserva rolagem para teclado virtual. Console da aplicação
+  sem erros ou avisos.
 - Prova automatizada: 12 cenários da tela, incluindo tutorial, swipe, fallback
   por teclado, ausência de setas visíveis, pulo sem mutação, confirmação,
   descanso após background, offline e correção.

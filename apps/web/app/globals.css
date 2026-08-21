@@ -20,7 +20,7 @@ body {
 }
 
 body:has(.session-active) {
-  background: var(--color-card);
+  background: var(--color-canvas);
 }
 
 .sr-only {
@@ -1195,14 +1195,20 @@ input:focus-visible {
 
 .session-active {
   display: flex;
+  width: 100%;
   min-height: 100dvh;
+  padding-right: 0;
+  padding-left: 0;
+  background: var(--color-canvas);
   flex-direction: column;
 }
 
 .session-active .session-topbar {
   position: relative;
   grid-template-columns: 1fr 1fr;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
+  padding: 0 var(--space-4);
+  background: var(--color-canvas);
 }
 
 .session-back-action,
@@ -1493,13 +1499,13 @@ button.session-sync-indicator {
   display: flex;
   min-height: calc(
     100dvh - max(var(--space-5), env(safe-area-inset-top)) -
-      max(var(--space-8), env(safe-area-inset-bottom)) - 67px
+      max(var(--space-8), env(safe-area-inset-bottom)) - 52px
   );
   padding: clamp(var(--space-6), 7vw, var(--space-8))
     clamp(var(--space-5), 6vw, var(--space-8))
     clamp(var(--space-5), 6vw, var(--space-8));
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border: 0;
+  border-radius: 0;
   background: var(--color-canvas);
   flex-direction: column;
   overflow: hidden;
@@ -1519,7 +1525,7 @@ button.session-sync-indicator {
   height: 6px;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  border-radius: 0;
   appearance: none;
   background: var(--color-action-soft);
 }
