@@ -27,6 +27,42 @@ function suggestedSetWeight(
   );
 }
 
+export function extendActiveTrainingRest(
+  state: PracticalTrainingState,
+  runId: string,
+  additionalSeconds: number,
+): PracticalTrainingState {
+  const rest = state.activeRest;
+  if (
+    !rest ||
+    rest.runId !== runId ||
+    !Number.isInteger(additionalSeconds) ||
+    additionalSeconds <= 0
+  ) {
+    return state;
+  }
+
+  const durationSeconds = Math.min(
+    1_800,
+    rest.durationSeconds + additionalSeconds,
+  );
+  const appliedSeconds = durationSeconds - rest.durationSeconds;
+  if (appliedSeconds <= 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    activeRest: {
+      ...rest,
+      durationSeconds,
+      endsAt: new Date(
+        new Date(rest.endsAt).getTime() + appliedSeconds * 1_000,
+      ).toISOString(),
+    },
+  };
+}
+
 export function applyCompletedTrainingSet(
   state: PracticalTrainingState,
   input: SetCompletionInput,

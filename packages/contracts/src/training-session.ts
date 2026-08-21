@@ -329,6 +329,10 @@ export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway
 export type TrainingSessionConflictResolution = "retry" | "use-server";
 
 export interface LocalFirstTrainingSessionGateway extends TrainingSessionGateway {
+  adjustRest(
+    runId: string,
+    additionalSeconds: number,
+  ): Promise<TrainingSessionResult<PracticalTrainingState>>;
   dismissRest(
     runId: string,
   ): Promise<TrainingSessionResult<PracticalTrainingState>>;

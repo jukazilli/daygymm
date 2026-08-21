@@ -185,6 +185,27 @@ Aceite do owner em 20/08/2026: a correção publicada no commit `bce2f15` foi
 aprovada após o teste em staging. A issue #42 foi encerrada; produção permanece
 inalterada.
 
+### US-010A — descanso ajustável e resumo essencial
+
+- o descanso deixa de interromper toda a sessão: abre como bottom sheet e pode
+  ser minimizado para um contador persistente sobre o treino;
+- `+30 segundos` altera o prazo absoluto no snapshot local, limitado a 30
+  minutos, de modo que refresh, suspensão ou reabertura preservem o ajuste;
+- a vibração ao terminar é uma preferência opcional, exibida somente quando a
+  API existe no navegador e mantida em memória se o armazenamento estiver
+  bloqueado;
+- concluir a última série abre um resumo curto calculado somente com registros
+  confirmados: duração, aderência, volume de força, tempo e distância;
+- sincronização pendente permanece visível, mas não bloqueia o resumo nem o
+  retorno para Hoje;
+- o diálogo move foco, fecha com `Escape` e devolve foco ao mini contador, sem
+  esconder a ação primária da série atual.
+
+O runtime cobre persistência do acréscimo e limite de 30 minutos. A tela cobre
+acrescentar tempo, minimizar/reabrir o descanso e os valores do resumo. Este
+recorte não cria equivalências de exercício nem inventa volume para séries não
+realizadas.
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
@@ -236,6 +257,7 @@ US-009B2b ainda deve executar o
 [roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md) sobre um
 development build do commit `ad56772`, com dois fechamentos/reaberturas e zero
 duplicação em pelo menos um aparelho. A segunda plataforma permanece no aceite
-abrangente da FND-017. Adicionar tempo, vibração, substituição e resumo continuam
-pertencendo à US-010; a persistência e a recomposição temporal do descanso foram
-antecipadas pela COR-006.
+abrangente da FND-017. Substituição com alternativa aprovada, conclusão parcial,
+PRs elegíveis, notas e recomendação de progressão continuam pertencendo aos
+próximos recortes da US-010. A COR-006 fechou a recomposição temporal e a
+US-010A acrescentou ajuste, vibração opcional e resumo essencial.

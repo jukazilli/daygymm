@@ -126,3 +126,25 @@ final result: cold-open offline verified in staging; 30-minute physical proof pe
   reconexão. A validação do owner permanece rastreada na issue #39.
 
 final result: offline agenda correction verified in staging; owner verification pending
+
+## US-010A — descanso ajustável e resumo essencial
+
+- Viewport inspecionado: Chromium em 390 × 844 CSS px, equivalente ao alvo
+  mobile estreito da direção de UI.
+- O descanso usa bottom sheet com fundo atenuado, drag handle, contador dominante
+  e somente as decisões do contexto: concluir, acrescentar 30 segundos, minimizar
+  e, quando suportado, vibrar ao terminar.
+- Minimizar devolve foco a um controle compacto no alcance do polegar e mantém a
+  série atual visível; reabrir devolve foco ao cabeçalho do diálogo.
+- O resumo final usa uma lista semântica de métricas, sem um card para cada dado:
+  duração e aderência dominam; volume, tempo e distância aparecem apenas quando
+  existem registros confirmados.
+- A inspeção encontrou uma célula vazia quando havia quantidade ímpar de
+  métricas. A última métrica passou a ocupar a largura inteira; o rótulo visual
+  do ajuste também foi encurtado para `+30 s`, preservando o nome acessível.
+- Snapshot acessível confirmou `dialog`, título, botões nomeados, foco inicial e
+  retorno de foco. O console terminou com zero erros e zero avisos da aplicação.
+- Vibração continua dependente do navegador e de ativação do usuário; a tela
+  não promete esse recurso quando a API não existe.
+
+final result: local mobile viewport verified; staging and owner acceptance pending

@@ -20,6 +20,7 @@ import {
 import {
   applyCancelledTraining,
   applyCompletedTrainingSetWithRest,
+  extendActiveTrainingRest,
   applyFinishedTraining,
   applyRevisedTrainingSet,
   applyStartedExercise,
@@ -488,6 +489,37 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
         return { ok: false, reason: "invalid" } as const;
       }
       const next = { ...snapshot, activeRest: null };
+      await this.store.saveSnapshot(ownerId, next);
+      return { ok: true, value: next } as const;
+    } catch {
+      this.blockLocalPersistence();
+      return { ok: false, reason: "unexpected" } as const;
+    }
+  }
+
+  async adjustRest(runId: string, additionalSeconds: number) {
+    const ownerId = await this.resolveOwnerId();
+    if (!ownerId) {
+      return { ok: false, reason: "session" } as const;
+    }
+    try {
+      const storedSnapshot = await this.store.readSnapshot(ownerId);
+      const snapshot = storedSnapshot
+        ? withoutExpiredRest(storedSnapshot, this.now())
+        : null;
+      if (
+        !snapshot ||
+        snapshot.activeRun?.runId !== runId ||
+        !snapshot.activeRest ||
+        !Number.isInteger(additionalSeconds) ||
+        additionalSeconds <= 0
+      ) {
+        return { ok: false, reason: "invalid" } as const;
+      }
+      const next = extendActiveTrainingRest(snapshot, runId, additionalSeconds);
+      if (next === snapshot) {
+        return { ok: false, reason: "invalid" } as const;
+      }
       await this.store.saveSnapshot(ownerId, next);
       return { ok: true, value: next } as const;
     } catch {

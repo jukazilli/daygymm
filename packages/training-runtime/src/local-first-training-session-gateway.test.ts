@@ -300,6 +300,81 @@ describe("TrainingSessionLocalFirstRuntime", () => {
     expect(afterDismiss.ok && afterDismiss.value.activeRest).toBeNull();
   });
 
+  it("extends the absolute rest deadline and persists the adjustment", async () => {
+    const connectivity = new MutableConnectivity(false);
+    const remote = remoteGateway();
+    const gateway = localGateway(store, connectivity, remote, {
+      now: () => new Date("2026-08-15T20:02:00.000Z"),
+    });
+    await gateway.completeSet(setInput);
+
+    const adjusted = await gateway.adjustRest(runId, 30);
+
+    expect(adjusted).toMatchObject({
+      ok: true,
+      value: {
+        activeRest: {
+          durationSeconds: 120,
+          endsAt: "2026-08-15T20:04:00.000Z",
+        },
+      },
+    });
+    expect(store.snapshots.get(ownerId)?.activeRest).toMatchObject({
+      durationSeconds: 120,
+      endsAt: "2026-08-15T20:04:00.000Z",
+    });
+    expect(remote.completeSet).not.toHaveBeenCalled();
+  });
+
+  it("caps an adjusted rest at thirty minutes", async () => {
+    const snapshot = activeState();
+    snapshot.activeRest = {
+      durationSeconds: 1_790,
+      endsAt: "2026-08-15T20:31:50.000Z",
+      nextItemId: itemId,
+      runId,
+      setNumber: 1,
+      sourceItemId: itemId,
+    };
+    snapshot.activeRun!.session.items[0]!.setExecutions = [
+      {
+        actualDistanceMeters: null,
+        actualDurationSeconds: null,
+        actualReps: 10,
+        actualWeightKg: 40,
+        completedAt: "2026-08-15T20:02:00.000Z",
+        plannedDistanceMeters: null,
+        plannedDurationSeconds: null,
+        plannedRepsMax: 12,
+        plannedRepsMin: 8,
+        plannedWeightKg: 40,
+        revision: 1,
+        setExecutionId: canonicalSetId,
+        setNumber: 1,
+        updatedAt: "2026-08-15T20:02:00.000Z",
+      },
+    ];
+    await store.saveSnapshot(ownerId, snapshot);
+    const gateway = localGateway(
+      store,
+      new MutableConnectivity(false),
+      remoteGateway(),
+      { now: () => new Date("2026-08-15T20:02:00.000Z") },
+    );
+
+    const adjusted = await gateway.adjustRest(runId, 30);
+
+    expect(adjusted).toMatchObject({
+      ok: true,
+      value: {
+        activeRest: {
+          durationSeconds: 1_800,
+          endsAt: "2026-08-15T20:32:00.000Z",
+        },
+      },
+    });
+  });
+
   it("drops a finished rest period when the app reopens", async () => {
     const connectivity = new MutableConnectivity(false);
     const remote = remoteGateway();

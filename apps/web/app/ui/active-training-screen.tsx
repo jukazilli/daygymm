@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type {
+  ActiveTrainingRun,
   LocalFirstTrainingSessionGateway,
   PracticalTrainingExercise,
   PracticalTrainingSet,
@@ -166,6 +167,52 @@ type SetRevisionRequest =
       readonly set: PracticalTrainingSet;
     }
   | { readonly action: "undo"; readonly set: PracticalTrainingSet };
+
+interface FinishedTrainingSummary {
+  readonly adherencePercent: number;
+  readonly completedSets: number;
+  readonly distanceMeters: number;
+  readonly durationSeconds: number;
+  readonly plannedSets: number;
+  readonly recordedDurationSeconds: number;
+  readonly volumeKg: number;
+}
+
+function trainingSummary(
+  run: ActiveTrainingRun,
+  durationSeconds: number,
+): FinishedTrainingSummary {
+  const sets = run.session.items.flatMap((item) => item.setExecutions);
+  const plannedSets = run.session.items.reduce(
+    (total, item) => total + item.sets,
+    0,
+  );
+  const completedSets = sets.length;
+  return {
+    adherencePercent:
+      plannedSets > 0
+        ? Math.min(100, Math.round((completedSets / plannedSets) * 100))
+        : 0,
+    completedSets,
+    distanceMeters: sets.reduce(
+      (total, set) => total + (set.actualDistanceMeters ?? 0),
+      0,
+    ),
+    durationSeconds,
+    plannedSets,
+    recordedDurationSeconds: sets.reduce(
+      (total, set) => total + (set.actualDurationSeconds ?? 0),
+      0,
+    ),
+    volumeKg: roundedWeight(
+      sets.reduce(
+        (total, set) =>
+          total + (set.actualWeightKg ?? 0) * (set.actualReps ?? 0),
+        0,
+      ),
+    ),
+  };
+}
 
 function SetRevisionDialog({
   busy,
@@ -768,6 +815,7 @@ function isLocalFirstGateway(
   candidate: TrainingSessionGateway,
 ): candidate is LocalFirstTrainingSessionGateway {
   return (
+    "adjustRest" in candidate &&
     "dismissRest" in candidate &&
     "getSyncState" in candidate &&
     "resolveConflict" in candidate &&
@@ -936,13 +984,29 @@ function ElapsedTimer({
   return <time aria-label={`Tempo de treino ${formatted}`}>{formatted}</time>;
 }
 
-function RestScreen({
+const restVibrationPreferenceKey = "daygym:rest-vibration";
+
+function RestTimer({
+  canAddTime,
   endsAt,
+  expanded,
+  onAddTime,
   onComplete,
+  onMinimize,
+  onOpen,
 }: Readonly<{
+  canAddTime: boolean;
   endsAt: string;
+  expanded: boolean;
+  onAddTime: () => void;
   onComplete: () => void;
+  onMinimize: () => void;
+  onOpen: () => void;
 }>) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const minimizeRef = useRef<HTMLButtonElement>(null);
+  const miniTimerRef = useRef<HTMLButtonElement>(null);
+  const notifiedRef = useRef(false);
   function currentRemainingSeconds() {
     return Math.max(
       0,
@@ -953,6 +1017,22 @@ function RestScreen({
   const [remainingSeconds, setRemainingSeconds] = useState(
     currentRemainingSeconds,
   );
+  const [vibrationSupported, setVibrationSupported] = useState(false);
+  const [vibrationEnabled, setVibrationEnabled] = useState(false);
+
+  useEffect(() => {
+    const supported = typeof navigator.vibrate === "function";
+    setVibrationSupported(supported);
+    if (supported) {
+      try {
+        setVibrationEnabled(
+          window.localStorage.getItem(restVibrationPreferenceKey) === "true",
+        );
+      } catch {
+        setVibrationEnabled(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     function updateRemaining() {
@@ -968,33 +1048,142 @@ function RestScreen({
   }, [endsAt]);
 
   useEffect(() => {
-    if (remainingSeconds <= 0) {
+    if (remainingSeconds <= 0 && !notifiedRef.current) {
+      notifiedRef.current = true;
+      if (vibrationEnabled && typeof navigator.vibrate === "function") {
+        navigator.vibrate([180, 80, 180]);
+      }
       onComplete();
     }
-  }, [onComplete, remainingSeconds]);
+  }, [onComplete, remainingSeconds, vibrationEnabled]);
+
+  useEffect(() => {
+    function handleDialogKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape" && expanded) {
+        onMinimize();
+        return;
+      }
+      if (event.key !== "Tab" || !expanded) {
+        return;
+      }
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), a[href], input:not(:disabled)",
+        ) ?? [],
+      );
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleDialogKeyboard);
+    if (expanded) {
+      minimizeRef.current?.focus();
+    } else {
+      miniTimerRef.current?.focus();
+    }
+    return () => window.removeEventListener("keydown", handleDialogKeyboard);
+  }, [expanded, onMinimize]);
+
+  function toggleVibration() {
+    const enabled = !vibrationEnabled;
+    setVibrationEnabled(enabled);
+    try {
+      window.localStorage.setItem(restVibrationPreferenceKey, String(enabled));
+    } catch {
+      // The in-memory preference still works when storage is unavailable.
+    }
+    if (enabled) {
+      navigator.vibrate?.(30);
+    }
+  }
 
   const formatted = formatClock(remainingSeconds);
+  if (!expanded) {
+    return (
+      <button
+        aria-label={`Abrir descanso, ${formatted} restantes`}
+        className="rest-mini-timer"
+        onClick={onOpen}
+        ref={miniTimerRef}
+        type="button"
+      >
+        <span>Descanso</span>
+        <time dateTime={`PT${remainingSeconds}S`}>{formatted}</time>
+      </button>
+    );
+  }
+
   return (
-    <section
-      aria-labelledby="rest-title"
-      aria-modal="true"
-      className="rest-screen"
-      role="dialog"
+    <div
+      className="rest-sheet-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) {
+          onMinimize();
+        }
+      }}
+      role="presentation"
     >
-      <div className="rest-screen-content">
-        <p className="eyebrow" id="rest-title">
-          Descanso
-        </p>
+      <section
+        aria-labelledby="rest-title"
+        aria-modal="true"
+        className="rest-sheet"
+        ref={dialogRef}
+        role="dialog"
+      >
+        <div className="rest-sheet-handle" aria-hidden="true" />
+        <header className="rest-sheet-header">
+          <p className="eyebrow" id="rest-title">
+            Descanso
+          </p>
+          <button
+            className="button-text"
+            onClick={onMinimize}
+            ref={minimizeRef}
+            type="button"
+          >
+            Voltar ao treino
+          </button>
+        </header>
         <time aria-live="polite" dateTime={`PT${remainingSeconds}S`}>
           {formatted}
         </time>
-      </div>
-      <div className="focused-flow-action">
-        <button className="button-primary" onClick={onComplete} type="button">
-          Concluir descanso
-        </button>
-      </div>
-    </section>
+        <div className="rest-sheet-actions">
+          <button className="button-primary" onClick={onComplete} type="button">
+            Concluir descanso
+          </button>
+          <button
+            aria-label="+30 segundos"
+            className="button-secondary"
+            disabled={!canAddTime}
+            onClick={onAddTime}
+            type="button"
+          >
+            +30 s
+          </button>
+        </div>
+        {vibrationSupported ? (
+          <button
+            aria-pressed={vibrationEnabled}
+            className="rest-vibration-toggle"
+            data-enabled={vibrationEnabled ? "true" : undefined}
+            onClick={toggleVibration}
+            type="button"
+          >
+            <span>Vibrar ao terminar</span>
+            <strong>{vibrationEnabled ? "Ativado" : "Desativado"}</strong>
+          </button>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
@@ -1111,8 +1300,10 @@ export function ActiveTrainingScreen({
     "cancel" | "pause" | "restart"
   >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [restExpanded, setRestExpanded] = useState(true);
   const [error, setError] = useState<string>();
-  const [finishedDuration, setFinishedDuration] = useState<number>();
+  const [finishedSummary, setFinishedSummary] =
+    useState<FinishedTrainingSummary>();
 
   function gateway() {
     gatewayRef.current ??= createLocalFirstTrainingSessionGateway();
@@ -1308,6 +1499,7 @@ export function ActiveTrainingScreen({
     const nextItems = nextState.activeRun?.session.items;
     const firstPending = nextItems?.findIndex((item) => !item.completedAt);
     if (nextState.activeRest) {
+      setRestExpanded(true);
       return;
     }
     if (result.value.exerciseCompleted) {
@@ -1331,6 +1523,7 @@ export function ActiveTrainingScreen({
     setState((current) =>
       current ? { ...current, activeRest: null } : current,
     );
+    setRestExpanded(false);
     const currentGateway = gateway();
     if (isLocalFirstGateway(currentGateway)) {
       const result = await currentGateway.dismissRest(restState.runId);
@@ -1338,6 +1531,40 @@ export function ActiveTrainingScreen({
         setError(sessionError(result.reason));
       }
     }
+  }
+
+  async function addRestTime() {
+    const restState = state?.activeRest;
+    if (!restState || restState.durationSeconds >= 1_800) {
+      return;
+    }
+    const currentGateway = gateway();
+    if (isLocalFirstGateway(currentGateway)) {
+      const result = await currentGateway.adjustRest(restState.runId, 30);
+      if (!result.ok) {
+        setError(sessionError(result.reason));
+        return;
+      }
+      setState(result.value);
+      return;
+    }
+    setState((current) => {
+      const activeRest = current?.activeRest;
+      if (!current || !activeRest || activeRest.runId !== restState.runId) {
+        return current;
+      }
+      const appliedSeconds = Math.min(30, 1_800 - activeRest.durationSeconds);
+      return {
+        ...current,
+        activeRest: {
+          ...activeRest,
+          durationSeconds: activeRest.durationSeconds + appliedSeconds,
+          endsAt: new Date(
+            new Date(activeRest.endsAt).getTime() + appliedSeconds * 1_000,
+          ).toISOString(),
+        },
+      };
+    });
   }
 
   async function synchronizeNow() {
@@ -1429,7 +1656,7 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
-    setFinishedDuration(result.value.durationSeconds);
+    setFinishedSummary(trainingSummary(run, result.value.durationSeconds));
   }
 
   async function pauseTraining() {
@@ -1550,12 +1777,54 @@ export function ActiveTrainingScreen({
     setBusy(false);
   }
 
-  if (finishedDuration !== undefined) {
+  if (finishedSummary) {
     return (
       <main className="session-shell session-finished">
         <p className="eyebrow">Treino salvo</p>
         <h1>Treino concluído.</h1>
-        <p>{formatTrainingDuration(finishedDuration)} de atividade</p>
+        <dl className="training-summary">
+          <div className="training-summary-highlight">
+            <dt>Duração</dt>
+            <dd>{formatTrainingDuration(finishedSummary.durationSeconds)}</dd>
+          </div>
+          <div className="training-summary-highlight">
+            <dt>Aderência</dt>
+            <dd>
+              <span>{finishedSummary.adherencePercent}%</span>
+              <small>
+                {finishedSummary.completedSets} de {finishedSummary.plannedSets}{" "}
+                {finishedSummary.plannedSets === 1 ? "série" : "séries"}
+              </small>
+            </dd>
+          </div>
+          {finishedSummary.volumeKg > 0 ? (
+            <div>
+              <dt>Volume</dt>
+              <dd>{formatWeight(finishedSummary.volumeKg)} kg</dd>
+            </div>
+          ) : null}
+          {finishedSummary.recordedDurationSeconds > 0 ? (
+            <div>
+              <dt>Tempo registrado</dt>
+              <dd>
+                {formatTrainingDuration(
+                  finishedSummary.recordedDurationSeconds,
+                )}
+              </dd>
+            </div>
+          ) : null}
+          {finishedSummary.distanceMeters > 0 ? (
+            <div>
+              <dt>Distância</dt>
+              <dd>{finishedSummary.distanceMeters} m</dd>
+            </div>
+          ) : null}
+        </dl>
+        {syncState.pendingCount > 0 ? (
+          <p className="training-summary-sync" role="status">
+            Salvo neste aparelho · sincronização pendente
+          </p>
+        ) : null}
         <Link className="button-primary" href="/hoje/">
           Voltar para Hoje
         </Link>
@@ -1816,9 +2085,14 @@ export function ActiveTrainingScreen({
         />
       ) : null}
       {state?.activeRest ? (
-        <RestScreen
+        <RestTimer
+          canAddTime={state.activeRest.durationSeconds < 1_800}
           endsAt={state.activeRest.endsAt}
+          expanded={restExpanded}
+          onAddTime={() => void addRestTime()}
           onComplete={() => void completeRest()}
+          onMinimize={() => setRestExpanded(false)}
+          onOpen={() => setRestExpanded(true)}
         />
       ) : null}
     </main>

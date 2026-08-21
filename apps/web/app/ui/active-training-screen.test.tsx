@@ -254,6 +254,21 @@ describe("ActiveTrainingScreen", () => {
       await screen.findByRole("dialog", { name: "Descanso" }),
     ).toBeTruthy();
     expect(screen.getByText("01:30")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Voltar ao treino" })).toBe(
+      document.activeElement,
+    );
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "+30 segundos" })).toBe(
+      document.activeElement,
+    );
+    await user.click(screen.getByRole("button", { name: "+30 segundos" }));
+    expect(await screen.findByText("02:00")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    const miniTimer = screen.getByRole("button", {
+      name: "Abrir descanso, 02:00 restantes",
+    });
+    expect(miniTimer).toBe(document.activeElement);
+    await user.click(miniTimer);
     await user.click(screen.getByRole("button", { name: "Concluir descanso" }));
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
     expect(screen.queryByText("Planejado")).toBeNull();
@@ -277,6 +292,9 @@ describe("ActiveTrainingScreen", () => {
     );
 
     expect(await screen.findByText("Treino concluído.")).toBeTruthy();
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getByText("2 de 2 séries")).toBeTruthy();
+    expect(screen.getByText("960 kg")).toBeTruthy();
     expect(gateway.start).toHaveBeenCalledWith(plannedSession.sessionId);
     expect(gateway.load).toHaveBeenNthCalledWith(1, plannedSession.sessionId);
     expect(gateway.startExercise).toHaveBeenCalledWith(
@@ -373,6 +391,7 @@ describe("ActiveTrainingScreen", () => {
       ((state: TrainingSessionSyncState) => void) | undefined;
     const synchronize = vi.fn().mockResolvedValue(undefined);
     const gateway: LocalFirstTrainingSessionGateway = {
+      adjustRest: vi.fn(),
       cancel: vi.fn(),
       completeExercise: vi.fn(),
       completeSet: vi.fn().mockImplementation(async () => {
@@ -450,6 +469,7 @@ describe("ActiveTrainingScreen", () => {
       value: canonical,
     });
     const gateway: LocalFirstTrainingSessionGateway = {
+      adjustRest: vi.fn(),
       cancel: vi.fn(),
       completeExercise: vi.fn(),
       completeSet: vi.fn(),
