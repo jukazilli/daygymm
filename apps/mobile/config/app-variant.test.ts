@@ -75,6 +75,22 @@ describe("mobile app variants", () => {
     ]);
     expect(config.android?.allowBackup).toBe(false);
   });
+
+  it("links the canonical Expo project and icon", () => {
+    const config = appConfig({
+      config: { name: "DayGym", slug: "daygym" },
+      packageJsonPath: null,
+      projectRoot: "C:/daygym/apps/mobile",
+      staticConfigPath: null,
+    });
+
+    expect(config.owner).toBe("soberania-tech");
+    expect(config.slug).toBe("daygym");
+    expect(config.icon).toBe("./assets/icon.png");
+    expect(config.extra?.eas).toEqual({
+      projectId: "5875a3a9-584b-4987-8086-cf110fbbf168",
+    });
+  });
 });
 
 describe("EAS profiles", () => {

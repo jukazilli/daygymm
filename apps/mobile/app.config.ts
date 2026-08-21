@@ -36,6 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: app.name,
+    owner: "soberania-tech",
     slug: "daygym",
     version: "0.1.0",
     icon: "./assets/icon.png",
@@ -99,6 +100,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...config.extra,
       appVariant: app.variant,
       authCallback: app.authCallback,
+      eas: {
+        projectId: "5875a3a9-584b-4987-8086-cf110fbbf168",
+      },
     },
   };
 };

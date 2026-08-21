@@ -62,11 +62,19 @@ fingerprint e perfis explícitos `development`, `preview` e `production`. Cada
 perfil seleciona seu próprio ambiente, channel, identificador de instalação e
 deep link; a ausência de `APP_VARIANT` falha de forma segura em `development`.
 
-O projeto remoto Expo/EAS, os ambientes hospedados e as credenciais de loja
-ainda não foram criados neste corte porque a sessão operacional não está
-autenticada no EAS. FND-016 permanece `In Progress` até um owner conectar o
-project ID, definir recuperação das credenciais e provar ao menos os builds de
-development e preview sem compartilhar valores com production.
+O projeto remoto `@soberania-tech/daygym` está vinculado pelo ID público
+`5875a3a9-584b-4987-8086-cf110fbbf168`. O painel usa o mesmo PNG 1024 × 1024
+versionado em `apps/mobile/assets/icon.png`. Os ambientes `development` e
+`preview` contêm somente `EXPO_PUBLIC_SUPABASE_URL` e
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, obtidas da configuração pública já
+publicada em staging; `production` permanece sem variáveis. Nenhum valor foi
+copiado para o repositório ou para logs.
+
+FND-016 permanece `In Progress` até definir a recuperação das credenciais e
+provar ao menos os builds de development e preview sem compartilhar valores com
+production. O primeiro projeto remoto criado com slug `soberania` não está
+vinculado ao aplicativo e deve ser removido somente após autorização explícita
+do owner.
 
 ## Estado do subcorte de autenticação
 
