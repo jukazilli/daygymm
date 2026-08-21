@@ -1193,6 +1193,18 @@ input:focus-visible {
   background: var(--color-card);
 }
 
+.session-active {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.session-active .session-topbar {
+  position: relative;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: var(--space-3);
+}
+
 .session-back-action,
 .session-pause-action {
   display: grid;
@@ -1254,6 +1266,61 @@ button.session-saved:focus-visible {
 
 .session-saved[data-sync-status="conflict"]::before {
   color: var(--color-danger);
+}
+
+.session-sync-indicator {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  justify-self: end;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.session-sync-indicator::before {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--color-success) 12%, transparent);
+  content: "";
+}
+
+button.session-sync-indicator {
+  cursor: pointer;
+}
+
+.session-sync-indicator:focus-visible {
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: 2px;
+}
+
+.session-sync-indicator[data-sync-status="offline"]::before,
+.session-sync-indicator[data-sync-status="pending"]::before,
+.session-sync-indicator[data-sync-status="syncing"]::before {
+  background: var(--color-action);
+  box-shadow: 0 0 0 4px var(--color-action-soft);
+}
+
+.session-sync-indicator[data-sync-status="syncing"]::before {
+  animation: sync-pulse 1.2s ease-in-out infinite;
+}
+
+.session-sync-indicator[data-sync-status="conflict"]::before {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+@keyframes sync-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
 }
 
 .session-intro {
@@ -1422,15 +1489,48 @@ button.session-saved:focus-visible {
 }
 
 .current-exercise {
+  position: relative;
   display: flex;
-  min-height: clamp(27rem, 58dvh, 38rem);
-  padding: clamp(var(--space-5), 6vw, var(--space-8));
+  min-height: calc(
+    100dvh - max(var(--space-5), env(safe-area-inset-top)) -
+      max(var(--space-8), env(safe-area-inset-bottom)) - 67px
+  );
+  padding: clamp(var(--space-6), 7vw, var(--space-8))
+    clamp(var(--space-5), 6vw, var(--space-8))
+    clamp(var(--space-5), 6vw, var(--space-8));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   flex-direction: column;
   overflow: hidden;
   touch-action: pan-y;
+}
+
+.current-exercise:focus-visible {
+  outline: 3px solid var(--color-action-soft);
+  outline-offset: -3px;
+}
+
+.current-exercise-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  appearance: none;
+  background: var(--color-action-soft);
+}
+
+.current-exercise-progress::-webkit-progress-bar {
+  background: var(--color-action-soft);
+}
+
+.current-exercise-progress::-webkit-progress-value,
+.current-exercise-progress::-moz-progress-bar {
+  background: var(--color-action);
 }
 
 .current-exercise-heading {
@@ -1490,7 +1590,7 @@ button.session-saved:focus-visible {
 .exercise-active-state .complete-set-button {
   width: min(100%, 24rem);
   min-height: 58px;
-  margin-top: auto;
+  margin-top: var(--space-5);
 }
 
 .exercise-active-state .set-adjustment-trigger {
@@ -1505,6 +1605,32 @@ button.session-saved:focus-visible {
   min-height: 52px;
   margin: var(--space-3) auto 0;
   flex: 0 0 auto;
+}
+
+.finish-training-button {
+  width: min(100%, 24rem);
+  min-height: 58px;
+  margin: var(--space-3) auto 0;
+  flex: 0 0 auto;
+}
+
+.exercise-executing-placeholder {
+  display: grid;
+  width: min(100%, 28rem);
+  min-height: clamp(10rem, 28dvh, 16rem);
+  margin: var(--space-7) auto 0;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at center, var(--color-card), transparent 68%),
+    var(--color-action-soft);
+  color: var(--color-text-secondary);
+}
+
+.exercise-executing-placeholder span {
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .exercise-play > span {
@@ -1905,6 +2031,11 @@ button.session-saved:focus-visible {
   box-shadow: 0 -12px 24px var(--color-card);
 }
 
+.set-completion-adjustment {
+  width: 100%;
+  min-height: 44px;
+}
+
 .rest-sheet-backdrop {
   position: fixed;
   z-index: 130;
@@ -2095,6 +2226,23 @@ button.session-saved:focus-visible {
 .session-dialog p {
   color: var(--color-text-secondary);
   line-height: 1.5;
+}
+
+.navigation-tutorial-dialog {
+  justify-items: center;
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  text-align: center;
+}
+
+.navigation-tutorial-dialog h2 {
+  font-size: clamp(1.75rem, 8vw, 2.5rem);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.navigation-tutorial-dialog .button-primary {
+  width: 100%;
+  margin-top: var(--space-2);
 }
 
 .session-dialog-actions {

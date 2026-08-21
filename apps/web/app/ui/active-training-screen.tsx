@@ -547,11 +547,13 @@ function SetRevisionFlow({
 function SetCompletionSheet({
   busy,
   exercise,
+  onAdjustPrevious,
   onCompleteSet,
   onClose,
 }: Readonly<{
   busy: boolean;
   exercise: PracticalTrainingExercise;
+  onAdjustPrevious?: () => void;
   onCompleteSet: (
     input: Omit<SetCompletionInput, "itemId" | "runId">,
   ) => Promise<boolean>;
@@ -827,6 +829,17 @@ function SetCompletionSheet({
           </p>
         ) : null}
 
+        {onAdjustPrevious ? (
+          <button
+            className="button-text set-completion-adjustment"
+            disabled={busy}
+            onClick={onAdjustPrevious}
+            type="button"
+          >
+            Ajustar série anterior
+          </button>
+        ) : null}
+
         {hasKnownMeasure || missingMeasure ? (
           <button
             className="button-primary complete-set-button"
@@ -870,7 +883,14 @@ function ExerciseExecution({
 
   function closeRevisionFlow() {
     setRevisionOpen(false);
-    window.requestAnimationFrame(() => revisionTriggerRef.current?.focus());
+    window.requestAnimationFrame(() =>
+      (revisionTriggerRef.current ?? completionTriggerRef.current)?.focus(),
+    );
+  }
+
+  function adjustPreviousSet() {
+    setCompletionOpen(false);
+    setRevisionOpen(true);
   }
 
   if (exercise.completedAt) {
@@ -930,6 +950,9 @@ function ExerciseExecution({
         Série {nextSet} de {exercise.sets}
       </p>
       <p className="exercise-target">{currentSetTarget(exercise, nextSet)}</p>
+      <div className="exercise-executing-placeholder" role="status">
+        <span>Executando agora…</span>
+      </div>
       <button
         className="button-primary complete-set-button"
         disabled={busy}
@@ -939,20 +962,13 @@ function ExerciseExecution({
       >
         Concluir série
       </button>
-      {exercise.setExecutions.length > 0 ? (
-        <button
-          className="button-text set-adjustment-trigger"
-          onClick={() => setRevisionOpen(true)}
-          ref={revisionTriggerRef}
-          type="button"
-        >
-          Ajustar ou desfazer
-        </button>
-      ) : null}
       {completionOpen ? (
         <SetCompletionSheet
           busy={busy}
           exercise={exercise}
+          onAdjustPrevious={
+            exercise.setExecutions.length > 0 ? adjustPreviousSet : undefined
+          }
           onClose={closeCompletionFlow}
           onCompleteSet={onCompleteSet}
         />
@@ -1083,6 +1099,47 @@ function SyncConflictDialog({
   );
 }
 
+const exerciseSwipeTutorialKey = "daygym:exercise-swipe-tutorial:v1";
+
+function ExerciseNavigationTutorial({
+  onClose,
+}: Readonly<{ onClose: () => void }>) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="session-dialog-backdrop" role="presentation">
+      <section
+        aria-labelledby="exercise-navigation-title"
+        aria-modal="true"
+        className="session-dialog navigation-tutorial-dialog"
+        role="dialog"
+      >
+        <h2 id="exercise-navigation-title">Navegue com um gesto.</h2>
+        <p>Deslize para os lados para trocar de exercício.</p>
+        <button
+          className="button-primary"
+          onClick={onClose}
+          ref={closeRef}
+          type="button"
+        >
+          Entendi
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function syncStatusLabel(
   syncState: TrainingSessionSyncState,
   busy: boolean,
@@ -1110,46 +1167,6 @@ function syncStatusLabel(
     return "Sincronização pendente";
   }
   return "Sincronizado";
-}
-
-function ElapsedTimer({
-  pausedAt,
-  pausedDurationSeconds,
-  startedAt,
-}: Readonly<{
-  pausedAt: string | null;
-  pausedDurationSeconds: number;
-  startedAt: string;
-}>) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    function updateElapsed() {
-      setElapsedSeconds(
-        Math.max(
-          0,
-          Math.floor(
-            ((pausedAt ? new Date(pausedAt).getTime() : Date.now()) -
-              new Date(startedAt).getTime()) /
-              1_000,
-          ) - pausedDurationSeconds,
-        ),
-      );
-    }
-    updateElapsed();
-    if (pausedAt) {
-      return;
-    }
-    const timer = window.setInterval(updateElapsed, 1_000);
-    const unsubscribe = subscribeToForegroundClock(updateElapsed);
-    return () => {
-      window.clearInterval(timer);
-      unsubscribe();
-    };
-  }, [pausedAt, pausedDurationSeconds, startedAt]);
-
-  const formatted = formatClock(elapsedSeconds);
-  return <time aria-label={`Tempo de treino ${formatted}`}>{formatted}</time>;
 }
 
 const restVibrationPreferenceKey = "daygym:rest-vibration";
@@ -1468,11 +1485,13 @@ export function ActiveTrainingScreen({
     "cancel" | "pause" | "restart"
   >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [navigationTutorialOpen, setNavigationTutorialOpen] = useState(false);
   const [restExpanded, setRestExpanded] = useState(true);
   const [error, setError] = useState<string>();
   const [finishedSummary, setFinishedSummary] =
     useState<FinishedTrainingSummary>();
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const tutorialRunRef = useRef<string | null>(null);
 
   function gateway() {
     gatewayRef.current ??= createLocalFirstTrainingSessionGateway();
@@ -1525,6 +1544,35 @@ export function ActiveTrainingScreen({
       active = false;
     };
   }, [navigate, plannedSessionId]);
+
+  useEffect(() => {
+    const activeRun = state?.activeRun;
+    if (
+      !activeRun ||
+      activeRun.session.items.length < 2 ||
+      tutorialRunRef.current === activeRun.runId
+    ) {
+      return;
+    }
+    tutorialRunRef.current = activeRun.runId;
+    try {
+      if (window.localStorage.getItem(exerciseSwipeTutorialKey) === "seen") {
+        return;
+      }
+    } catch {
+      // The tutorial still works when storage is unavailable.
+    }
+    setNavigationTutorialOpen(true);
+  }, [state?.activeRun]);
+
+  function closeNavigationTutorial() {
+    try {
+      window.localStorage.setItem(exerciseSwipeTutorialKey, "seen");
+    } catch {
+      // Dismissing remains possible when storage is unavailable.
+    }
+    setNavigationTutorialOpen(false);
+  }
 
   useEffect(() => {
     const currentGateway = gateway();
@@ -2076,6 +2124,16 @@ export function ActiveTrainingScreen({
     (item) => item.completedAt,
   ).length;
   const allCompleted = completedCount === run.session.items.length;
+  const plannedSetCount = run.session.items.reduce(
+    (total, item) => total + item.sets,
+    0,
+  );
+  const progressMax = Math.max(1, plannedSetCount);
+  const completedSetCount = run.session.items.reduce(
+    (total, item) => total + item.setExecutions.length,
+    0,
+  );
+  const progressValue = allCompleted ? plannedSetCount : completedSetCount;
   const currentExercise =
     run.session.items[selectedIndex] ?? run.session.items[0];
   const nextPendingIndex = run.session.items.findIndex(
@@ -2086,6 +2144,8 @@ export function ActiveTrainingScreen({
   );
   const skipIndex =
     nextPendingIndex >= 0 ? nextPendingIndex : wrappedPendingIndex;
+  const syncLabel = syncStatusLabel(syncState, busy, Boolean(run.pausedAt));
+  const syncVisualStatus = busy || run.pausedAt ? "pending" : syncState.status;
 
   function moveBetweenExercises(direction: -1 | 1) {
     if (busy) {
@@ -2118,57 +2178,36 @@ export function ActiveTrainingScreen({
             <AppIcon name="back" size={30} />
           </button>
         )}
-        <ElapsedTimer
-          pausedAt={run.pausedAt}
-          pausedDurationSeconds={run.pausedDurationSeconds}
-          startedAt={run.startedAt}
-        />
         {syncState.status === "conflict" ? (
           <button
             aria-label="Resolver sincronização bloqueada"
-            className="session-saved"
-            data-sync-status={syncState.status}
+            className="session-sync-indicator"
+            data-sync-status={syncVisualStatus}
             onClick={() => setConflictDialogOpen(true)}
             type="button"
-          >
-            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
-          </button>
+          />
         ) : syncState.pendingCount > 0 ? (
           <button
-            aria-label={`Sincronizar ${syncState.pendingCount} ${
+            aria-label={`${syncLabel}. Sincronizar ${syncState.pendingCount} ${
               syncState.pendingCount === 1
                 ? "registro pendente"
                 : "registros pendentes"
             }`}
-            className="session-saved"
-            data-sync-status={syncState.status}
+            className="session-sync-indicator"
+            data-sync-status={syncVisualStatus}
             disabled={syncState.status === "syncing"}
             onClick={() => void synchronizeNow()}
             type="button"
-          >
-            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
-          </button>
+          />
         ) : (
-          <span className="session-saved" data-sync-status={syncState.status}>
-            {syncStatusLabel(syncState, busy, Boolean(run.pausedAt))}
-          </span>
+          <span
+            aria-label={syncLabel}
+            className="session-sync-indicator"
+            data-sync-status={syncVisualStatus}
+            role="status"
+          />
         )}
       </header>
-
-      <section
-        className="session-progress"
-        aria-labelledby="session-progress-title"
-      >
-        <div>
-          <p className="eyebrow">{run.session.name}</p>
-          <strong id="session-progress-title">
-            {completedCount} de {run.session.items.length}
-          </strong>
-        </div>
-        <progress max={run.session.items.length} value={completedCount}>
-          {completedCount} de {run.session.items.length}
-        </progress>
-      </section>
 
       {run.pausedAt ? (
         <section className="resume-training" aria-labelledby="resume-title">
@@ -2187,51 +2226,23 @@ export function ActiveTrainingScreen({
         </section>
       ) : null}
 
-      {!run.pausedAt && allCompleted ? (
-        <section className="finish-training">
-          <h2>Treino completo.</h2>
-          <button
-            className="button-primary"
-            disabled={busy}
-            onClick={finishTraining}
-            type="button"
-          >
-            {busy ? "Finalizando…" : "Finalizar treino"}
-          </button>
-        </section>
-      ) : null}
-
-      {!run.pausedAt ? (
-        <nav
-          className="exercise-navigation"
-          aria-label="Navegar entre exercícios"
-        >
-          <button
-            aria-label="Exercício anterior"
-            disabled={busy || selectedIndex === 0}
-            onClick={() => moveBetweenExercises(-1)}
-            type="button"
-          >
-            <AppIcon name="back" size={24} />
-          </button>
-          <span aria-live="polite">
-            Exercício {selectedIndex + 1} de {run.session.items.length}
-          </span>
-          <button
-            aria-label="Próximo exercício"
-            disabled={busy || selectedIndex === run.session.items.length - 1}
-            onClick={() => moveBetweenExercises(1)}
-            type="button"
-          >
-            <AppIcon name="forward" size={24} />
-          </button>
-        </nav>
-      ) : null}
-
       {!run.pausedAt && currentExercise ? (
         <section
+          aria-label={`${currentExercise.exerciseName}, série ${Math.min(
+            currentExercise.setExecutions.length + 1,
+            currentExercise.sets,
+          )} de ${currentExercise.sets}`}
           aria-describedby="exercise-swipe-hint"
           className="current-exercise"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              moveBetweenExercises(-1);
+            } else if (event.key === "ArrowRight") {
+              event.preventDefault();
+              moveBetweenExercises(1);
+            }
+          }}
           onTouchEnd={(event) => {
             const start = swipeStartRef.current;
             const touch = event.changedTouches[0];
@@ -2255,9 +2266,17 @@ export function ActiveTrainingScreen({
               ? { x: touch.clientX, y: touch.clientY }
               : null;
           }}
+          tabIndex={0}
         >
+          <progress
+            aria-label={`Progresso do treino: ${progressValue} de ${plannedSetCount} séries`}
+            className="current-exercise-progress"
+            max={progressMax}
+            value={progressValue}
+          />
           <p className="sr-only" id="exercise-swipe-hint">
-            Deslize para os lados ou use os botões para trocar de exercício.
+            Deslize para os lados para trocar de exercício. No teclado, use as
+            setas esquerda e direita.
           </p>
           <div className="current-exercise-heading">
             <div>
@@ -2272,7 +2291,16 @@ export function ActiveTrainingScreen({
             onReviseSet={reviseCurrentSet}
             onStart={() => void startCurrentExercise()}
           />
-          {skipIndex >= 0 ? (
+          {allCompleted ? (
+            <button
+              className="button-primary finish-training-button"
+              disabled={busy}
+              onClick={finishTraining}
+              type="button"
+            >
+              {busy ? "Finalizando…" : "Finalizar treino"}
+            </button>
+          ) : skipIndex >= 0 ? (
             <button
               className="button-secondary skip-exercise-button"
               disabled={busy}
@@ -2307,6 +2335,9 @@ export function ActiveTrainingScreen({
           onUseServer={() => void resolveSyncConflict("use-server")}
           pendingAction={conflictAction}
         />
+      ) : null}
+      {navigationTutorialOpen ? (
+        <ExerciseNavigationTutorial onClose={closeNavigationTutorial} />
       ) : null}
       {state?.activeRest ? (
         <RestTimer

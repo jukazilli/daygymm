@@ -82,6 +82,7 @@ function state(activeRun: ActiveTrainingRun | null): PracticalTrainingState {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -238,6 +239,9 @@ describe("ActiveTrainingScreen", () => {
     await user.click(
       screen.getByRole("button", { name: "Iniciar Agachamento" }),
     );
+    expect(await screen.findByText("Executando agora…")).toBeTruthy();
+    expect(screen.queryByLabelText(/Tempo de treino/)).toBeNull();
+    expect(screen.queryByText("Treino A")).toBeNull();
     expect(await screen.findByText("8–12 repetições · 40 kg")).toBeTruthy();
     expect(screen.queryByRole("spinbutton", { name: "Carga kg" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Concluir série" }));
@@ -455,16 +459,16 @@ describe("ActiveTrainingScreen", () => {
     );
     await user.click(screen.getByRole("button", { name: "Salvar série" }));
 
-    expect(await screen.findByText("Salvo neste aparelho")).toBeTruthy();
+    expect(await screen.findByLabelText(/Salvo neste aparelho/)).toBeTruthy();
     await user.click(
       screen.getByRole("button", {
-        name: "Sincronizar 1 registro pendente",
+        name: /Sincronizar 1 registro pendente/,
       }),
     );
     expect(synchronize).toHaveBeenCalledOnce();
   });
 
-  it("navigates exercises by swipe, buttons, and skip without changing their completion", async () => {
+  it("teaches swipe once and navigates without visible arrows or changing completion", async () => {
     const user = userEvent.setup();
     const multiExerciseSession = {
       ...plannedSession,
@@ -508,6 +512,11 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
+    expect(
+      await screen.findByRole("dialog", { name: "Navegue com um gesto." }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Entendi" }));
+
     const firstHeading = await screen.findByRole("heading", {
       name: "Agachamento",
     });
@@ -522,10 +531,14 @@ describe("ActiveTrainingScreen", () => {
     expect(
       await screen.findByRole("heading", { name: "Mesa flexora" }),
     ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Exercício anterior" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Próximo exercício" }),
+    ).toBeNull();
 
-    await user.click(
-      screen.getByRole("button", { name: "Exercício anterior" }),
-    );
+    fireEvent.keyDown(exerciseSurface!, { key: "ArrowLeft" });
     expect(
       await screen.findByRole("heading", { name: "Agachamento" }),
     ).toBeTruthy();
@@ -661,7 +674,7 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
 
     expect(await screen.findByText("01:30")).toBeTruthy();
-    expect(await screen.findByLabelText("Tempo de treino 02:00")).toBeTruthy();
+    expect(screen.queryByLabelText(/Tempo de treino/)).toBeNull();
 
     now.mockReturnValue(initialNow + 60_000);
     await act(async () => {
@@ -669,7 +682,7 @@ describe("ActiveTrainingScreen", () => {
     });
 
     expect(await screen.findByText("00:30")).toBeTruthy();
-    expect(await screen.findByLabelText("Tempo de treino 03:00")).toBeTruthy();
+    expect(screen.queryByLabelText(/Tempo de treino/)).toBeNull();
   });
 
   it("corrects and undoes the latest persisted set from its focused dialog", async () => {
@@ -788,7 +801,10 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
 
     await user.click(
-      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
     expect(
       screen.getByRole("dialog", { name: "Escolha uma série" }),
@@ -812,7 +828,10 @@ describe("ActiveTrainingScreen", () => {
       ),
     );
     await user.click(
-      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     await user.click(
@@ -892,7 +911,10 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
 
     await user.click(
-      await screen.findByRole("button", { name: "Ajustar ou desfazer" }),
+      await screen.findByRole("button", { name: "Concluir série" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Ajustar série anterior" }),
     );
     const firstSetOption = screen.getByRole("radio", { name: /Série 1/ });
     const secondSetOption = screen.getByRole("radio", { name: /Série 2/ });

@@ -273,9 +273,13 @@ US-010A acrescentou ajuste, vibração opcional e resumo essencial.
 - a confirmação bem-sucedida continua aplicando o recibo local e criando o
   descanso por prazo absoluto. Uma falha mantém o popup aberto, conserva os
   valores digitados e oferece nova tentativa sem induzir dupla gravação;
-- swipe, setas e `Pular por agora` alteram apenas o exercício selecionado no
-  cliente. Pular não enfileira comando, não registra conclusão parcial e não
-  mascara uma pendência;
+- swipe, fallback de teclado e `Pular por agora` alteram apenas o exercício
+  selecionado no cliente. As setas visíveis foram removidas e um tutorial local
+  ensina o gesto uma única vez. Pular não enfileira comando, não registra
+  conclusão parcial e não mascara uma pendência;
+- ocultar o cronômetro total, o nome do treino e o texto de sincronização não
+  altera o runtime: tempo e estado de sync continuam derivados dos mesmos
+  timestamps e recibos persistidos; o ponto visual mantém rótulo acessível;
 - histórico anterior, orientação e correção/desfazer ficam sob divulgação
   progressiva. Cardio e circuitos preservam duração e distância no mesmo popup;
 - testes da tela cobrem a sequência
