@@ -148,3 +148,30 @@ final result: offline agenda correction verified in staging; owner verification 
   não promete esse recurso quando a API não existe.
 
 final result: local mobile viewport verified; staging and owner acceptance pending
+
+## Refinamento US-008 — execução focada por exercício
+
+- Referência: telas Nubank e mockups enviados pelo owner nesta conversa; o
+  objetivo transplantado foi hierarquia e baixa densidade, sem copiar marca ou
+  alterar contratos do domínio.
+- Viewport inspecionado: Chromium em 390 × 844 CSS px.
+- A tela principal apresenta somente contexto do treino, posição do exercício,
+  nome, série atual, meta e as ações `Concluir série` e `Pular por agora`.
+- Carga, repetições, duração, distância, referência anterior e orientação foram
+  movidas para um bottom sheet aberto por `Concluir série`; o primeiro campo
+  recebe foco e `Salvar série` mantém o início automático do descanso.
+- A lista horizontal de exercícios foi substituída por swipe lateral. Setas com
+  nomes acessíveis preservam o mesmo caminho para teclado, leitor de tela e
+  pessoas que não descobrirem o gesto.
+- `Pular por agora` somente navega para outro exercício pendente. Não grava um
+  estado fictício de conclusão, não altera o plano e permite retornar depois.
+- Correção/desfazer aparece apenas quando existe série registrada e continua em
+  fluxo progressivo separado.
+- Comparação visual local: o nome e a série dominam o card; CTAs permanecem no
+  alcance do polegar; o bottom sheet coube no viewport e preservou rolagem para
+  teclado virtual. Console da aplicação sem erros ou avisos; o único 404 local
+  foi `/favicon.ico` no servidor temporário de QA.
+- Prova automatizada: 12 cenários da tela, incluindo swipe, setas, pulo sem
+  mutação, preenchimento sugerido, confirmação, descanso, offline e correção.
+
+final result: local mobile viewport verified; staging and owner acceptance pending

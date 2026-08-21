@@ -1306,6 +1306,58 @@ button.session-saved:focus-visible {
   background: var(--color-action);
 }
 
+.session-active .session-progress {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.session-active .session-progress > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.session-active .session-progress .eyebrow {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exercise-navigation {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.exercise-navigation button {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-card);
+  color: var(--color-action);
+  cursor: pointer;
+}
+
+.exercise-navigation button:disabled {
+  color: var(--color-text-secondary);
+  cursor: default;
+  opacity: 0.35;
+}
+
+.exercise-navigation > span {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .exercise-stepper {
   display: flex;
   gap: var(--space-2);
@@ -1370,33 +1422,49 @@ button.session-saved:focus-visible {
 }
 
 .current-exercise {
-  padding: clamp(var(--space-4), 5vw, var(--space-6));
+  display: flex;
+  min-height: clamp(27rem, 58dvh, 38rem);
+  padding: clamp(var(--space-5), 6vw, var(--space-8));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
 .current-exercise-heading {
+  text-align: center;
+}
+
+.current-exercise-heading h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 11vw, 4.5rem);
+  text-wrap: balance;
+}
+
+.exercise-start-state,
+.exercise-active-state {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
+  align-items: center;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
 }
 
-.current-exercise-heading > span {
-  flex: 0 0 auto;
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  background: var(--color-action-soft);
-  color: var(--color-action-pressed);
-  font-size: 0.8125rem;
+.exercise-series-label {
+  margin: var(--space-7) 0 var(--space-2);
+  font-size: clamp(1.4rem, 6vw, 2rem);
   font-weight: 800;
-  font-variant-numeric: tabular-nums;
 }
 
-.exercise-notes {
+.exercise-target {
+  margin: 0;
   color: var(--color-text-secondary);
-  line-height: 1.5;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 700;
+  text-align: center;
 }
 
 .exercise-play {
@@ -1404,13 +1472,39 @@ button.session-saved:focus-visible {
   place-items: center;
   width: 72px;
   height: 72px;
-  margin: var(--space-5) auto 0;
+  margin: var(--space-8) auto var(--space-3);
   padding: var(--space-2);
   border: 0;
   border-radius: 50%;
   background: var(--color-action);
   color: var(--color-action-contrast);
   cursor: pointer;
+}
+
+.exercise-play-label {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.exercise-active-state .complete-set-button {
+  width: min(100%, 24rem);
+  min-height: 58px;
+  margin-top: auto;
+}
+
+.exercise-active-state .set-adjustment-trigger {
+  width: auto;
+  min-height: 44px;
+  margin-top: var(--space-2);
+  padding-inline: var(--space-3);
+}
+
+.skip-exercise-button {
+  width: min(100%, 24rem);
+  min-height: 52px;
+  margin: var(--space-3) auto 0;
+  flex: 0 0 auto;
 }
 
 .exercise-play > span {
@@ -1733,6 +1827,82 @@ button.session-saved:focus-visible {
 .set-undo-action {
   width: 100%;
   margin-top: var(--space-3);
+}
+
+.set-completion-backdrop {
+  position: fixed;
+  z-index: 140;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: max(var(--space-8), env(safe-area-inset-top));
+  background: rgb(25 18 14 / 58%);
+}
+
+.set-completion-sheet {
+  display: grid;
+  gap: var(--space-5);
+  width: min(100%, 48rem);
+  max-height: 92dvh;
+  padding: var(--space-3) var(--space-5)
+    max(var(--space-5), env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-card);
+  box-shadow: 0 -18px 70px rgb(25 18 14 / 22%);
+}
+
+.set-completion-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.set-completion-header h2,
+.set-completion-header p {
+  margin: 0;
+}
+
+.set-completion-header h2 {
+  margin-top: var(--space-1);
+  font-size: clamp(1.75rem, 8vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.set-completion-header .button-text {
+  min-height: 44px;
+  padding-inline: 0;
+}
+
+.set-completion-sheet .set-fields {
+  grid-template-columns: 1fr;
+}
+
+.set-completion-notes {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.set-completion-notes strong {
+  font-size: 0.8125rem;
+}
+
+.set-completion-notes span {
+  color: var(--color-text-secondary);
+}
+
+.set-completion-sheet .complete-set-button {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  min-height: 58px;
+  box-shadow: 0 -12px 24px var(--color-card);
 }
 
 .rest-sheet-backdrop {

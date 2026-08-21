@@ -261,3 +261,24 @@ abrangente da FND-017. Substituição com alternativa aprovada, conclusão parci
 PRs elegíveis, notas e recomendação de progressão continuam pertencendo aos
 próximos recortes da US-010. A COR-006 fechou a recomposição temporal e a
 US-010A acrescentou ajuste, vibração opcional e resumo essencial.
+
+### Refinamento da execução focada — US-008/US-010
+
+- a reorganização é exclusivamente de interação: os comandos `startExercise`,
+  `completeSet` e `reviseSet` continuam passando pelo mesmo gateway local-first,
+  com a mesma chave idempotente, ordem causal e recuperação após suspensão;
+- a tela principal deixa de manter inputs permanentes. `Concluir série` abre um
+  bottom sheet com valores sugeridos editáveis e `Salvar série` confirma somente
+  a série atual; a quantidade concluída é derivada dos recibos persistidos;
+- a confirmação bem-sucedida continua aplicando o recibo local e criando o
+  descanso por prazo absoluto. Uma falha mantém o popup aberto, conserva os
+  valores digitados e oferece nova tentativa sem induzir dupla gravação;
+- swipe, setas e `Pular por agora` alteram apenas o exercício selecionado no
+  cliente. Pular não enfileira comando, não registra conclusão parcial e não
+  mascara uma pendência;
+- histórico anterior, orientação e correção/desfazer ficam sob divulgação
+  progressiva. Cardio e circuitos preservam duração e distância no mesmo popup;
+- testes da tela cobrem a sequência
+  `iniciar → concluir → revisar valores → salvar → descansar`, navegação por
+  gesto/controles, valores sugeridos por série, estado offline e medidas por
+  duração.

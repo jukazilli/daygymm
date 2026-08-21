@@ -88,6 +88,26 @@ function exerciseTarget(exercise: PracticalTrainingExercise) {
   return targets.length > 0 ? `${prefix} · ${targets.join(" · ")}` : prefix;
 }
 
+function currentSetTarget(
+  exercise: PracticalTrainingExercise,
+  setNumber: number,
+) {
+  const suggestedWeight = suggestedSetWeight(exercise, setNumber);
+  const targets = [
+    exercise.repsMin !== null && exercise.repsMax !== null
+      ? exercise.repsMin === exercise.repsMax
+        ? `${exercise.repsMin} repetições`
+        : `${exercise.repsMin}–${exercise.repsMax} repetições`
+      : null,
+    suggestedWeight !== null ? `${formatWeight(suggestedWeight)} kg` : null,
+    exercise.durationSeconds
+      ? formatTrainingDuration(exercise.durationSeconds)
+      : null,
+    exercise.distanceMeters ? `${exercise.distanceMeters} m` : null,
+  ].filter(Boolean);
+  return targets.length > 0 ? targets.join(" · ") : "Repetições ou tempo";
+}
+
 function setResult(exercise: PracticalTrainingExercise, setIndex: number) {
   const performed = exercise.setExecutions[setIndex];
   if (!performed) {
@@ -524,22 +544,22 @@ function SetRevisionFlow({
   );
 }
 
-function ExerciseExecution({
+function SetCompletionSheet({
   busy,
   exercise,
   onCompleteSet,
-  onReviseSet,
-  onStart,
+  onClose,
 }: Readonly<{
   busy: boolean;
   exercise: PracticalTrainingExercise;
-  onCompleteSet: (input: Omit<SetCompletionInput, "itemId" | "runId">) => void;
-  onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
-  onStart: () => void;
+  onCompleteSet: (
+    input: Omit<SetCompletionInput, "itemId" | "runId">,
+  ) => Promise<boolean>;
+  onClose: () => void;
 }>) {
-  const revisionTriggerRef = useRef<HTMLButtonElement>(null);
-  const [revisionOpen, setRevisionOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
   const lastSet = exercise.setExecutions.at(-1);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [missingMeasure, setMissingMeasure] = useState<
     MissingMeasure | undefined
   >(
@@ -594,11 +614,258 @@ function ExerciseExecution({
     (!needsDuration || actualDurationSeconds !== null) &&
     (!needsDistance || actualDistanceMeters !== null);
 
+  useEffect(() => {
+    const firstField = dialogRef.current?.querySelector<HTMLElement>(
+      "input:not(:disabled)",
+    );
+    const firstAction = dialogRef.current?.querySelector<HTMLElement>(
+      "button:not(:disabled)",
+    );
+    (firstField ?? firstAction)?.focus();
+
+    function handleKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), input:not(:disabled)",
+        ) ?? [],
+      );
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [busy, onClose]);
+
   function adjustWeight(direction: -1 | 1) {
     const currentWeight =
       parsedDecimal(weight) ?? suggestedWeight ?? weightStep;
     const adjusted = roundedWeight(currentWeight + direction * weightStep);
     setWeight(String(Math.min(2_000, Math.max(0.25, adjusted))));
+  }
+
+  async function saveSet() {
+    if (!canComplete || busy) {
+      return;
+    }
+    setSaveFailed(false);
+    const saved = await onCompleteSet({
+      actualDistanceMeters,
+      actualDurationSeconds,
+      actualReps,
+      actualWeightKg,
+      setNumber: nextSet,
+    });
+    if (saved) {
+      onClose();
+      return;
+    }
+    setSaveFailed(true);
+  }
+
+  return (
+    <div
+      className="set-completion-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="set-completion-title"
+        aria-modal="true"
+        className="set-completion-sheet"
+        ref={dialogRef}
+        role="dialog"
+      >
+        <div className="rest-sheet-handle" aria-hidden="true" />
+        <header className="set-completion-header">
+          <div>
+            <p className="eyebrow">{exercise.exerciseName}</p>
+            <h2 id="set-completion-title">
+              Série {nextSet} de {exercise.sets}
+            </h2>
+          </div>
+          <button
+            className="button-text"
+            disabled={busy}
+            onClick={onClose}
+            type="button"
+          >
+            Voltar
+          </button>
+        </header>
+
+        {previousResult ? (
+          <div className="previous-set-reference">
+            <span>Última vez · {previousResult.completedAt}</span>
+            <strong>{previousResult.result}</strong>
+          </div>
+        ) : null}
+
+        {exercise.notes ? (
+          <p className="set-completion-notes">
+            <strong>Orientação</strong>
+            <span>{exercise.notes}</span>
+          </p>
+        ) : null}
+
+        {!hasKnownMeasure && !missingMeasure ? (
+          <fieldset className="measure-choice">
+            <legend>Como você mediu esta série?</legend>
+            <button onClick={() => setMissingMeasure("reps")} type="button">
+              Repetições
+            </button>
+            <button onClick={() => setMissingMeasure("duration")} type="button">
+              Tempo
+            </button>
+          </fieldset>
+        ) : null}
+
+        {hasKnownMeasure || missingMeasure ? (
+          <div className="set-fields">
+            {exercise.modality === "strength" ? (
+              <div className="set-load-field">
+                <label htmlFor={`set-weight-${exercise.itemId}`}>
+                  Carga <small>kg</small>
+                </label>
+                <div className="set-load-control">
+                  <button
+                    aria-label={`Reduzir carga em ${formatWeight(weightStep)} kg`}
+                    className="icon-button"
+                    onClick={() => adjustWeight(-1)}
+                    type="button"
+                  >
+                    <AppIcon name="decrease" size={20} />
+                  </button>
+                  <input
+                    id={`set-weight-${exercise.itemId}`}
+                    inputMode="decimal"
+                    min="0.25"
+                    onChange={(event) => setWeight(event.target.value)}
+                    placeholder="—"
+                    step="0.01"
+                    type="number"
+                    value={weight}
+                  />
+                  <button
+                    aria-label={`Aumentar carga em ${formatWeight(weightStep)} kg`}
+                    className="icon-button"
+                    onClick={() => adjustWeight(1)}
+                    type="button"
+                  >
+                    <AppIcon name="increase" size={20} />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {needsReps ? (
+              <label>
+                <span>Repetições</span>
+                <input
+                  inputMode="numeric"
+                  max="1000"
+                  min="1"
+                  onChange={(event) => setReps(event.target.value)}
+                  type="number"
+                  value={reps}
+                />
+              </label>
+            ) : null}
+            {needsDuration ? (
+              <label>
+                <span>Tempo</span>
+                <DurationInput
+                  maximum={maximumExerciseDurationSeconds}
+                  minimum={1}
+                  onChange={setDurationSeconds}
+                  required
+                  seconds={durationSeconds}
+                />
+              </label>
+            ) : null}
+            {needsDistance ? (
+              <label>
+                <span>
+                  Distância <small>metros</small>
+                </span>
+                <input
+                  inputMode="numeric"
+                  max="100000"
+                  min="1"
+                  onChange={(event) => setDistance(event.target.value)}
+                  type="number"
+                  value={distance}
+                />
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+
+        {saveFailed ? (
+          <p className="status-message status-error" role="alert">
+            Não foi possível salvar agora. Tente novamente.
+          </p>
+        ) : null}
+
+        {hasKnownMeasure || missingMeasure ? (
+          <button
+            className="button-primary complete-set-button"
+            disabled={busy || !canComplete}
+            onClick={() => void saveSet()}
+            type="button"
+          >
+            {busy ? "Salvando…" : "Salvar série"}
+          </button>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function ExerciseExecution({
+  busy,
+  exercise,
+  onCompleteSet,
+  onReviseSet,
+  onStart,
+}: Readonly<{
+  busy: boolean;
+  exercise: PracticalTrainingExercise;
+  onCompleteSet: (
+    input: Omit<SetCompletionInput, "itemId" | "runId">,
+  ) => Promise<boolean>;
+  onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
+  onStart: () => void;
+}>) {
+  const completionTriggerRef = useRef<HTMLButtonElement>(null);
+  const revisionTriggerRef = useRef<HTMLButtonElement>(null);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const nextSet = exercise.setExecutions.length + 1;
+
+  function closeCompletionFlow() {
+    setCompletionOpen(false);
+    window.requestAnimationFrame(() => completionTriggerRef.current?.focus());
   }
 
   function closeRevisionFlow() {
@@ -610,14 +877,14 @@ function ExerciseExecution({
     return (
       <>
         <div className="exercise-completed-summary">
-          <strong>Concluído</strong>
+          <strong>Exercício concluído</strong>
           {exercise.setExecutions.length === 0 ? (
             <p>{exerciseTarget(exercise)}</p>
           ) : null}
         </div>
         {exercise.setExecutions.length > 0 ? (
           <button
-            className="button-secondary set-adjustment-trigger"
+            className="button-text set-adjustment-trigger"
             onClick={() => setRevisionOpen(true)}
             ref={revisionTriggerRef}
             type="button"
@@ -639,155 +906,56 @@ function ExerciseExecution({
 
   if (!exercise.startedAt) {
     return (
-      <button
-        aria-label={`Iniciar ${exercise.exerciseName}`}
-        aria-busy={busy}
-        className="exercise-play"
-        disabled={busy}
-        onClick={onStart}
-        type="button"
-      >
-        <AppIcon name="play" size={30} />
-      </button>
+      <div className="exercise-start-state">
+        <p className="exercise-series-label">Série 1 de {exercise.sets}</p>
+        <p className="exercise-target">{currentSetTarget(exercise, 1)}</p>
+        <button
+          aria-label={`Iniciar ${exercise.exerciseName}`}
+          aria-busy={busy}
+          className="exercise-play"
+          disabled={busy}
+          onClick={onStart}
+          type="button"
+        >
+          <AppIcon name="play" size={34} />
+        </button>
+        <span className="exercise-play-label">Iniciar exercício</span>
+      </div>
     );
   }
 
   return (
-    <div className="set-execution">
-      <div className="set-heading">
-        <span>Agora</span>
-        <strong>
-          Série {nextSet} de {exercise.sets}
-        </strong>
-      </div>
-
-      {previousResult ? (
-        <div className="previous-set-reference">
-          <span>Última vez · {previousResult.completedAt}</span>
-          <strong>{previousResult.result}</strong>
-        </div>
-      ) : null}
-
-      {!hasKnownMeasure && !missingMeasure ? (
-        <fieldset className="measure-choice">
-          <legend>Como medir?</legend>
-          <button onClick={() => setMissingMeasure("reps")} type="button">
-            Repetições
-          </button>
-          <button onClick={() => setMissingMeasure("duration")} type="button">
-            Tempo
-          </button>
-        </fieldset>
-      ) : null}
-
-      {hasKnownMeasure || missingMeasure ? (
-        <div className="set-fields">
-          {exercise.modality === "strength" ? (
-            <div className="set-load-field">
-              <label htmlFor={`set-weight-${exercise.itemId}`}>
-                Carga <small>kg</small>
-              </label>
-              <div className="set-load-control">
-                <button
-                  aria-label={`Reduzir carga em ${formatWeight(weightStep)} kg`}
-                  className="icon-button"
-                  onClick={() => adjustWeight(-1)}
-                  type="button"
-                >
-                  <AppIcon name="decrease" size={20} />
-                </button>
-                <input
-                  id={`set-weight-${exercise.itemId}`}
-                  inputMode="decimal"
-                  min="0.25"
-                  onChange={(event) => setWeight(event.target.value)}
-                  placeholder="—"
-                  step="0.01"
-                  type="number"
-                  value={weight}
-                />
-                <button
-                  aria-label={`Aumentar carga em ${formatWeight(weightStep)} kg`}
-                  className="icon-button"
-                  onClick={() => adjustWeight(1)}
-                  type="button"
-                >
-                  <AppIcon name="increase" size={20} />
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {needsReps ? (
-            <label>
-              <span>Repetições</span>
-              <input
-                inputMode="numeric"
-                max="1000"
-                min="1"
-                onChange={(event) => setReps(event.target.value)}
-                type="number"
-                value={reps}
-              />
-            </label>
-          ) : null}
-          {needsDuration ? (
-            <label>
-              <span>Tempo</span>
-              <DurationInput
-                maximum={maximumExerciseDurationSeconds}
-                minimum={1}
-                onChange={setDurationSeconds}
-                required
-                seconds={durationSeconds}
-              />
-            </label>
-          ) : null}
-          {needsDistance ? (
-            <label>
-              <span>
-                Distância <small>metros</small>
-              </span>
-              <input
-                inputMode="numeric"
-                max="100000"
-                min="1"
-                onChange={(event) => setDistance(event.target.value)}
-                type="number"
-                value={distance}
-              />
-            </label>
-          ) : null}
-        </div>
-      ) : null}
-
-      {hasKnownMeasure || missingMeasure ? (
-        <button
-          className="button-primary complete-set-button"
-          disabled={busy || !canComplete}
-          onClick={() =>
-            onCompleteSet({
-              actualDistanceMeters,
-              actualDurationSeconds,
-              actualReps,
-              actualWeightKg,
-              setNumber: nextSet,
-            })
-          }
-          type="button"
-        >
-          {busy ? "Salvando…" : "Concluir série"}
-        </button>
-      ) : null}
-
+    <div className="exercise-active-state">
+      <p className="exercise-series-label">
+        Série {nextSet} de {exercise.sets}
+      </p>
+      <p className="exercise-target">{currentSetTarget(exercise, nextSet)}</p>
+      <button
+        className="button-primary complete-set-button"
+        disabled={busy}
+        onClick={() => setCompletionOpen(true)}
+        ref={completionTriggerRef}
+        type="button"
+      >
+        Concluir série
+      </button>
       {exercise.setExecutions.length > 0 ? (
         <button
-          className="button-secondary set-adjustment-trigger"
+          className="button-text set-adjustment-trigger"
           onClick={() => setRevisionOpen(true)}
           ref={revisionTriggerRef}
           type="button"
         >
           Ajustar ou desfazer
         </button>
+      ) : null}
+      {completionOpen ? (
+        <SetCompletionSheet
+          busy={busy}
+          exercise={exercise}
+          onClose={closeCompletionFlow}
+          onCompleteSet={onCompleteSet}
+        />
       ) : null}
       {revisionOpen ? (
         <SetRevisionFlow
@@ -1304,6 +1472,7 @@ export function ActiveTrainingScreen({
   const [error, setError] = useState<string>();
   const [finishedSummary, setFinishedSummary] =
     useState<FinishedTrainingSummary>();
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
   function gateway() {
     gatewayRef.current ??= createLocalFirstTrainingSessionGateway();
@@ -1470,7 +1639,7 @@ export function ActiveTrainingScreen({
       currentExercise.completedAt ||
       busy
     ) {
-      return;
+      return false;
     }
     setBusy(true);
     setError(undefined);
@@ -1484,10 +1653,10 @@ export function ActiveTrainingScreen({
       setBusy(false);
       if (result.reason === "session") {
         navigate("/entrar/");
-        return;
+        return false;
       }
       setError(sessionError(result.reason));
-      return;
+      return false;
     }
     const nextState = applyCompletedTrainingSetWithRest(
       state,
@@ -1500,13 +1669,14 @@ export function ActiveTrainingScreen({
     const firstPending = nextItems?.findIndex((item) => !item.completedAt);
     if (nextState.activeRest) {
       setRestExpanded(true);
-      return;
+      return true;
     }
     if (result.value.exerciseCompleted) {
       if (firstPending !== undefined && firstPending >= 0) {
         setSelectedIndex(firstPending);
       }
     }
+    return true;
   }
 
   async function completeRest() {
@@ -1908,6 +2078,23 @@ export function ActiveTrainingScreen({
   const allCompleted = completedCount === run.session.items.length;
   const currentExercise =
     run.session.items[selectedIndex] ?? run.session.items[0];
+  const nextPendingIndex = run.session.items.findIndex(
+    (item, index) => index > selectedIndex && !item.completedAt,
+  );
+  const wrappedPendingIndex = run.session.items.findIndex(
+    (item, index) => index !== selectedIndex && !item.completedAt,
+  );
+  const skipIndex =
+    nextPendingIndex >= 0 ? nextPendingIndex : wrappedPendingIndex;
+
+  function moveBetweenExercises(direction: -1 | 1) {
+    if (busy) {
+      return;
+    }
+    setSelectedIndex((current) =>
+      Math.min(run.session.items.length - 1, Math.max(0, current + direction)),
+    );
+  }
 
   return (
     <main className="session-shell session-active">
@@ -2015,48 +2202,85 @@ export function ActiveTrainingScreen({
       ) : null}
 
       {!run.pausedAt ? (
-        <nav className="exercise-stepper" aria-label="Exercícios do treino">
-          {run.session.items.map((exercise, index) => (
-            <button
-              aria-current={index === selectedIndex ? "step" : undefined}
-              data-completed={exercise.completedAt ? "true" : undefined}
-              data-selected={index === selectedIndex ? "true" : undefined}
-              key={exercise.itemId}
-              onClick={() => setSelectedIndex(index)}
-              type="button"
-            >
-              <span>{index + 1}</span>
-              <small>
-                {exercise.completedAt ? "Concluído" : exercise.exerciseName}
-              </small>
-            </button>
-          ))}
+        <nav
+          className="exercise-navigation"
+          aria-label="Navegar entre exercícios"
+        >
+          <button
+            aria-label="Exercício anterior"
+            disabled={busy || selectedIndex === 0}
+            onClick={() => moveBetweenExercises(-1)}
+            type="button"
+          >
+            <AppIcon name="back" size={24} />
+          </button>
+          <span aria-live="polite">
+            Exercício {selectedIndex + 1} de {run.session.items.length}
+          </span>
+          <button
+            aria-label="Próximo exercício"
+            disabled={busy || selectedIndex === run.session.items.length - 1}
+            onClick={() => moveBetweenExercises(1)}
+            type="button"
+          >
+            <AppIcon name="forward" size={24} />
+          </button>
         </nav>
       ) : null}
 
       {!run.pausedAt && currentExercise ? (
-        <section className="current-exercise">
+        <section
+          aria-describedby="exercise-swipe-hint"
+          className="current-exercise"
+          onTouchEnd={(event) => {
+            const start = swipeStartRef.current;
+            const touch = event.changedTouches[0];
+            swipeStartRef.current = null;
+            if (!start || !touch) {
+              return;
+            }
+            const distanceX = touch.clientX - start.x;
+            const distanceY = touch.clientY - start.y;
+            if (
+              Math.abs(distanceX) < 56 ||
+              Math.abs(distanceX) <= Math.abs(distanceY) * 1.2
+            ) {
+              return;
+            }
+            moveBetweenExercises(distanceX < 0 ? 1 : -1);
+          }}
+          onTouchStart={(event) => {
+            const touch = event.touches[0];
+            swipeStartRef.current = touch
+              ? { x: touch.clientX, y: touch.clientY }
+              : null;
+          }}
+        >
+          <p className="sr-only" id="exercise-swipe-hint">
+            Deslize para os lados ou use os botões para trocar de exercício.
+          </p>
           <div className="current-exercise-heading">
             <div>
-              <p className="eyebrow">
-                Exercício {selectedIndex + 1} de {run.session.items.length}
-              </p>
               <h1>{currentExercise.exerciseName}</h1>
             </div>
-            <span>
-              {currentExercise.setExecutions.length}/{currentExercise.sets}
-            </span>
           </div>
           <ExerciseExecution
             busy={busy}
             exercise={currentExercise}
             key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "pending"}`}
-            onCompleteSet={(input) => void completeCurrentSet(input)}
+            onCompleteSet={completeCurrentSet}
             onReviseSet={reviseCurrentSet}
             onStart={() => void startCurrentExercise()}
           />
-          {currentExercise.notes ? (
-            <p className="exercise-notes">{currentExercise.notes}</p>
+          {skipIndex >= 0 ? (
+            <button
+              className="button-secondary skip-exercise-button"
+              disabled={busy}
+              onClick={() => setSelectedIndex(skipIndex)}
+              type="button"
+            >
+              Pular por agora
+            </button>
           ) : null}
         </section>
       ) : null}

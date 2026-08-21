@@ -1,6 +1,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -237,6 +238,12 @@ describe("ActiveTrainingScreen", () => {
     await user.click(
       screen.getByRole("button", { name: "Iniciar Agachamento" }),
     );
+    expect(await screen.findByText("8–12 repetições · 40 kg")).toBeTruthy();
+    expect(screen.queryByRole("spinbutton", { name: "Carga kg" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Concluir série" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Série 1 de 2" }),
+    ).toBeTruthy();
     expect(await screen.findByText(/Última vez/)).toBeTruthy();
     expect(screen.getByText("37,5 kg × 10 repetições")).toBeTruthy();
     expect(
@@ -249,7 +256,7 @@ describe("ActiveTrainingScreen", () => {
         .getByRole("spinbutton", { name: "Carga kg" })
         .getAttribute("value"),
     ).toBe("40");
-    await user.click(screen.getByRole("button", { name: "Concluir série" }));
+    await user.click(screen.getByRole("button", { name: "Salvar série" }));
     expect(
       await screen.findByRole("dialog", { name: "Descanso" }),
     ).toBeTruthy();
@@ -273,6 +280,7 @@ describe("ActiveTrainingScreen", () => {
     expect(await screen.findByText("Série 2 de 2")).toBeTruthy();
     expect(screen.queryByText("Planejado")).toBeNull();
     expect(screen.queryByText("Realizado")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Concluir série" }));
     expect(
       screen
         .getByRole("spinbutton", { name: "Carga kg" })
@@ -286,7 +294,7 @@ describe("ActiveTrainingScreen", () => {
         .getByRole("spinbutton", { name: "Carga kg" })
         .getAttribute("value"),
     ).toBe("40");
-    await user.click(screen.getByRole("button", { name: "Concluir série" }));
+    await user.click(screen.getByRole("button", { name: "Salvar série" }));
     await user.click(
       await screen.findByRole("button", { name: "Finalizar treino" }),
     );
@@ -361,6 +369,7 @@ describe("ActiveTrainingScreen", () => {
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
     );
+    await user.click(screen.getByRole("button", { name: "Salvar série" }));
     await user.click(
       await screen.findByRole("button", { name: "Concluir descanso" }),
     );
@@ -444,6 +453,7 @@ describe("ActiveTrainingScreen", () => {
     await user.click(
       await screen.findByRole("button", { name: "Concluir série" }),
     );
+    await user.click(screen.getByRole("button", { name: "Salvar série" }));
 
     expect(await screen.findByText("Salvo neste aparelho")).toBeTruthy();
     await user.click(
@@ -452,6 +462,79 @@ describe("ActiveTrainingScreen", () => {
       }),
     );
     expect(synchronize).toHaveBeenCalledOnce();
+  });
+
+  it("navigates exercises by swipe, buttons, and skip without changing their completion", async () => {
+    const user = userEvent.setup();
+    const multiExerciseSession = {
+      ...plannedSession,
+      items: [
+        plannedSession.items[0]!,
+        {
+          ...plannedSession.items[0]!,
+          exerciseName: "Mesa flexora",
+          itemId: "71000000-0000-4000-8000-000000000002",
+          order: 2,
+          previousSetReferences: [],
+        },
+      ],
+    };
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: multiExerciseSession,
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          ...state(activeRun),
+          nextSession: multiExerciseSession,
+          sessions: [multiExerciseSession],
+        },
+      }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    const firstHeading = await screen.findByRole("heading", {
+      name: "Agachamento",
+    });
+    const exerciseSurface = firstHeading.closest("section");
+    expect(exerciseSurface).toBeTruthy();
+    fireEvent.touchStart(exerciseSurface!, {
+      touches: [{ clientX: 280, clientY: 320 }],
+    });
+    fireEvent.touchEnd(exerciseSurface!, {
+      changedTouches: [{ clientX: 120, clientY: 325 }],
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Mesa flexora" }),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole("button", { name: "Exercício anterior" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Agachamento" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Pular por agora" }));
+    expect(
+      await screen.findByRole("heading", { name: "Mesa flexora" }),
+    ).toBeTruthy();
+    expect(gateway.startExercise).not.toHaveBeenCalled();
+    expect(gateway.completeExercise).not.toHaveBeenCalled();
   });
 
   it("keeps a blocked sync visible until the user chooses a recovery", async () => {
@@ -1020,6 +1103,9 @@ describe("ActiveTrainingScreen", () => {
 
     render(createElement(ActiveTrainingScreen, { gateway }));
 
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "Concluir série" }));
     const duration = await screen.findByRole("textbox", {
       name: "Tempo",
     });
