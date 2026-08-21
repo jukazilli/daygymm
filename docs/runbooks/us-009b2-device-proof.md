@@ -1,7 +1,8 @@
 # Prova da US-009B2 em aparelho físico
 
 Status: jornada móvel conectada e verificada no CI de staging pelo commit
-`ad56772`; execução pendente de development build e aparelho físico.
+`ad56772`; prova física priorizada no Android enquanto a validação de identidade
+da conta Apple bloqueia a emissão das credenciais iOS.
 
 ## Objetivo
 
@@ -12,8 +13,9 @@ série, revisão, sessão ou evento duplicado.
 ## Pré-condições
 
 1. Usar somente staging e conta sintética autorizada.
-2. Instalar development build gerado do commit candidato, nunca Expo Go:
-   SQLCipher exige código nativo próprio.
+2. Instalar um preview APK interno ou development build gerado do commit
+   candidato, nunca Expo Go: SQLCipher exige código nativo próprio. Para a prova
+   autônoma, preferir o preview APK porque ele não depende do servidor Metro.
 3. Confirmar `PRAGMA cipher_version` sem registrar chave, sessão ou conteúdo de
    treino.
 4. Confirmar schema local v2 e as tabelas `training_session_snapshots` e
@@ -46,7 +48,7 @@ série, revisão, sessão ou evento duplicado.
 ## Evidência obrigatória
 
 - plataforma, modelo, versão do sistema e versão do app;
-- commit e identificador do development build;
+- commit, perfil EAS e identificador do build;
 - horários de início, pausas, encerramentos, reaberturas e reconexão;
 - contagem e tipos de comandos antes da reconexão e outbox zero depois dela;
 - IDs canônicos e contagem de séries/revisões antes e depois de novo reload;
@@ -62,3 +64,13 @@ US-009B2b só pode ser marcada `FECHADA` quando todos os passos passarem em pelo
 menos um aparelho físico, sem perda, reordenação ou duplicação. A segunda
 plataforma continua obrigatória para fechar a prova abrangente da FND-017.
 Emulador, teste unitário, export web ou documentação não substituem essa prova.
+
+## Bloqueio temporário do iPhone
+
+Em 20 de agosto de 2026, passaporte, CNH e CIN/RG retornaram `Invalid
+Submission` na verificação de identidade do Apple Developer Program. O owner
+abriu chamado com a Apple para validação alternativa/manual. A prova iOS só
+pode começar depois que a associação estiver ativa e o EAS puder emitir o
+certificado e o provisioning profile; não contornar esse gate com credenciais
+de terceiros. Enquanto isso, executar integralmente este roteiro em Android e
+manter a segunda plataforma pendente para o fechamento abrangente da FND-017.

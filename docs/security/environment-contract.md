@@ -76,6 +76,28 @@ production. O primeiro projeto remoto criado com slug `soberania` não está
 vinculado ao aplicativo e deve ser removido somente após autorização explícita
 do owner.
 
+Em 20 de agosto de 2026, a inscrição individual no Apple Developer Program
+ficou bloqueada na verificação de identidade: passaporte, CNH e CIN/RG válidos
+retornaram `Invalid Submission` no app Apple Developer. O owner abriu chamado
+com o Apple Developer Support para revisão ou validação manual. Até a resposta,
+não existem certificado nem provisioning profile iOS; nenhuma credencial Apple
+foi criada, compartilhada ou armazenada no EAS. Esse bloqueio externo impede o
+build físico de iPhone, mas não invalida a configuração iOS versionada.
+
+Para manter a prova nativa em andamento, o perfil `preview` fixa
+`android.buildType=apk` e `distribution=internal`. O APK Android usa a variante
+e o ambiente `preview`, é assinado por uma keystore gerenciada pelo EAS e pode
+ser instalado diretamente, sem Google Play Console e sem servidor Metro. A URL
+do artefato é acesso interno e não deve ser publicada. Produção continua sem
+variáveis e sem build de loja.
+
+O primeiro job Android expôs uma diferença entre o export local e o build EAS:
+o bundle remoto começava antes que os pacotes TypeScript do workspace tivessem
+gerado `dist`. O mobile agora possui `postinstall` explícito para compilar
+`@daygym/contracts` e `@daygym/training-runtime` em instalações limpas. Os
+pacotes Expo também seguem os patches esperados pelo SDK 55; `expo install
+--check` é gate operacional antes de novos builds hospedados.
+
 ## Estado do subcorte de autenticação
 
 ### Continuidade de sessão
