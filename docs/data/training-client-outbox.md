@@ -210,7 +210,7 @@ realizadas.
 
 - `Finalizar treino` continua direto quando todas as séries foram confirmadas;
 - quando ainda existem séries pendentes, um diálogo curto oferece `Continuar
-  treino`, `Revisar pendências` e `Concluir parcialmente`, mantendo a opção
+treino`, `Revisar pendências` e `Concluir parcialmente`, mantendo a opção
   segura em primeiro plano;
 - a conclusão parcial exige ao menos uma série confirmada e mantém separadamente
   o total planejado e o total realizado; nenhuma série pendente entra no volume
