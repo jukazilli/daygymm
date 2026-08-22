@@ -288,15 +288,17 @@ US-010A acrescentou ajuste, vibração opcional e resumo essencial.
 - o detalhe usa título compacto no cabeçalho e reserva sua maior superfície para
   futura demonstração neutra do movimento. As medidas realizadas ficam
   editáveis logo abaixo, sem alterar payloads ou inventar um contrato de mídia;
-- concluir a série pelo controle compacto envia os valores visíveis ao mesmo
-  comando idempotente e inicia o descanso na própria tela. O prazo absoluto,
-  `+30 s`, vibração e retomada continuam usando o snapshot local; a lista mantém
-  um mini timer em vez de abrir uma tela adicional;
+- concluir a série pelo controle central envia os valores visíveis ao mesmo
+  comando idempotente. Séries intermediárias abrem o descanso focado em tela
+  cheia; a última série do exercício retorna à lista e expõe o próximo item. O
+  prazo absoluto, `+30 s`, vibração e retomada continuam usando o snapshot
+  local; durante a transição entre exercícios, a lista mantém um mini timer que
+  pode reabrir o descanso;
 - histórico anterior, orientação e correção/desfazer ficam sob divulgação
-  progressiva no menu `Mais ações` sobre a área de mídia. `Pular por agora`
-  usa um controle circular de avançar com rótulo acessível, mas continua apenas
-  selecionando o próximo exercício no cliente. Cardio e circuitos preservam
-  duração e distância no mesmo popup;
+  progressiva no fluxo focado acionado pela seta circular. Play, pause, ajuste e
+  pular compartilham anatomia centralizada com rótulo acessível; pular continua
+  apenas selecionando o próximo exercício no cliente. Cardio e circuitos
+  preservam duração e distância no mesmo popup;
 - testes da tela cobrem a sequência
   `iniciar → concluir → revisar valores → salvar → descansar`, navegação por
   gesto/controles, valores sugeridos por série, estado offline e medidas por

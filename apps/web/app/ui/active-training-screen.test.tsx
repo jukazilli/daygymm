@@ -90,9 +90,8 @@ async function openActiveExercise(
 }
 
 async function openSetAdjustment(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: "Mais ações" }));
   await user.click(
-    screen.getByRole("menuitem", { name: "Ajustar série anterior" }),
+    screen.getByRole("button", { name: "Ajustar série anterior" }),
   );
 }
 
@@ -578,6 +577,99 @@ describe("ActiveTrainingScreen", () => {
     ).toBeNull();
   });
 
+  it("returns to the list after the last set and exposes the next exercise", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-08-14T03:32:00.000Z").getTime(),
+    );
+    const user = userEvent.setup();
+    const firstExercise = {
+      ...plannedSession.items[0]!,
+      sets: 1,
+      startedAt: "2026-08-14T03:31:00.000+00:00",
+    };
+    const nextExercise = {
+      ...plannedSession.items[0]!,
+      exerciseName: "Mesa flexora",
+      itemId: "71000000-0000-4000-8000-000000000002",
+      order: 2,
+      previousSetReferences: [],
+    };
+    const multiExerciseSession = {
+      ...plannedSession,
+      items: [firstExercise, nextExercise],
+    };
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: multiExerciseSession,
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          completedAt: "2026-08-14T03:32:00.000Z",
+          completedSetCount: 1,
+          exerciseCompleted: true,
+          setExecutionId: "76000000-0000-4000-8000-000000000006",
+          setNumber: 1,
+          totalSets: 1,
+          wasCreated: true,
+        },
+      }),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          ...state(activeRun),
+          nextSession: multiExerciseSession,
+          sessions: [multiExerciseSession],
+        },
+      }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Concluir série e iniciar descanso",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("list", { name: "Exercícios do treino" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Abrir Mesa flexora" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Exercício concluído")).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: /Voltar ao descanso/ }),
+    );
+    expect(screen.getByRole("heading", { name: "Descanso" })).toBeTruthy();
+    expect(screen.getByText("Próximo · Mesa flexora")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Concluir descanso e continuar",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Mesa flexora" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Iniciar Mesa flexora" }),
+    ).toBeTruthy();
+  });
+
   it("keeps a blocked sync visible until the user chooses a recovery", async () => {
     const user = userEvent.setup();
     const activeRun: ActiveTrainingRun = {
@@ -829,9 +921,7 @@ describe("ActiveTrainingScreen", () => {
     render(createElement(ActiveTrainingScreen, { gateway }));
     await openActiveExercise(user);
 
-    expect(
-      screen.queryByRole("menuitem", { name: "Ajustar série anterior" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais ações" })).toBeNull();
     await openSetAdjustment(user);
     expect(
       screen.getByRole("dialog", { name: "Escolha uma série" }),
