@@ -279,6 +279,16 @@ describe("ActiveTrainingScreen", () => {
       }),
     );
     expect(screen.getByText("01:30")).toBeTruthy();
+    const continueRest = screen.getByRole("button", {
+      name: "Concluir descanso e continuar",
+    });
+    const finishFromRest = screen.getByRole("button", {
+      name: "Finalizar treino",
+    });
+    expect(continueRest.closest(".exercise-control-bar")).toBe(
+      finishFromRest.closest(".exercise-control-bar"),
+    );
+    expect(finishFromRest.querySelector("svg")).not.toBeNull();
     await user.click(
       screen.getByRole("button", { name: "Adicionar 30 segundos" }),
     );

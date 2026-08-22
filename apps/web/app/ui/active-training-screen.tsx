@@ -948,6 +948,7 @@ function ExerciseExecution({
   busy,
   exercise,
   onCompleteSet,
+  onFinish,
   onReviseSet,
   onSkip,
   onStart,
@@ -957,6 +958,7 @@ function ExerciseExecution({
   onCompleteSet: (
     input: Omit<SetCompletionInput, "itemId" | "runId">,
   ) => Promise<boolean>;
+  onFinish?: () => void;
   onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
   onSkip?: () => void;
   onStart: () => void;
@@ -1046,21 +1048,26 @@ function ExerciseExecution({
             <p>{exerciseTarget(exercise)}</p>
           ) : null}
         </div>
-        {exercise.setExecutions.length > 0 ? (
+        {exercise.setExecutions.length > 0 || onFinish ? (
           <div className="exercise-control-bar">
-            <button
-              aria-label="Ajustar ou desfazer série"
-              className="exercise-control-action"
-              disabled={busy}
-              onClick={() => setRevisionOpen(true)}
-              ref={revisionTriggerRef}
-              type="button"
-            >
-              <span className="exercise-control-icon">
-                <AppIcon name="reset" size={26} />
-              </span>
-              <span>Ajustar</span>
-            </button>
+            {exercise.setExecutions.length > 0 ? (
+              <button
+                aria-label="Ajustar ou desfazer série"
+                className="exercise-control-action"
+                disabled={busy}
+                onClick={() => setRevisionOpen(true)}
+                ref={revisionTriggerRef}
+                type="button"
+              >
+                <span className="exercise-control-icon">
+                  <AppIcon name="reset" size={26} />
+                </span>
+                <span>Ajustar</span>
+              </button>
+            ) : null}
+            {onFinish ? (
+              <FinishTrainingControl busy={busy} onFinish={onFinish} />
+            ) : null}
           </div>
         ) : null}
         {revisionOpen ? (
@@ -1116,6 +1123,9 @@ function ExerciseExecution({
               </span>
               <span>Pular</span>
             </button>
+          ) : null}
+          {onFinish ? (
+            <FinishTrainingControl busy={busy} onFinish={onFinish} />
           ) : null}
         </div>
       </div>
@@ -1257,6 +1267,9 @@ function ExerciseExecution({
               </span>
               <span>Pular</span>
             </button>
+          ) : null}
+          {onFinish ? (
+            <FinishTrainingControl busy={busy} onFinish={onFinish} />
           ) : null}
         </div>
       </>
@@ -1462,17 +1475,21 @@ function RestTimer({
   canAddTime,
   compact = false,
   endsAt,
+  finishBusy = false,
   nextLabel,
   onAddTime,
   onComplete,
+  onFinish,
   onOpen,
 }: Readonly<{
   canAddTime: boolean;
   compact?: boolean;
   endsAt: string;
+  finishBusy?: boolean;
   nextLabel?: string;
   onAddTime: () => void;
   onComplete: () => void;
+  onFinish?: () => void;
   onOpen?: () => void;
 }>) {
   const notifiedRef = useRef(false);
@@ -1592,6 +1609,9 @@ function RestTimer({
           </span>
           <span>Continuar</span>
         </button>
+        {onFinish ? (
+          <FinishTrainingControl busy={finishBusy} onFinish={onFinish} />
+        ) : null}
       </div>
       {vibrationSupported ? (
         <button
@@ -1608,6 +1628,26 @@ function RestTimer({
         </button>
       ) : null}
     </section>
+  );
+}
+
+function FinishTrainingControl({
+  busy,
+  onFinish,
+}: Readonly<{ busy: boolean; onFinish: () => void }>) {
+  return (
+    <button
+      aria-label="Finalizar treino"
+      className="exercise-control-action"
+      disabled={busy}
+      onClick={onFinish}
+      type="button"
+    >
+      <span className="exercise-control-icon">
+        <AppIcon name="exit" size={27} />
+      </span>
+      <span>{busy ? "Finalizando…" : "Finalizar"}</span>
+    </button>
   );
 }
 
@@ -2463,6 +2503,14 @@ export function ActiveTrainingScreen({
   const syncLabel = syncStatusLabel(syncState, busy, Boolean(run.pausedAt));
   const syncVisualStatus = busy || run.pausedAt ? "pending" : syncState.status;
 
+  function requestTrainingFinish() {
+    if (allCompleted) {
+      void finishTraining("complete");
+    } else {
+      setPartialFinishDialogOpen(true);
+    }
+  }
+
   function moveBetweenExercises(direction: -1 | 1) {
     if (busy || state?.activeRest) {
       return;
@@ -2611,20 +2659,12 @@ export function ActiveTrainingScreen({
             ))}
           </ol>
           {completedSetCount > 0 && !run.pausedAt ? (
-            <button
-              className="button-primary workout-list-finish"
-              disabled={busy}
-              onClick={() => {
-                if (allCompleted) {
-                  void finishTraining("complete");
-                } else {
-                  setPartialFinishDialogOpen(true);
-                }
-              }}
-              type="button"
-            >
-              {busy ? "Finalizando…" : "Finalizar treino"}
-            </button>
+            <div className="exercise-control-bar workout-list-controls">
+              <FinishTrainingControl
+                busy={busy}
+                onFinish={requestTrainingFinish}
+              />
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -2689,9 +2729,13 @@ export function ActiveTrainingScreen({
             <RestTimer
               canAddTime={state.activeRest.durationSeconds < 1_800}
               endsAt={state.activeRest.endsAt}
+              finishBusy={busy}
               nextLabel={restNextLabel}
               onAddTime={() => void addRestTime()}
               onComplete={() => void completeRest()}
+              onFinish={
+                completedSetCount > 0 ? requestTrainingFinish : undefined
+              }
             />
           ) : (
             <ExerciseExecution
@@ -2699,6 +2743,9 @@ export function ActiveTrainingScreen({
               exercise={currentExercise}
               key={`${currentExercise.itemId}:${currentExercise.setExecutions.length}:${currentExercise.startedAt ?? "pending"}`}
               onCompleteSet={completeCurrentSet}
+              onFinish={
+                completedSetCount > 0 ? requestTrainingFinish : undefined
+              }
               onReviseSet={reviseCurrentSet}
               onSkip={
                 skipIndex >= 0 ? () => setSelectedIndex(skipIndex) : undefined
@@ -2706,22 +2753,6 @@ export function ActiveTrainingScreen({
               onStart={() => void startCurrentExercise()}
             />
           )}
-          {completedSetCount > 0 ? (
-            <button
-              className="button-primary finish-training-button"
-              disabled={busy}
-              onClick={() => {
-                if (allCompleted) {
-                  void finishTraining("complete");
-                } else {
-                  setPartialFinishDialogOpen(true);
-                }
-              }}
-              type="button"
-            >
-              {busy ? "Finalizando…" : "Finalizar treino"}
-            </button>
-          ) : null}
         </section>
       ) : null}
 

@@ -1264,11 +1264,6 @@ input:focus-visible {
   text-align: center;
 }
 
-.workout-list-finish {
-  width: 100%;
-  min-height: 58px;
-}
-
 .session-shell {
   width: min(100%, 48rem);
   min-height: 100vh;
@@ -1700,13 +1695,6 @@ button.session-sync-indicator {
   margin-top: var(--space-5);
 }
 
-.finish-training-button {
-  width: min(100%, 24rem);
-  min-height: 58px;
-  margin: var(--space-3) auto 0;
-  flex: 0 0 auto;
-}
-
 .exercise-media-placeholder {
   display: grid;
   width: min(100%, 30rem);
@@ -1817,20 +1805,19 @@ button.session-sync-indicator {
 }
 
 .exercise-control-bar {
-  display: grid;
-  grid-auto-columns: 72px;
-  grid-auto-flow: column;
+  display: flex;
   justify-content: center;
-  gap: clamp(var(--space-3), 5vw, var(--space-6));
+  gap: clamp(var(--space-2), 3vw, var(--space-5));
   width: min(100%, 30rem);
   margin: var(--space-5) auto 0;
 }
 
 .exercise-control-action {
   display: grid;
+  flex: 0 1 72px;
   justify-items: center;
   gap: var(--space-2);
-  min-width: 64px;
+  min-width: 56px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1840,6 +1827,10 @@ button.session-sync-indicator {
   font-weight: 800;
   text-align: center;
   cursor: pointer;
+}
+
+.workout-list-controls {
+  margin-top: var(--space-4);
 }
 
 .exercise-control-icon {

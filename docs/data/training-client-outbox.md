@@ -228,6 +228,14 @@ O corte está rastreado na
 alternativa aprovada, PRs, notas e recomendação explicada de progressão
 permanecem nos próximos recortes da US-010.
 
+Aceite do owner em 22/08/2026: contrato, diálogo, conclusão parcial, resumo e
+persistência foram aprovados. Como refinamento final, `Finalizar treino` deixa
+de ser um botão largo isolado e passa a usar o mesmo controle compacto dos
+demais comandos: ícone de saída, rótulo curto e nome acessível. Durante o
+descanso, ele fica ao lado de `Continuar`; na lista e na execução mantém a mesma
+anatomia, preparando a linguagem de controles para superfícies móveis menores
+sem depender somente do desenho do ícone.
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
