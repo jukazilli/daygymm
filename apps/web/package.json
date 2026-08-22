@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @daygym/contracts build && next build",
+    "build": "pnpm --filter @daygym/contracts build && pnpm --filter @daygym/training-runtime build && next build",
     "dev": "next dev",
     "generate:training-template": "node scripts/generate-official-training-template.mjs",
     "lint": "eslint app lib next.config.ts",
@@ -16,13 +16,16 @@
     "@daygym/config": "workspace:*",
     "@daygym/contracts": "workspace:*",
     "@daygym/design-tokens": "workspace:*",
+    "@daygym/training-runtime": "workspace:*",
     "@fontsource/nunito": "5.3.0",
     "@supabase/supabase-js": "2.112.3",
     "fflate": "0.8.3",
+    "lucide-react": "1.31.0",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "read-excel-file": "9.3.10"
+    "read-excel-file": "9.3.10",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

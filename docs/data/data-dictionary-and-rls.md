@@ -3,6 +3,8 @@
 Status: baseline executável do `FND-011`, atualizado pelo comando transacional
 de finalização do `FND-022`, pelo contexto progressivo da `US-003`, pela
 escolha de origem do plano da `US-004` e pela importação oficial da `US-005`.
+O recorte pré-US-007 acrescenta a projeção semanal explícita do plano importado;
+a antecipação `US-008A` registra o início do exercício e cada série realizada.
 
 ## Escopo e precedência
 
@@ -103,28 +105,33 @@ do despacho para a fila durável privada.
 
 Owner: função `private.complete_training_session()`.
 
-Finalidade: persistir a confirmação canônica mínima de uma sessão concluída e a
-identidade estável do evento correspondente. O corte não modela sets, timers,
-notas ou o ciclo da sessão ativa; esses dados pertencem ao M1 e serão adicionados
-sem reescrever uma finalização já confirmada.
+Finalidade: persistir a confirmação canônica de uma sessão concluída e a
+identidade estável do evento correspondente. O recorte prático de M1 adiciona o
+vínculo imutável com plano/sessão, início, duração e contagem de exercícios; sets,
+carga e desempenho detalhado permanecem em cortes posteriores.
 
-| Campo                    | Tipo/restrição                              | Finalidade                                     | Classificação              | Retenção atual                                                               | Índice                                 |
-| ------------------------ | ------------------------------------------- | ---------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
-| `session_id`             | UUID, PK                                    | Identificar a sessão canônica                  | Identificador técnico      | Ciclo de vida da conta; política final no `FND-029`                          | PK                                     |
-| `user_id`                | UUID, FK `api.profiles.user_id`, cascade    | Vincular a sessão ao titular                   | Identificador pessoal      | Removido em cascade com o perfil enquanto não houver decisão legal diferente | `training_sessions_user_completed_idx` |
-| `operation_id`           | text, 16–128, formato técnico, unique/owner | Deduplicar replay do comando offline           | Identificador técnico      | Mesmo ciclo da sessão                                                        | Unique composto                        |
-| `completed_at`           | timestamptz, obrigatório                    | Registrar o instante declarado da finalização  | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | `training_sessions_user_completed_idx` |
-| `version`                | integer positivo                            | Controlar a versão canônica da sessão          | Metadado técnico           | Mesmo ciclo da sessão                                                        | Não                                    |
-| `completion_event_id`    | UUID, unique                                | Fixar o evento emitido na primeira finalização | Identificador técnico      | Mesmo ciclo da sessão/evento                                                 | Unique                                 |
-| `completion_consumed_at` | timestamptz, opcional                       | Confirmar aplicação idempotente do handler     | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
-| `created_at`             | timestamptz, obrigatório                    | Registrar a persistência no servidor           | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                    |
+| Campo                    | Tipo/restrição                              | Finalidade                                     | Classificação              | Retenção atual                                                               | Índice                                      |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------- |
+| `session_id`             | UUID, PK                                    | Identificar a sessão canônica                  | Identificador técnico      | Ciclo de vida da conta; política final no `FND-029`                          | PK                                          |
+| `user_id`                | UUID, FK `api.profiles.user_id`, cascade    | Vincular a sessão ao titular                   | Identificador pessoal      | Removido em cascade com o perfil enquanto não houver decisão legal diferente | `training_sessions_user_completed_idx`      |
+| `operation_id`           | text, 16–128, formato técnico, unique/owner | Deduplicar replay do comando offline           | Identificador técnico      | Mesmo ciclo da sessão                                                        | Unique composto                             |
+| `completed_at`           | timestamptz, obrigatório                    | Registrar o instante declarado da finalização  | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | `training_sessions_user_completed_idx`      |
+| `version`                | integer positivo                            | Controlar a versão canônica da sessão          | Metadado técnico           | Mesmo ciclo da sessão                                                        | Não                                         |
+| `completion_event_id`    | UUID, unique                                | Fixar o evento emitido na primeira finalização | Identificador técnico      | Mesmo ciclo da sessão/evento                                                 | Unique                                      |
+| `completion_consumed_at` | timestamptz, opcional                       | Confirmar aplicação idempotente do handler     | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                         |
+| `plan_id`                | UUID, FK `api.training_plans`, opcional     | Vincular uma conclusão prática ao plano        | Identificador técnico      | Mesmo ciclo da sessão                                                        | `training_sessions_plan_id_idx`             |
+| `plan_version_id`        | UUID, FK de versão, opcional                | Fixar a versão executada                       | Identificador técnico      | Mesmo ciclo da sessão                                                        | `training_sessions_user_plan_completed_idx` |
+| `planned_session_id`     | UUID, FK de sessão planejada, opcional      | Fixar o treino executado                       | Identificador técnico      | Mesmo ciclo da sessão                                                        | `training_sessions_planned_session_id_idx`  |
+| `started_at`             | timestamptz, opcional                       | Registrar o início da execução prática         | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | Não                                         |
+| contagens e duração      | inteiros não negativos, opcionais           | Resumir checklist concluído e tempo decorrido  | Dado de atividade sensível | Mesmo ciclo da sessão                                                        | Não                                         |
+| `created_at`             | timestamptz, obrigatório                    | Registrar a persistência no servidor           | Metadado operacional       | Mesmo ciclo da sessão                                                        | Não                                         |
 
 ### `api.onboarding_contexts`
 
 Owner: usuário autenticado, limitado por grants de coluna, RLS e pela função
 `api.save_onboarding_context()` executada como invoker.
 
-Finalidade: salvar e retomar apenas o contexto mínimo e um dos quatro caminhos
+Finalidade: salvar e retomar apenas o contexto mínimo e um dos três caminhos
 de plano: objetivo, experiência comportamental, frequência, duração,
 equipamentos, estado amplo de limitação e origem escolhida. Não armazena peso,
 diagnóstico, descrição clínica ou texto livre. A função
@@ -142,55 +149,65 @@ concluída e o trigger privado impede contorno por escrita direta.
 | `limitation_status`       | text opcional, allowlist sem detalhe clínico    | Direcionar revisão profissional quando indicada | Dado de atividade sensível | Mesmo ciclo do contexto                                                      | Não    |
 | `current_step`            | smallint, entre 0 e 6, progresso coerente       | Retomar sem repetir respostas                   | Metadado de uso            | Mesmo ciclo do contexto                                                      | Não    |
 | `completed_at`            | timestamptz opcional, normalizado pelo servidor | Registrar confirmação explícita                 | Metadado de uso            | Mesmo ciclo do contexto                                                      | Não    |
-| `plan_source`             | text opcional, allowlist de quatro caminhos     | Registrar a origem de plano escolhida           | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
+| `plan_source`             | text opcional, allowlist de três caminhos       | Registrar a origem de plano escolhida           | Preferência de treino      | Mesmo ciclo do contexto                                                      | Não    |
 | `plan_source_selected_at` | timestamptz opcional, normalizado pelo servidor | Registrar a última troca permitida              | Metadado de uso            | Mesmo ciclo do contexto                                                      | Não    |
 | `updated_at`              | timestamptz, normalizado pelo servidor          | Registrar a última atualização                  | Metadado operacional       | Mesmo ciclo do contexto                                                      | Não    |
 
 ### `api.training_plans`
 
-Owner: comando `private.import_official_xlsx_plan()` chamado pelo wrapper
-versionado `api.import_official_xlsx_plan()`.
+Owner: comandos privados de importação, publicação versionada, arquivamento,
+restauração e renomeação, chamados por wrappers autenticados limitados no
+schema `api`.
 
 Finalidade: manter o plano pertencente ao usuário e apontar explicitamente para
-sua versão ativa. O cliente possui leitura do próprio plano, mas não pode gravar
-diretamente nas tabelas deste agregado.
+sua versão ativa. O cliente possui leitura dos próprios planos, mas não recebe
+escrita direta neste agregado. No máximo um plano não arquivado assume a Home e
+a Agenda; arquivar remove somente o uso futuro e preserva versões e sessões
+concluídas.
 
 | Campo               | Tipo/restrição                                   | Finalidade                  | Classificação         | Retenção atual                              | Índice                            |
 | ------------------- | ------------------------------------------------ | --------------------------- | --------------------- | ------------------------------------------- | --------------------------------- |
 | `plan_id`           | UUID, PK                                         | Identificar o plano         | Identificador técnico | Ciclo da conta; política final no `FND-029` | PK                                |
 | `user_id`           | UUID, FK `api.profiles.user_id`, cascade         | Vincular o plano ao titular | Identificador pessoal | Removido em cascade com o perfil            | `training_plans_user_updated_idx` |
 | `name`              | text, 1–80                                       | Nomear o plano              | Conteúdo de treino    | Mesmo ciclo do plano                        | Não                               |
-| `provenance`        | somente `official_xlsx`                          | Registrar a origem          | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
+| `provenance`        | `official_xlsx` ou `manual`                      | Registrar a origem inicial  | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `active_version_id` | UUID, FK de versão, opcional durante a transação | Apontar a versão ativa      | Identificador técnico | Mesmo ciclo do plano                        | FK                                |
 | `current_version`   | inteiro positivo                                 | Expor a versão corrente     | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `session_count`     | inteiro, 1–14                                    | Resumir sessões             | Metadado de treino    | Mesmo ciclo do plano                        | Não                               |
 | `item_count`        | inteiro, 1–300                                   | Resumir itens               | Metadado de treino    | Mesmo ciclo do plano                        | Não                               |
+| `archived_at`       | timestamptz opcional                             | Retirar o plano do futuro   | Metadado operacional  | Mesmo ciclo do plano                        | Índice unique parcial por titular |
 | `created_at`        | timestamptz                                      | Registrar criação           | Metadado operacional  | Mesmo ciclo do plano                        | Não                               |
 | `updated_at`        | timestamptz                                      | Ordenar planos recentes     | Metadado operacional  | Mesmo ciclo do plano                        | `training_plans_user_updated_idx` |
 
 ### `api.training_plan_versions`
 
-Owner: comando `private.import_official_xlsx_plan()`.
+Owner: comandos privados de importação e
+`private.publish_training_plan_version()`.
 
 Finalidade: preservar uma versão imutável confirmada a partir da proposta
-normalizada no aparelho. Guarda somente hash, nome sanitizado e tamanho como
-proveniência; o arquivo XLSX original não é enviado nem armazenado.
+normalizada no aparelho. Importações guardam somente hash, nome sanitizado e
+tamanho; versões manuais guardam hash do conteúdo normalizado. O XLSX original
+não é enviado nem armazenado.
 
-| Campo               | Tipo/restrição                          | Finalidade                           | Classificação         | Retenção atual  | Índice                                    |
-| ------------------- | --------------------------------------- | ------------------------------------ | --------------------- | --------------- | ----------------------------------------- |
-| `version_id`        | UUID, PK                                | Identificar a versão                 | Identificador técnico | Ciclo do plano  | PK                                        |
-| `plan_id`           | UUID, FK `api.training_plans`, cascade  | Vincular ao plano                    | Identificador técnico | Ciclo do plano  | Unique com `version_number`               |
-| `user_id`           | UUID, FK `api.profiles`, cascade        | Aplicar isolamento por titular       | Identificador pessoal | Ciclo da conta  | `training_plan_versions_user_created_idx` |
-| `version_number`    | inteiro positivo                        | Ordenar versões                      | Metadado operacional  | Ciclo do plano  | Unique com `plan_id`                      |
-| `operation_id`      | texto técnico, unique por usuário       | Deduplicar repetição do comando      | Identificador técnico | Ciclo da versão | Unique com `user_id`                      |
-| `source_sha256`     | SHA-256 hexadecimal, unique por usuário | Deduplicar o mesmo arquivo           | Metadado técnico      | Ciclo da versão | Unique com `user_id`                      |
-| `source_file_name`  | nome sanitizado `.xlsx`, 6–120          | Registrar proveniência sem o arquivo | Metadado do conteúdo  | Ciclo da versão | Não                                       |
-| `source_size_bytes` | inteiro, 1–2.097.152                    | Evidenciar o limite validado         | Metadado técnico      | Ciclo da versão | Não                                       |
-| `created_at`        | timestamptz                             | Registrar confirmação                | Metadado operacional  | Ciclo da versão | `training_plan_versions_user_created_idx` |
+| Campo               | Tipo/restrição                         | Finalidade                           | Classificação         | Retenção atual  | Índice                                    |
+| ------------------- | -------------------------------------- | ------------------------------------ | --------------------- | --------------- | ----------------------------------------- |
+| `version_id`        | UUID, PK                               | Identificar a versão                 | Identificador técnico | Ciclo do plano  | PK                                        |
+| `plan_id`           | UUID, FK `api.training_plans`, cascade | Vincular ao plano                    | Identificador técnico | Ciclo do plano  | Unique com `version_number`               |
+| `user_id`           | UUID, FK `api.profiles`, cascade       | Aplicar isolamento por titular       | Identificador pessoal | Ciclo da conta  | `training_plan_versions_user_created_idx` |
+| `version_number`    | inteiro positivo                       | Ordenar versões                      | Metadado operacional  | Ciclo do plano  | Unique com `plan_id`                      |
+| `operation_id`      | texto técnico, unique por usuário      | Deduplicar repetição do comando      | Identificador técnico | Ciclo da versão | Unique com `user_id`                      |
+| `source_sha256`     | SHA-256 opcional, unique por usuário   | Deduplicar o mesmo arquivo XLSX      | Metadado técnico      | Ciclo da versão | Unique com `user_id`                      |
+| `source_file_name`  | nome `.xlsx` opcional, 6–120           | Registrar proveniência sem o arquivo | Metadado do conteúdo  | Ciclo da versão | Não                                       |
+| `source_size_bytes` | inteiro opcional, 1–2.097.152          | Evidenciar o limite validado         | Metadado técnico      | Ciclo da versão | Não                                       |
+| `author_user_id`    | UUID do autor                          | Rastrear quem publicou               | Identificador pessoal | Ciclo da versão | Não                                       |
+| `change_summary`    | texto, 1–240                           | Explicar a mudança                   | Conteúdo de treino    | Ciclo da versão | Não                                       |
+| `content_sha256`    | SHA-256 opcional                       | Fixar conteúdo de versão manual      | Metadado técnico      | Ciclo da versão | Não                                       |
+| `origin`            | `official_xlsx` ou `manual`            | Distinguir contrato de proveniência  | Metadado operacional  | Ciclo da versão | Não                                       |
+| `created_at`        | timestamptz                            | Registrar confirmação                | Metadado operacional  | Ciclo da versão | `training_plan_versions_user_created_idx` |
 
 ### `api.training_plan_sessions`
 
-Owner: comando `private.import_official_xlsx_plan()`.
+Owner: comandos privados de importação e publicação versionada.
 
 Finalidade: registrar as sessões ordenadas de uma versão importada, sem permitir
 mutação direta pelo cliente.
@@ -203,26 +220,256 @@ mutação direta pelo cliente.
 | `day_order`  | inteiro, 1–14, unique por versão               | Ordenar o dia                  | Conteúdo de treino    | Ciclo da versão | Unique com `version_id`                   |
 | `name`       | texto, 1–80                                    | Nomear a sessão                | Conteúdo de treino    | Ciclo da versão | Não                                       |
 
+### `api.training_plan_schedule_entries`
+
+Owner: trigger `private.seed_training_plan_schedule_entry()`.
+
+Finalidade: projetar cada sessão imutável em uma agenda semanal explícita. O
+contrato usa `1 = segunda-feira` até `7 = domingo`; uma segunda volta do plano
+ocupa o slot 2 do mesmo dia. Planos existentes são retropreenchidos e novas
+sessões recebem a projeção no mesmo commit da importação.
+
+| Campo                | Tipo/restrição                      | Finalidade                            | Classificação         | Retenção atual  | Índice                                            |
+| -------------------- | ----------------------------------- | ------------------------------------- | --------------------- | --------------- | ------------------------------------------------- |
+| `schedule_entry_id`  | UUID, PK                            | Identificar a projeção semanal        | Identificador técnico | Ciclo da versão | PK                                                |
+| `version_id`         | UUID, FK de versão, cascade         | Vincular à versão imutável            | Identificador técnico | Ciclo da versão | Unique com `weekday` e `slot_order`               |
+| `planned_session_id` | UUID, FK de sessão, cascade, unique | Vincular ao treino executável         | Identificador técnico | Ciclo da versão | Unique                                            |
+| `user_id`            | UUID, FK de perfil, cascade         | Aplicar isolamento por titular        | Identificador pessoal | Ciclo da conta  | `training_plan_schedule_entries_user_version_idx` |
+| `weekday`            | inteiro, 1–7                        | Representar segunda a domingo         | Conteúdo de agenda    | Ciclo da versão | Unique com `version_id` e `slot_order`            |
+| `slot_order`         | inteiro, 1–2                        | Ordenar até duas sessões no mesmo dia | Conteúdo de agenda    | Ciclo da versão | Unique com `version_id` e `weekday`               |
+| timestamps           | timestamptz do servidor             | Auditar criação e atualização         | Metadado operacional  | Ciclo da versão | Não                                               |
+
 ### `api.training_plan_items`
 
 Owner: comando `private.import_official_xlsx_plan()`.
 
-Finalidade: armazenar itens normalizados e limitados de cada sessão importada.
+Finalidade: armazenar itens normalizados e limitados de cada sessão versionada.
 Fórmulas, macros, links, objetos e conteúdo arbitrário da planilha não entram
 nesta relação.
 
-| Campo              | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
-| ------------------ | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
-| `item_id`          | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
-| `session_id`       | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
-| `version_id`       | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
-| `user_id`          | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
-| `item_order`       | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
-| `exercise_name`    | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `modality`         | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| `sets`             | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| medidas e descanso | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
-| circuito e notas   | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| Campo                | Tipo/restrição                                 | Finalidade                                 | Classificação         | Retenção atual  | Índice                                 |
+| -------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------- | --------------- | -------------------------------------- |
+| `item_id`            | UUID, PK                                       | Identificar o item                         | Identificador técnico | Ciclo da versão | PK                                     |
+| `session_id`         | UUID, FK `api.training_plan_sessions`, cascade | Vincular à sessão                          | Identificador técnico | Ciclo da versão | Unique com `item_order`                |
+| `version_id`         | UUID, FK `api.training_plan_versions`, cascade | Vincular à versão                          | Identificador técnico | Ciclo da versão | `training_plan_items_user_version_idx` |
+| `user_id`            | UUID, FK `api.profiles`, cascade               | Aplicar isolamento por titular             | Identificador pessoal | Ciclo da conta  | `training_plan_items_user_version_idx` |
+| `item_order`         | inteiro, 1–100, unique por sessão              | Ordenar o item                             | Conteúdo de treino    | Ciclo da versão | Unique com `session_id`                |
+| `exercise_name`      | texto, 1–120                                   | Nomear o exercício                         | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `modality`           | allowlist de cinco modalidades                 | Definir regra de execução                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `sets`               | inteiro, 1–20                                  | Definir séries                             | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `planned_weight_kg`  | decimal opcional, 0,25–2.000 kg                | Sugerir carga sem substituir o realizado   | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_mode`          | `unconfigured`, `external` ou `none`           | Classificar uso de carga em força          | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `load_increment_kg`  | decimal opcional, 0,01–2.000 kg                | Registrar menor passo do equipamento       | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| `set_progression_kg` | decimal opcional, 0–2.000 kg                   | Incrementar sugestão entre séries          | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| medidas e descanso   | inteiros opcionais com limites                 | Definir repetição/tempo/distância/descanso | Conteúdo de treino    | Ciclo da versão | Não                                    |
+| circuito e notas     | textos opcionais limitados                     | Agrupar e orientar o item                  | Conteúdo de treino    | Ciclo da versão | Não                                    |
+
+Tempos planejados e de descanso permanecem canônicos como segundos inteiros no
+banco e nos contratos. As superfícies humanas apresentam e recebem `HH:MM:SS` e
+convertem esse valor na fronteira; o importador também aceita o modelo XLSX legado
+em segundos para evitar quebra de arquivos existentes.
+
+### `api.training_plan_item_alternatives`
+
+Owner: comando `private.publish_training_plan_version_v3()`.
+
+Finalidade: manter até cinco movimentos alternativos previamente aprovados para
+cada item imutável do plano. A alternativa troca somente o movimento; séries,
+repetições, carga planejada, progressão e descanso continuam pertencendo ao item
+original. O cliente lê as próprias alternativas e não pode escrevê-las
+diretamente.
+
+| Campo               | Tipo/restrição                                | Finalidade                               | Classificação         | Retenção atual  | Índice                                             |
+| ------------------- | --------------------------------------------- | ---------------------------------------- | --------------------- | --------------- | -------------------------------------------------- |
+| `alternative_id`    | UUID, PK                                      | Identificar a alternativa                | Identificador técnico | Ciclo da versão | PK                                                 |
+| `plan_item_id`      | UUID, FK de item, cascade                     | Fixar o exercício planejado              | Identificador técnico | Ciclo da versão | Unique com ordem e nome normalizado                |
+| `version_id`        | UUID, FK de versão, cascade                   | Impedir alternativa fora da versão ativa | Identificador técnico | Ciclo da versão | `training_plan_item_alternatives_user_version_idx` |
+| `user_id`           | UUID, FK de perfil, cascade                   | Aplicar isolamento redundante            | Identificador pessoal | Ciclo da conta  | `training_plan_item_alternatives_user_version_idx` |
+| `alternative_order` | inteiro, 1–5                                  | Ordenar escolhas no popup                | Conteúdo de treino    | Ciclo da versão | Unique por item                                    |
+| `exercise_name`     | texto aparado, 1–120, unique normalizado/item | Nomear somente um movimento aprovado     | Conteúdo de treino    | Ciclo da versão | Unique normalizado por item                        |
+
+### `api.training_session_runs`
+
+Owner: comandos `private.start_training_session()`,
+`private.pause_training_session()`, `private.resume_training_session()` e
+`private.finish_practical_training_session()`.
+
+Finalidade: manter no servidor uma única sessão ativa por usuário, ligada à
+versão imutável do plano. O cliente possui leitura própria; criação, atualização
+e encerramento ocorrem somente pelos comandos allowlisted. A persistência
+offline e sua outbox local continuam fora deste recorte e pertencem à US-009.
+
+| Campo                       | Tipo/restrição                    | Finalidade                        | Classificação              | Retenção atual                       | Índice                                            |
+| --------------------------- | --------------------------------- | --------------------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------- |
+| `run_id`                    | UUID, PK                          | Identificar a execução ativa      | Identificador técnico      | Até finalização ou exclusão da conta | PK                                                |
+| `user_id`                   | UUID, FK de perfil, unique        | Isolar e limitar uma sessão ativa | Identificador pessoal      | Mesmo ciclo da execução              | Unique e `training_session_runs_user_started_idx` |
+| referências do plano        | FKs de plano, versão e sessão     | Fixar o alvo da execução          | Identificador técnico      | Mesmo ciclo da execução              | Índices individuais de FK                         |
+| `operation_id`              | texto técnico, unique por usuário | Deduplicar o início               | Identificador técnico      | Mesmo ciclo da execução              | Unique composto                                   |
+| `started_at` / `updated_at` | timestamptz do servidor           | Medir duração e última gravação   | Dado de atividade sensível | Mesmo ciclo da execução              | Início por usuário                                |
+| `paused_at`                 | timestamptz opcional do servidor  | Bloquear avanço durante a pausa   | Dado de atividade sensível | Mesmo ciclo da execução              | Não                                               |
+| `paused_duration_seconds`   | inteiro não negativo              | Excluir pausas da duração final   | Dado de atividade sensível | Mesmo ciclo da execução              | Não                                               |
+
+Os comandos de pausa e retomada são idempotentes. Enquanto `paused_at` estiver
+preenchido, gatilhos internos recusam início/conclusão de exercício e novas
+séries; a finalização também exige retomada prévia.
+
+### `api.training_session_run_items`
+
+Owner: `private.start_training_session()` cria o snapshot;
+`private.start_training_exercise()` inicia o item e
+`private.complete_training_set()` conclui automaticamente o item na última série.
+
+Finalidade: copiar os alvos dos exercícios da versão selecionada para a sessão
+ativa e manter o estado resumido do exercício. Os valores realizados ficam nas
+relações de séries e nunca sobrescrevem o alvo planejado.
+
+| Campo                     | Tipo/restrição                                    | Finalidade                      | Classificação              | Retenção atual                | Índice                                    |
+| ------------------------- | ------------------------------------------------- | ------------------------------- | -------------------------- | ----------------------------- | ----------------------------------------- |
+| `run_id` + `plan_item_id` | FKs, PK composta                                  | Vincular execução e exercício   | Identificador técnico      | Até a finalização da execução | PK e índice da FK do item                 |
+| `user_id`                 | UUID, FK de perfil                                | Aplicar isolamento redundante   | Identificador pessoal      | Mesmo ciclo da execução       | `training_session_run_items_user_run_idx` |
+| alvo do exercício         | ordem, nome, modalidade, sets e medidas limitadas | Preservar o alvo apresentado    | Conteúdo de treino         | Mesmo ciclo da execução       | Ordem unique por execução                 |
+| `planned_weight_kg`       | decimal opcional, 0,25–2.000 kg                   | Preservar a carga planejada     | Conteúdo de treino         | Mesmo ciclo da execução       | Não                                       |
+| `set_progression_kg`      | decimal opcional, 0–2.000 kg                      | Preservar progressão por série  | Conteúdo de treino         | Mesmo ciclo da execução       | Não                                       |
+| `started_at`              | timestamptz opcional do servidor                  | Retomar o exercício iniciado    | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+| `completed_at`            | timestamptz opcional do servidor                  | Marcar a última série concluída | Dado de atividade sensível | Mesmo ciclo da execução       | Não                                       |
+
+`set_progression_kg` guarda o snapshot imutável vigente no início da execução.
+A carga planejada de cada registro de série é derivada no servidor; a carga
+realizada permanece um campo independente e editável pelo titular.
+
+### `api.training_session_run_item_substitutions`
+
+Owner: comando `private.substitute_training_exercise()`.
+
+Finalidade: registrar uma única substituição ativa por exercício, antes da
+primeira série confirmada. O comando aceita apenas uma alternativa pertencente
+ao mesmo item, titular e versão da execução, exige motivo estruturado e é
+idempotente pela chave de operação.
+
+| Campo                                        | Tipo/restrição                    | Finalidade                                    | Classificação              | Retenção atual                    | Índice                                            |
+| -------------------------------------------- | --------------------------------- | --------------------------------------------- | -------------------------- | --------------------------------- | ------------------------------------------------- |
+| `run_id` + `plan_item_id`                    | FKs, PK composta                  | Fixar execução e exercício planejado          | Identificador técnico      | Até finalizar/cancelar a execução | PK                                                |
+| `user_id`                                    | UUID, FK de perfil                | Aplicar isolamento redundante                 | Identificador pessoal      | Mesmo ciclo da execução           | `training_session_run_substitutions_user_run_idx` |
+| `alternative_id`                             | UUID, FK de alternativa aprovada  | Impedir movimento arbitrário                  | Identificador técnico      | Mesmo ciclo da execução           | FK                                                |
+| `operation_id`                               | texto técnico, unique por titular | Deduplicar confirmação e replay               | Metadado operacional       | Mesmo ciclo da execução           | Unique composto                                   |
+| `reason`                                     | allowlist de quatro motivos       | Explicar a decisão sem texto livre            | Dado de atividade sensível | Mesmo ciclo da execução           | Não                                               |
+| nomes planejado/executado e `substituted_at` | textos limitados e timestamptz    | Preservar o antes, o depois e o instante real | Dado de atividade sensível | Mesmo ciclo da execução           | Não                                               |
+
+### `api.training_session_run_sets`
+
+Owner: comando `private.complete_training_set()`.
+
+Finalidade: persistir imediatamente cada série de uma execução ativa. A chave
+de operação e a unicidade por exercício/série tornam o comando idempotente; os
+campos planejados e realizados permanecem separados. As linhas são removidas
+em cascade depois da cópia atômica para o histórico canônico.
+
+| Campo              | Tipo/restrição                                  | Finalidade                         | Classificação              | Retenção atual                    | Índice                     |
+| ------------------ | ----------------------------------------------- | ---------------------------------- | -------------------------- | --------------------------------- | -------------------------- |
+| `set_execution_id` | UUID, PK                                        | Identificar a série realizada      | Identificador técnico      | Até finalizar/cancelar a execução | PK                         |
+| referências        | FKs de execução, item e titular                 | Fixar origem e isolamento          | Identificador pessoal      | Mesmo ciclo da execução           | Índices de execução e item |
+| `operation_id`     | texto técnico, unique por usuário               | Deduplicar double-submit e replay  | Identificador técnico      | Mesmo ciclo da execução           | Unique composto            |
+| `set_number`       | inteiro, 1–20, unique por item da execução      | Ordenar e impedir salto/duplicação | Conteúdo de treino         | Mesmo ciclo da execução           | Unique composto            |
+| medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo da série          | Conteúdo de treino         | Mesmo ciclo da execução           | Não                        |
+| medidas realizadas | ao menos repetição, duração ou distância        | Registrar o que foi realizado      | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| `completed_at`     | timestamptz do servidor                         | Confirmar persistência imediata    | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| `revision`         | inteiro, 1–1.000                                | Impedir sobrescrita concorrente    | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| `updated_at`       | timestamptz do servidor                         | Registrar a última correção        | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+
+### `api.training_session_sets`
+
+Owner: comando `private.finish_practical_training_session()`.
+
+Finalidade: preservar no histórico canônico as séries realizadas depois da
+finalização da sessão, inclusive quando valores reais diferem dos planejados.
+O cliente possui apenas leitura das próprias linhas.
+
+| Campo              | Tipo/restrição                                  | Finalidade                            | Classificação              | Retenção atual                  | Índice                       |
+| ------------------ | ----------------------------------------------- | ------------------------------------- | -------------------------- | ------------------------------- | ---------------------------- |
+| `set_execution_id` | UUID, PK                                        | Preservar a identidade da série ativa | Identificador técnico      | Mesmo ciclo da sessão concluída | PK                           |
+| referências        | FKs de sessão, item e titular                   | Fixar proveniência e isolamento       | Identificador pessoal      | Mesmo ciclo da sessão concluída | Índices por sessão e item    |
+| exercício e série  | nome, ordem e número limitados                  | Manter o snapshot legível             | Conteúdo de treino         | Mesmo ciclo da sessão concluída | Unique por sessão/item/série |
+| medidas planejadas | repetição, carga, duração e distância opcionais | Preservar o alvo histórico            | Conteúdo de treino         | Mesmo ciclo da sessão concluída | Não                          |
+| medidas realizadas | repetição, carga, duração e distância opcionais | Preservar o resultado histórico       | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+| `completed_at`     | timestamptz do servidor                         | Registrar quando a série terminou     | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+| `revision`         | inteiro, 1–1.000                                | Preservar a versão final da série     | Metadado operacional       | Mesmo ciclo da sessão concluída | Não                          |
+| `updated_at`       | timestamptz do servidor                         | Preservar quando ocorreu a correção   | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                          |
+
+`planned_exercise_name` preserva o movimento prescrito. `exercise_name` passa a
+representar o movimento efetivamente executado quando existe substituição; sem
+substituição, os dois campos possuem o mesmo valor.
+
+### `api.training_session_substitutions`
+
+Owner: trigger `private.archive_training_run_substitutions()` durante a
+finalização.
+
+Finalidade: preservar a trilha canônica das substituições que fazem parte de
+uma sessão concluída. Cancelar a execução remove o registro ativo sem criar
+histórico; finalizar copia o motivo, os dois nomes e o instante original.
+
+| Campo                                        | Tipo/restrição                   | Finalidade                                  | Classificação              | Retenção atual            | Índice                                            |
+| -------------------------------------------- | -------------------------------- | ------------------------------------------- | -------------------------- | ------------------------- | ------------------------------------------------- |
+| `session_id` + `plan_item_id`                | FKs, PK composta                 | Fixar sessão concluída e prescrição         | Identificador técnico      | Ciclo da sessão concluída | PK                                                |
+| `user_id`                                    | UUID, FK de perfil               | Aplicar isolamento redundante               | Identificador pessoal      | Ciclo da conta            | `training_session_substitutions_user_session_idx` |
+| `alternative_id`                             | UUID, FK de alternativa aprovada | Fixar o movimento permitido                 | Identificador técnico      | Ciclo da sessão concluída | FK                                                |
+| `reason`                                     | allowlist de quatro motivos      | Explicar a decisão                          | Dado de atividade sensível | Ciclo da sessão concluída | Não                                               |
+| nomes planejado/executado e `substituted_at` | textos limitados e timestamptz   | Preservar antes, depois e instante original | Dado de atividade sensível | Ciclo da sessão concluída | Não                                               |
+
+### `api.training_session_run_set_adjustments`
+
+Owner: comando `private.revise_training_set()`.
+
+Finalidade: auditar correções e desfazimentos enquanto a execução permanece
+ativa. A linha registra valores anteriores e posteriores, revisão esperada,
+resultado do comando e chave idempotente. O vínculo com a execução usa cascade:
+cancelar não preserva dados e finalizar copia somente correções de séries que
+permanecem no histórico canônico.
+
+| Campo             | Tipo/restrição                       | Finalidade                            | Classificação              | Retenção atual                    | Índice                     |
+| ----------------- | ------------------------------------ | ------------------------------------- | -------------------------- | --------------------------------- | -------------------------- |
+| `adjustment_id`   | UUID, PK                             | Identificar a alteração               | Identificador técnico      | Até finalizar/cancelar a execução | PK                         |
+| referências       | execução, série, item e titular      | Fixar escopo e isolamento             | Identificador pessoal      | Mesmo ciclo da execução           | Índices por execução/série |
+| `operation_id`    | texto técnico, unique por usuário    | Deduplicar repetição do comando       | Identificador técnico      | Mesmo ciclo da execução           | Unique composto            |
+| ação e revisões   | `correct`/`undo`, inteiros limitados | Aplicar concorrência otimista         | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| antes/depois      | JSONB validado                       | Preservar a mudança auditável         | Dado de atividade sensível | Mesmo ciclo da execução           | Não                        |
+| estado resultante | contagens e conclusão                | Repetir resposta sem reaplicar a ação | Metadado operacional       | Mesmo ciclo da execução           | Não                        |
+| `changed_at`      | timestamptz do servidor              | Ordenar alterações                    | Dado de atividade sensível | Mesmo ciclo da execução           | Índice composto            |
+
+### `api.training_session_set_adjustments`
+
+Owner: trigger `private.copy_training_set_adjustments()` durante a finalização.
+
+Finalidade: preservar a trilha de correções das séries que efetivamente compõem
+uma sessão concluída. Desfazimentos não são copiados porque a respectiva série
+não faz parte do resultado; cancelamentos removem toda a execução sem histórico.
+
+| Campo           | Tipo/restrição                    | Finalidade                          | Classificação              | Retenção atual                  | Índice                  |
+| --------------- | --------------------------------- | ----------------------------------- | -------------------------- | ------------------------------- | ----------------------- |
+| `adjustment_id` | UUID, PK                          | Preservar a identidade da alteração | Identificador técnico      | Mesmo ciclo da sessão concluída | PK                      |
+| referências     | sessão, série, item e titular     | Fixar proveniência e isolamento     | Identificador pessoal      | Mesmo ciclo da sessão concluída | Índice por sessão/série |
+| `operation_id`  | texto técnico, unique por usuário | Preservar a deduplicação original   | Identificador técnico      | Mesmo ciclo da sessão concluída | Unique composto         |
+| revisões        | inteiros, 1–1.000                 | Explicar a evolução da série        | Metadado operacional       | Mesmo ciclo da sessão concluída | Não                     |
+| antes/depois    | JSONB validado                    | Auditar os valores corrigidos       | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Não                     |
+| `changed_at`    | timestamptz do servidor           | Ordenar alterações                  | Dado de atividade sensível | Mesmo ciclo da sessão concluída | Índice composto         |
+
+### `private.training_session_command_receipts`
+
+Owner: comandos `private.cancel_training_session_once()`.
+
+Finalidade: preservar apenas a chave idempotente de um cancelamento já aplicado,
+para que a repetição causada por uma resposta de rede perdida não transforme
+sucesso em erro. O cliente não possui acesso direto e o recibo não contém JWT,
+e-mail nem medidas do treino.
+
+| Campo          | Tipo/restrição                        | Finalidade                              | Classificação         | Retenção atual  | Índice      |
+| -------------- | ------------------------------------- | --------------------------------------- | --------------------- | --------------- | ----------- |
+| `user_id`      | UUID, FK, PK composta                 | Isolar o titular                        | Identificador pessoal | Ciclo da conta  | PK composta |
+| `operation_id` | texto técnico limitado, PK composta   | Deduplicar o replay                     | Identificador técnico | Ciclo da conta  | PK composta |
+| `command_kind` | somente `cancel-session`              | Impedir reuso entre tipos de comando    | Metadado operacional  | Ciclo do recibo | Não         |
+| `run_id`       | UUID sem FK após exclusão da execução | Validar conteúdo do comando repetido    | Identificador técnico | Ciclo do recibo | Não         |
+| `occurred_at`  | timestamptz obrigatório               | Registrar quando o cancelamento ocorreu | Metadado operacional  | Ciclo do recibo | Não         |
+| `created_at`   | timestamptz do servidor               | Auditar a confirmação                   | Metadado operacional  | Ciclo do recibo | Não         |
 
 ### `platform.domain_event_receipts`
 
@@ -249,36 +496,56 @@ canônicas críticas continuam server-owned; o contexto progressivo, pertencente
 ao próprio titular, usa grants de coluna, constraints e RLS. O schema `private`
 não é exposto ao cliente.
 
-| Recurso                           | Papel                  |  SELECT |  INSERT |  UPDATE | DELETE | Política/controle                                                                                                                    | Teste negativo                  |
-| --------------------------------- | ---------------------- | ------: | ------: | ------: | -----: | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| `api.profiles`                    | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.profiles`                    | `authenticated`        | Próprio |     Não |     Não |    Não | `profiles_select_own`; grants mínimos                                                                                                | `RLS-N02`, `RLS-N05`            |
-| `api.profiles`                    | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
-| `api.consents`                    | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.consents`                    | `authenticated`        | Próprio |     Não |     Não |    Não | `consents_select_own`; grants mínimos                                                                                                | `RLS-N03`, `RLS-N06`            |
-| `api.consents`                    | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
-| `private.legal_document_versions` | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; grants revogados                                                                                                     | `RLS-N04`                       |
-| `private.legal_document_versions` | administração          |     Sim |     Sim |     Sim |    Sim | migration/operação privilegiada                                                                                                      | fora do cliente                 |
-| `platform.job_outbox`             | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N07`                       |
-| `platform.job_outbox`             | funções internas       |     Sim |     Sim |     Sim |    Não | definer boundary e fila privada                                                                                                      | testes do outbox                |
-| `platform.job_outbox`             | worker runtime         |     Não |     Não |     Não |    Não | apenas wrappers privados bounded                                                                                                     | `RLS-N08`                       |
-| `api.training_sessions`           | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.training_sessions`           | `authenticated`        | Próprio |     Não |     Não |    Não | `training_sessions_select_own`; grants mínimos                                                                                       | `RLS-N09`                       |
-| `api.training_sessions`           | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando               |
-| `api.onboarding_contexts`         | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
-| `api.onboarding_contexts`         | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12`, `RLS-N13` |
-| `api.training_plans`              | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; escrita somente pelo comando importador                                                                 | `RLS-N14`                       |
-| `api.training_plan_versions`      | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_versions_select_own`; versões imutáveis                                                                               | `RLS-N15`                       |
-| `api.training_plan_sessions`      | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_sessions_select_own`; isolamento redundante por titular                                                               | `RLS-N16`                       |
-| `api.training_plan_items`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_items_select_own`; proposta revalidada pelo servidor                                                                  | `RLS-N17`                       |
-| `platform.domain_event_receipts`  | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`                       |
-| `platform.domain_event_receipts`  | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`                       |
-| `platform.domain_event_receipts`  | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler               |
+| Recurso                                       | Papel                  |  SELECT |  INSERT |  UPDATE | DELETE | Política/controle                                                                                                                    | Teste negativo                  |
+| --------------------------------------------- | ---------------------- | ------: | ------: | ------: | -----: | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| `api.profiles`                                | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.profiles`                                | `authenticated`        | Próprio |     Não |     Não |    Não | `profiles_select_own`; grants mínimos                                                                                                | `RLS-N02`, `RLS-N05`            |
+| `api.profiles`                                | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
+| `api.consents`                                | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.consents`                                | `authenticated`        | Próprio |     Não |     Não |    Não | `consents_select_own`; grants mínimos                                                                                                | `RLS-N03`, `RLS-N06`            |
+| `api.consents`                                | função interna         |     N/A |     Sim |     Não |    Não | trigger `SECURITY DEFINER`                                                                                                           | testes do cadastro              |
+| `private.legal_document_versions`             | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; grants revogados                                                                                                     | `RLS-N04`                       |
+| `private.legal_document_versions`             | administração          |     Sim |     Sim |     Sim |    Sim | migration/operação privilegiada                                                                                                      | fora do cliente                 |
+| `private.training_session_command_receipts`   | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema privado; acesso somente pelos comandos server-owned                                                                           | testes da outbox de treino      |
+| `private.training_session_command_receipts`   | funções internas       |     Sim |     Sim |     Não |    Não | definer boundary e chave idempotente por titular                                                                                     | testes da outbox de treino      |
+| `platform.job_outbox`                         | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N07`                       |
+| `platform.job_outbox`                         | funções internas       |     Sim |     Sim |     Sim |    Não | definer boundary e fila privada                                                                                                      | testes do outbox                |
+| `platform.job_outbox`                         | worker runtime         |     Não |     Não |     Não |    Não | apenas wrappers privados bounded                                                                                                     | `RLS-N08`                       |
+| `api.training_sessions`                       | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.training_sessions`                       | `authenticated`        | Próprio |     Não |     Não |    Não | `training_sessions_select_own`; grants mínimos                                                                                       | `RLS-N09`                       |
+| `api.training_sessions`                       | função interna         |     Sim |     Sim |     Não |    Não | comando transacional server-owned                                                                                                    | testes do comando               |
+| `api.onboarding_contexts`                     | `anon`                 |     Não |     Não |     Não |    Não | sem `USAGE` em `api`                                                                                                                 | `RLS-N01`                       |
+| `api.onboarding_contexts`                     | `authenticated`        | Próprio | Próprio | Próprio |    Não | `onboarding_contexts_select_own`, `onboarding_contexts_insert_own`, `onboarding_contexts_update_own`; constraints e grants de coluna | `RLS-N11`, `RLS-N12`, `RLS-N13` |
+| `api.training_plans`                          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plans_select_own`; publicação, arquivamento e restauração somente por comandos limitados                                   | `RLS-N14`, `RLS-N21`, `RLS-N25` |
+| `api.training_plan_versions`                  | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_versions_select_own`; versões imutáveis                                                                               | `RLS-N15`                       |
+| `api.training_plan_sessions`                  | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_sessions_select_own`; isolamento redundante por titular                                                               | `RLS-N16`                       |
+| `api.training_plan_items`                     | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_items_select_own`; proposta revalidada pelo servidor                                                                  | `RLS-N17`                       |
+| `api.training_plan_item_alternatives`         | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_item_alternatives_select_own`; publicação somente pelo comando versionado                                             | `RLS-N28`                       |
+| `api.training_plan_schedule_entries`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_plan_schedule_entries_select_own`; projeção escrita somente pelo trigger                                                   | `RLS-N20`                       |
+| `api.training_session_runs`                   | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_runs_select_own`; mutação somente por comandos                                                                     | `RLS-N18`, `RLS-N22`            |
+| `api.training_session_run_items`              | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_items_select_own`; mutação somente por comandos                                                                | `RLS-N19`                       |
+| `api.training_session_run_item_substitutions` | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_substitutions_select_own`; escrita somente pelo comando idempotente                                            | `RLS-N29`                       |
+| `api.training_session_run_sets`               | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_sets_select_own`; cada série é gravada somente pelo comando idempotente                                        | `RLS-N23`                       |
+| `api.training_session_sets`                   | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_sets_select_own`; histórico escrito somente durante a finalização                                                  | `RLS-N24`                       |
+| `api.training_session_substitutions`          | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_substitutions_select_own`; histórico escrito somente durante a finalização                                         | `RLS-N30`                       |
+| `api.training_session_run_set_adjustments`    | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_run_set_adjustments_select_own`; escrita somente pelo comando transacional                                         | `RLS-N26`                       |
+| `api.training_session_set_adjustments`        | `authenticated`        | Próprio |     Não |     Não |    Não | `training_session_set_adjustments_select_own`; cópia somente durante a finalização                                                   | `RLS-N27`                       |
+| `platform.domain_event_receipts`              | `anon`/`authenticated` |     Não |     Não |     Não |    Não | schema interno; grants revogados                                                                                                     | `RLS-N10`                       |
+| `platform.domain_event_receipts`              | worker runtime         |     Não |     Não |     Não |    Não | somente router privado bounded                                                                                                       | `RLS-N10`                       |
+| `platform.domain_event_receipts`              | handler interno        |     Sim |     Sim |     Não |    Não | definer boundary sem payload                                                                                                         | testes do handler               |
 
 As policies temporárias de inserção da fundação foram removidas pela migration
 seguinte. As policies ativas são `profiles_select_own`, `consents_select_own`,
-`training_sessions_select_own`, `onboarding_contexts_select_own`,
-`onboarding_contexts_insert_own` e `onboarding_contexts_update_own`. Os controles
+`training_sessions_select_own`, `training_session_runs_select_own`,
+`training_session_run_items_select_own`, `training_session_run_sets_select_own`,
+`training_session_sets_select_own`,
+`training_plan_item_alternatives_select_own`,
+`training_session_run_substitutions_select_own`,
+`training_session_substitutions_select_own`,
+`training_session_run_set_adjustments_select_own`,
+`training_session_set_adjustments_select_own`, `onboarding_contexts_select_own`,
+`onboarding_contexts_insert_own`, `onboarding_contexts_update_own` e
+`training_plan_schedule_entries_select_own`. Os controles
 negativos estáveis são:
 
 - `RLS-N01`: bloqueia acesso anônimo ao schema exposto;
@@ -300,6 +567,20 @@ negativos estáveis são:
 - `RLS-N15`: isola versões importadas entre titulares.
 - `RLS-N16`: isola sessões de plano entre titulares.
 - `RLS-N17`: isola itens de plano entre titulares.
+- `RLS-N18`: isola execuções ativas entre titulares.
+- `RLS-N19`: bloqueia a conclusão de exercícios por outro titular.
+- `RLS-N20`: isola a agenda semanal entre titulares.
+- `RLS-N21`: bloqueia a renomeação de plano pertencente a outro titular.
+- `RLS-N22`: bloqueia o cancelamento da execução ativa de outro titular.
+- `RLS-N23`: isola as séries persistidas de uma execução ativa entre titulares.
+- `RLS-N24`: isola o histórico canônico de séries entre titulares.
+- `RLS-N25`: bloqueia publicação, arquivamento e restauração de plano por outro
+  titular; uma execução ativa também bloqueia a troca da versão futura.
+- `RLS-N26`: isola a auditoria ativa de correções e desfazimentos entre titulares.
+- `RLS-N27`: isola a auditoria canônica de correções entre titulares.
+- `RLS-N28`: isola alternativas aprovadas entre titulares.
+- `RLS-N29`: isola substituições da execução ativa entre titulares.
+- `RLS-N30`: isola o histórico canônico de substituições entre titulares.
 
 ## Pendências deliberadas para `FND-029`
 

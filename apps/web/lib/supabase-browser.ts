@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { getWebPublicConfig } from "./supabase-public-config";
+import { createSupabaseFetchWithClockSkewRecovery } from "./supabase-resilience";
 import type { WebDatabase } from "./supabase-database";
 
 function createWebClient(url: string, publishableKey: string) {
@@ -12,6 +13,7 @@ function createWebClient(url: string, publishableKey: string) {
       persistSession: true,
     },
     db: { schema: "api" },
+    global: { fetch: createSupabaseFetchWithClockSkewRecovery() },
   });
 }
 

@@ -29,6 +29,7 @@ describe("mobileAuthOptions", () => {
         storageKey: mobileSessionStorageKey,
       },
       db: { schema: "api" },
+      global: { fetch: expect.any(Function) },
     });
   });
 });

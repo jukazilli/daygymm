@@ -12,5 +12,6 @@ export default defineConfig({
   oxc: false,
   test: {
     environment: "jsdom",
+    testTimeout: 10_000,
   },
 });

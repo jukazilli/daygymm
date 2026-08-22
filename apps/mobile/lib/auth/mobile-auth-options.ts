@@ -1,4 +1,5 @@
 import { processLock } from "@supabase/supabase-js";
+import { createSupabaseFetchWithClockSkewRecovery } from "@daygym/training-runtime";
 
 import {
   mobileSessionStorageKey,
@@ -17,5 +18,6 @@ export function mobileAuthOptions(storage: SecureSessionStorage) {
       storageKey: mobileSessionStorageKey,
     },
     db: { schema: "api" as const },
+    global: { fetch: createSupabaseFetchWithClockSkewRecovery() },
   };
 }

@@ -7,6 +7,7 @@ const publicPackages = new Set([
   "@daygym/contracts",
   "@daygym/design-tokens",
   "@daygym/domain",
+  "@daygym/training-runtime",
 ]);
 const errors: string[] = [];
 

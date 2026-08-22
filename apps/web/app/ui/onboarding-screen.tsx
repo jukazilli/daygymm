@@ -11,10 +11,18 @@ import type {
   OnboardingLimitationStatus,
   OnboardingSessionDuration,
   OnboardingStep,
+  PlanSourceGateway,
+  TrainingSessionGateway,
 } from "@daygym/contracts";
 
+import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
+import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
 import { createWebOnboardingGateway } from "../../lib/onboarding-gateway";
-import { AppLoadingSkeleton } from "./app-shell";
+import {
+  AppLoadingSkeleton,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 
 type AnswerValue =
   | OnboardingEquipmentContext
@@ -40,6 +48,8 @@ interface StepDefinition {
 interface OnboardingScreenProps {
   readonly gateway?: OnboardingGateway;
   readonly navigate?: (path: string) => void;
+  readonly sourceGateway?: PlanSourceGateway;
+  readonly trainingGateway?: TrainingSessionGateway;
 }
 
 const stepDefinitions: readonly StepDefinition[] = [
@@ -207,8 +217,16 @@ function completeDraft(context: OnboardingContext) {
 export function OnboardingScreen({
   gateway: providedGateway,
   navigate = defaultNavigate,
+  sourceGateway: providedSourceGateway,
+  trainingGateway: providedTrainingGateway,
 }: OnboardingScreenProps) {
   const gatewayRef = useRef<OnboardingGateway | undefined>(providedGateway);
+  const sourceGatewayRef = useRef<PlanSourceGateway | undefined>(
+    providedSourceGateway,
+  );
+  const trainingGatewayRef = useRef<TrainingSessionGateway | undefined>(
+    providedTrainingGateway,
+  );
   const [context, setContext] = useState<OnboardingContext>();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [editingFromReview, setEditingFromReview] = useState(false);
@@ -220,29 +238,67 @@ export function OnboardingScreen({
     return gatewayRef.current;
   }
 
-  useEffect(() => {
-    void gateway()
-      .load()
-      .then((result) => {
-        if (!result.ok) {
-          if (result.reason === "session") {
-            navigate("/entrar/");
-            return;
-          }
-          setFeedback(
-            "Não foi possível carregar suas respostas. Tente novamente.",
-          );
-          return;
-        }
+  function sourceGateway() {
+    sourceGatewayRef.current ??= createWebPlanSourceGateway();
+    return sourceGatewayRef.current;
+  }
 
-        if (result.value.completedAt) {
+  function trainingGateway() {
+    trainingGatewayRef.current ??= createLocalFirstTrainingSessionGateway();
+    return trainingGatewayRef.current;
+  }
+
+  useEffect(() => {
+    const localFallback = () =>
+      Promise.all([sourceGateway().load(), trainingGateway().load()]);
+    const opensSavedTraining = ([sourceResult, trainingResult]: Awaited<
+      ReturnType<typeof localFallback>
+    >) =>
+      (sourceResult.ok && sourceResult.value.onboardingCompleted) ||
+      (trainingResult.ok &&
+        Boolean(trainingResult.value.plan || trainingResult.value.activeRun));
+
+    void (async () => {
+      if (!navigator.onLine) {
+        const localResults = await localFallback();
+        if (opensSavedTraining(localResults)) {
           navigate("/hoje/");
           return;
         }
+        setFeedback("Você está sem internet. Conecte-se para continuar.");
+        return;
+      }
 
-        setContext(result.value);
-        setActiveStep(result.value.currentStep);
-      });
+      const result = await gateway().load();
+      if (!result.ok) {
+        const localResults = await localFallback();
+        const [sourceResult, trainingResult] = localResults;
+        if (opensSavedTraining(localResults)) {
+          navigate("/hoje/");
+          return;
+        }
+        if (
+          result.reason === "session" &&
+          !sourceResult.ok &&
+          sourceResult.reason === "session" &&
+          !trainingResult.ok &&
+          trainingResult.reason === "session"
+        ) {
+          navigate("/entrar/");
+          return;
+        }
+        setFeedback("Não foi possível abrir a configuração. Tente novamente.");
+        return;
+      }
+
+      if (result.value.completedAt) {
+        navigate("/hoje/");
+        return;
+      }
+
+      setContext(result.value);
+      setActiveStep(result.value.currentStep);
+    })();
   }, [navigate]);
 
   useEffect(() => {
@@ -312,6 +368,24 @@ export function OnboardingScreen({
     setActiveStep(step);
   }
 
+  function returnToPreviousLevel() {
+    setFeedback(undefined);
+    if (editingFromReview) {
+      setEditingFromReview(false);
+      setActiveStep(6);
+      return;
+    }
+    if (activeStep === 6) {
+      setActiveStep(stepDefinitions.length - 1);
+      return;
+    }
+    if (activeStep > 0) {
+      setActiveStep(activeStep - 1);
+      return;
+    }
+    navigate("/conta/");
+  }
+
   if (!context) {
     return (
       <main className="onboarding-shell">
@@ -328,13 +402,8 @@ export function OnboardingScreen({
 
   if (activeStep === 6) {
     return (
-      <main className="onboarding-shell">
-        <header className="product-header">
-          <a className="brand" href="/comecar/" aria-label="DayGym — início">
-            DayGym
-          </a>
-          <a href="/conta/">Minha conta</a>
-        </header>
+      <main className="onboarding-shell onboarding-shell-focused">
+        <FocusedBackAction onClick={returnToPreviousLevel} />
         <section className="onboarding-card">
           <p className="eyebrow">Revisão</p>
           <h1>Confira suas respostas.</h1>
@@ -364,6 +433,8 @@ export function OnboardingScreen({
               {feedback}
             </p>
           ) : null}
+        </section>
+        <FixedActionBar>
           <button
             className="button-primary"
             disabled={isSaving || !completeDraft(context)}
@@ -372,7 +443,7 @@ export function OnboardingScreen({
           >
             {isSaving ? "Confirmando…" : "Confirmar respostas"}
           </button>
-        </section>
+        </FixedActionBar>
       </main>
     );
   }
@@ -390,13 +461,8 @@ export function OnboardingScreen({
   const selectedAnswer = answerForStep(context, activeStep);
 
   return (
-    <main className="onboarding-shell">
-      <header className="product-header">
-        <a className="brand" href="/comecar/" aria-label="DayGym — início">
-          DayGym
-        </a>
-        <a href="/conta/">Minha conta</a>
-      </header>
+    <main className="onboarding-shell onboarding-shell-focused">
+      <FocusedBackAction onClick={returnToPreviousLevel} />
       <section className="onboarding-card">
         <div className="onboarding-progress">
           <span>
@@ -447,39 +513,21 @@ export function OnboardingScreen({
             {feedback}
           </p>
         ) : null}
-        <div className="onboarding-actions">
-          {activeStep > 0 || editingFromReview ? (
-            <button
-              className="button-secondary"
-              disabled={isSaving}
-              onClick={() => {
-                setFeedback(undefined);
-                if (editingFromReview) {
-                  setEditingFromReview(false);
-                  setActiveStep(6);
-                } else {
-                  setActiveStep(activeStep - 1);
-                }
-              }}
-              type="button"
-            >
-              Voltar
-            </button>
-          ) : null}
-          <button
-            className="button-primary"
-            disabled={isSaving || selectedAnswer === null}
-            onClick={() => void saveStep()}
-            type="button"
-          >
-            {isSaving
-              ? "Salvando…"
-              : editingFromReview
-                ? "Salvar alteração"
-                : "Continuar"}
-          </button>
-        </div>
       </section>
+      <FixedActionBar>
+        <button
+          className="button-primary"
+          disabled={isSaving || selectedAnswer === null}
+          onClick={() => void saveStep()}
+          type="button"
+        >
+          {isSaving
+            ? "Salvando…"
+            : editingFromReview
+              ? "Salvar alteração"
+              : "Continuar"}
+        </button>
+      </FixedActionBar>
     </main>
   );
 }

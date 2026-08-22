@@ -8,6 +8,8 @@ import {
 } from "@daygym/contracts";
 import type { Sheet } from "read-excel-file/browser";
 
+import { parseTrainingDurationCell } from "./training-duration";
+
 const maximumFileBytes = 2_097_152;
 const maximumExpandedBytes = 12_582_912;
 const maximumArchiveEntries = 200;
@@ -22,12 +24,15 @@ const expectedHeaders = [
   "Séries",
   "Reps mín",
   "Reps máx",
-  "Duração (s)",
+  "Duração (HH:MM:SS)",
   "Distância (m)",
-  "Descanso (s)",
+  "Descanso (HH:MM:SS)",
   "Circuito",
   "Observações",
 ] as const;
+const optionalPlannedWeightHeader = "Carga (kg)";
+const legacyDurationHeader = "Duração (s)";
+const legacyRestHeader = "Descanso (s)";
 
 type CellValue = string | number | boolean | Date | null;
 
@@ -87,6 +92,47 @@ function optionalInteger(value: CellValue): number | null {
   return value === null || value === "" ? null : cellInteger(value);
 }
 
+function optionalDuration(value: CellValue): number | null {
+  if (typeof value === "boolean") {
+    return null;
+  }
+  return parseTrainingDurationCell(value);
+}
+
+export function isSupportedOfficialTrainingHeader(
+  header: readonly CellValue[],
+) {
+  return (
+    expectedHeaders.every((expected, index) => {
+      const actual = cellText(header[index] ?? null);
+      if (index === 8) {
+        return actual === expected || actual === legacyDurationHeader;
+      }
+      if (index === 10) {
+        return actual === expected || actual === legacyRestHeader;
+      }
+      return actual === expected;
+    }) &&
+    (header[13] === undefined ||
+      header[13] === null ||
+      cellText(header[13]) === optionalPlannedWeightHeader)
+  );
+}
+
+function optionalDecimal(value: CellValue): number | null {
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+(?:[.,]\d{1,2})?$/.test(value.trim())) {
+    const parsed = Number(value.trim().replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function modalityFromCell(value: CellValue): TrainingModality | null {
   const normalized = cellText(value);
   if (!normalized) {
@@ -119,9 +165,10 @@ function sanitizedFileName(name: string): string {
   return clean.slice(Math.max(0, clean.length - 120));
 }
 
-function planNameFromFile(name: string): string {
-  const withoutExtension = name.replace(/\.xlsx$/i, "").trim();
-  return (withoutExtension || "Meu treino importado").slice(0, 80);
+export function defaultImportedPlanName(date = new Date()): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `Treino - ${day}/${month}/${date.getFullYear()}`;
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -228,15 +275,16 @@ function buildItem(
   issues: PlanImportIssue[],
 ): OfficialXlsxPlanItem | null {
   const modality = modalityFromCell(row[4] ?? null);
-  const rest = optionalInteger(row[10] ?? null);
+  const rest = optionalDuration(row[10] ?? null);
   const candidate = {
     circuitGroup: cellText(row[11] ?? null),
     distanceMeters: optionalInteger(row[9] ?? null),
-    durationSeconds: optionalInteger(row[8] ?? null),
+    durationSeconds: optionalDuration(row[8] ?? null),
     exerciseName: cellText(row[3] ?? null) ?? "",
     modality,
     notes: cellText(row[12] ?? null),
     order: cellInteger(row[2] ?? null),
+    plannedWeightKg: optionalDecimal(row[13] ?? null),
     repsMax: optionalInteger(row[7] ?? null),
     repsMin: optionalInteger(row[6] ?? null),
     restSeconds: rest ?? 60,
@@ -244,7 +292,7 @@ function buildItem(
   };
   if (rest === null) {
     issues.push({
-      message: "Descanso vazio: será usado o padrão de 60 segundos.",
+      message: "Descanso vazio: será usado o padrão de 00:01:00.",
       row: rowNumber,
       severity: "warning",
     });
@@ -266,7 +314,7 @@ export async function parseOfficialXlsxFile(
 ): Promise<ParsedOfficialXlsx> {
   const safeFileName = sanitizedFileName(file.name);
   const baseResult = {
-    planName: planNameFromFile(safeFileName),
+    planName: defaultImportedPlanName(),
     sessions: [] as OfficialXlsxPlanSession[],
   };
   if (!safeFileName.toLocaleLowerCase("pt-BR").endsWith(".xlsx")) {
@@ -351,9 +399,7 @@ export async function parseOfficialXlsxFile(
     };
   }
   const [header, ...rows] = sheet.data.map((row) => row.map(trustedCell));
-  const headerMatches = expectedHeaders.every(
-    (expected, index) => cellText(header?.[index] ?? null) === expected,
-  );
+  const headerMatches = isSupportedOfficialTrainingHeader(header ?? []);
   if (!headerMatches) {
     return {
       ...baseResult,

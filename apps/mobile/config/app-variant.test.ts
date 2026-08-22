@@ -7,6 +7,9 @@ import appConfig, { getAppVariant, resolveAppVariant } from "../app.config";
 import appVariants from "./app-variants.json";
 
 interface EasBuildProfile {
+  android?: {
+    buildType: "apk" | "app-bundle";
+  };
   autoIncrement?: boolean;
   channel: string;
   developmentClient?: boolean;
@@ -24,6 +27,10 @@ interface EasConfig {
     version: string;
   };
   build: Record<string, EasBuildProfile>;
+}
+
+interface MobilePackageConfig {
+  scripts: Record<string, string>;
 }
 
 describe("mobile app variants", () => {
@@ -75,6 +82,22 @@ describe("mobile app variants", () => {
     ]);
     expect(config.android?.allowBackup).toBe(false);
   });
+
+  it("links the canonical Expo project and icon", () => {
+    const config = appConfig({
+      config: { name: "DayGym", slug: "daygym" },
+      packageJsonPath: null,
+      projectRoot: "C:/daygym/apps/mobile",
+      staticConfigPath: null,
+    });
+
+    expect(config.owner).toBe("soberania-tech");
+    expect(config.slug).toBe("daygym");
+    expect(config.icon).toBe("./assets/icon.png");
+    expect(config.extra?.eas).toEqual({
+      projectId: "5875a3a9-584b-4987-8086-cf110fbbf168",
+    });
+  });
 });
 
 describe("EAS profiles", () => {
@@ -109,5 +132,28 @@ describe("EAS profiles", () => {
     expect(easConfig.build.production?.developmentClient).toBeUndefined();
     expect(easConfig.build.production?.distribution).toBe("store");
     expect(easConfig.build.production?.autoIncrement).toBe(true);
+  });
+
+  it("produces a directly installable Android preview APK", () => {
+    expect(easConfig.build.preview?.android).toEqual({
+      buildType: "apk",
+    });
+    expect(easConfig.build.production?.android).toBeUndefined();
+  });
+});
+
+describe("EAS monorepo bootstrap", () => {
+  const packageConfig = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as MobilePackageConfig;
+
+  it("builds workspace dependencies after a clean remote install", () => {
+    expect(packageConfig.scripts.postinstall).toBe("pnpm build:workspace-deps");
+    expect(packageConfig.scripts["build:workspace-deps"]).toBe(
+      "pnpm --filter @daygym/contracts build && pnpm --filter @daygym/training-runtime build",
+    );
+    expect(packageConfig.scripts.build).toMatch(
+      /^pnpm build:workspace-deps && /,
+    );
   });
 });

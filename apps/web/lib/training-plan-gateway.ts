@@ -10,8 +10,10 @@ import {
 import { getWebSupabaseClient } from "./supabase-browser";
 import type {
   TrainingPlanImportRpcRow,
+  TrainingPlanRenameRpcRow,
   TrainingPlanRow,
 } from "./supabase-database";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
 
 function failureFromError(error: unknown): TrainingPlanFailure {
   if (error && typeof error === "object") {
@@ -47,6 +49,7 @@ function rpcSessions(proposal: OfficialXlsxPlanProposal) {
       modality: item.modality,
       notes: item.notes,
       order: item.order,
+      planned_weight_kg: item.plannedWeightKg,
       reps_max: item.repsMax,
       reps_min: item.repsMin,
       rest_seconds: item.restSeconds,
@@ -89,14 +92,16 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
       try {
         const proposal = officialXlsxPlanProposalSchema.parse(input);
         const client = getWebSupabaseClient();
-        const { data, error } = await client.rpc("import_official_xlsx_plan", {
-          p_operation_id: proposal.operationId,
-          p_plan_name: proposal.planName,
-          p_sessions: rpcSessions(proposal),
-          p_source_file_name: proposal.sourceFileName,
-          p_source_sha256: proposal.sourceSha256,
-          p_source_size_bytes: proposal.sourceSizeBytes,
-        });
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("import_official_xlsx_plan_v2", {
+            p_operation_id: proposal.operationId,
+            p_plan_name: proposal.planName,
+            p_sessions: rpcSessions(proposal),
+            p_source_file_name: proposal.sourceFileName,
+            p_source_sha256: proposal.sourceSha256,
+            p_source_size_bytes: proposal.sourceSizeBytes,
+          }),
+        );
         const row = data?.[0];
         if (error || !row) {
           return failure(error);
@@ -121,10 +126,9 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
         const { data, error } = await client
           .from("training_plans")
           .select(
-            "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,updated_at",
+            "plan_id,user_id,name,provenance,active_version_id,current_version,session_count,item_count,updated_at,archived_at",
           )
-          .order("updated_at", { ascending: false })
-          .limit(1)
+          .is("archived_at", null)
           .maybeSingle();
         if (error) {
           return failure(error);
@@ -137,6 +141,32 @@ export function createWebTrainingPlanGateway(): TrainingPlanGateway {
         if (error instanceof Error && error.name === "ZodError") {
           return failure(error);
         }
+        return { ok: false, reason: "configuration" };
+      }
+    },
+
+    async rename(planId, name) {
+      try {
+        const normalizedName = name.trim();
+        if (!normalizedName || normalizedName.length > 80) {
+          return { ok: false, reason: "invalid" };
+        }
+        const client = getWebSupabaseClient();
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("rename_training_plan", {
+            p_name: normalizedName,
+            p_plan_id: planId,
+          }),
+        );
+        const row = data?.[0] as TrainingPlanRenameRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: { name: row.plan_name, planId: row.plan_id },
+        };
+      } catch {
         return { ok: false, reason: "configuration" };
       }
     },

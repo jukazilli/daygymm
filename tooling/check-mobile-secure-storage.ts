@@ -9,6 +9,7 @@ const packageManifest = JSON.parse(
   dependencies?: Record<string, string>;
 };
 const requiredDependencies = [
+  "@react-native-community/netinfo",
   "expo-crypto",
   "expo-secure-store",
   "expo-sqlite",
@@ -94,6 +95,46 @@ if (!/PRAGMA cipher_version/.test(databaseBootstrap)) {
   findings.push(
     "local database bootstrap does not verify SQLCipher at runtime",
   );
+}
+
+const localMigrations = readFileSync(
+  join(mobileRoot, "lib", "database", "local-migrations.ts"),
+  "utf8",
+);
+for (const requiredTable of [
+  "training_session_snapshots",
+  "training_outbox_operations",
+]) {
+  if (!localMigrations.includes(requiredTable)) {
+    findings.push(`mobile SQLCipher schema is missing ${requiredTable}`);
+  }
+}
+
+const trainingStore = readFileSync(
+  join(
+    mobileRoot,
+    "lib",
+    "training",
+    "sqlcipher-training-session-local-store.ts",
+  ),
+  "utf8",
+);
+if (!/database\.transaction\(/.test(trainingStore)) {
+  findings.push("mobile training outbox does not use atomic transactions");
+}
+if (!/WHERE owner_id = \?/.test(trainingStore)) {
+  findings.push("mobile training storage is not scoped by owner UUID");
+}
+
+const trainingGateway = readFileSync(
+  join(mobileRoot, "lib", "training", "mobile-training-session-gateway.ts"),
+  "utf8",
+);
+if (!/NetInfo\.addEventListener/.test(trainingGateway)) {
+  findings.push("mobile training sync does not observe connectivity changes");
+}
+if (!/mobileTrainingSessionLocalStore/.test(trainingGateway)) {
+  findings.push("mobile training journey is not connected to its local store");
 }
 
 if (findings.length > 0) {

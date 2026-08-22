@@ -6,6 +6,8 @@ import {
 
 import { getWebPublicConfig } from "./supabase-public-config";
 import { getWebSupabaseClient } from "./supabase-browser";
+import { retryIdempotentSupabaseRequest } from "./supabase-resilience";
+import { forgetWebOwnerId, rememberWebOwnerId } from "./web-offline-owner";
 
 export { stagingLegalVersions } from "@daygym/contracts";
 export type {
@@ -98,25 +100,35 @@ export function createWebAuthGateway(): AuthGateway {
 
   async function isEligible(
     currentClient: WebSupabaseClient,
-  ): Promise<boolean> {
+  ): Promise<{ ok: true; value: boolean } | { ok: false }> {
     const [profile, consents] = await Promise.all([
-      currentClient.from("profiles").select("user_id").limit(1).maybeSingle(),
-      currentClient.from("consents").select("document, document_version"),
+      retryIdempotentSupabaseRequest(() =>
+        currentClient.from("profiles").select("user_id").limit(1).maybeSingle(),
+      ),
+      retryIdempotentSupabaseRequest(() =>
+        currentClient.from("consents").select("document, document_version"),
+      ),
     ]);
 
-    if (profile.error || consents.error || !profile.data || !consents.data) {
-      return false;
+    if (profile.error || consents.error) {
+      return { ok: false };
     }
 
-    return Object.entries({
-      privacy_notice: stagingLegalVersions.privacyNotice,
-      terms_of_service: stagingLegalVersions.termsOfService,
-    }).every(([document, version]) =>
-      consents.data.some(
-        (consent) =>
-          consent.document === document && consent.document_version === version,
-      ),
-    );
+    return {
+      ok: true,
+      value:
+        Boolean(profile.data && consents.data) &&
+        Object.entries({
+          privacy_notice: stagingLegalVersions.privacyNotice,
+          terms_of_service: stagingLegalVersions.termsOfService,
+        }).every(([document, version]) =>
+          consents.data?.some(
+            (consent) =>
+              consent.document === document &&
+              consent.document_version === version,
+          ),
+        ),
+    };
   }
 
   return {
@@ -132,11 +144,17 @@ export function createWebAuthGateway(): AuthGateway {
           return { ok: false, reason: failureFromError(error, "credentials") };
         }
 
-        if (!(await isEligible(currentClient))) {
+        const eligibility = await isEligible(currentClient);
+        if (!eligibility.ok) {
+          return { ok: false, reason: "unexpected" };
+        }
+        if (!eligibility.value) {
           await currentClient.auth.signOut({ scope: "local" });
+          forgetWebOwnerId();
           return { ok: false, reason: "account-incomplete" };
         }
 
+        rememberWebOwnerId(data.session.user?.id ?? "");
         return { ok: true, value: undefined };
       } catch (error) {
         return { ok: false, reason: failureFromError(error, "unexpected") };
@@ -237,8 +255,11 @@ export function createWebAuthGateway(): AuthGateway {
 
     async exchangeAuthCode(code) {
       try {
-        const { error } =
+        const { data, error } =
           await configuredClient().auth.exchangeCodeForSession(code);
+        if (!error) {
+          rememberWebOwnerId(data.session?.user.id ?? "");
+        }
         return error
           ? { ok: false, reason: "link-invalid" }
           : { ok: true, value: undefined };
@@ -252,10 +273,13 @@ export function createWebAuthGateway(): AuthGateway {
 
     async verifyEmailToken(tokenHash, purpose) {
       try {
-        const { error } = await configuredClient().auth.verifyOtp({
+        const { data, error } = await configuredClient().auth.verifyOtp({
           token_hash: tokenHash,
           type: purpose === "confirmation" ? "email" : "recovery",
         });
+        if (!error) {
+          rememberWebOwnerId(data.session?.user.id ?? "");
+        }
         return error
           ? { ok: false, reason: "link-invalid" }
           : { ok: true, value: undefined };
@@ -278,6 +302,9 @@ export function createWebAuthGateway(): AuthGateway {
         const { error: signOutError } = await currentClient.auth.signOut({
           scope: "global",
         });
+        if (!signOutError) {
+          forgetWebOwnerId();
+        }
         return signOutError
           ? { ok: false, reason: "unexpected" }
           : { ok: true, value: undefined };
@@ -294,7 +321,10 @@ export function createWebAuthGateway(): AuthGateway {
           return { ok: true, value: false };
         }
 
-        return { ok: true, value: await isEligible(currentClient) };
+        const eligibility = await isEligible(currentClient);
+        return eligibility.ok
+          ? { ok: true, value: eligibility.value }
+          : { ok: false, reason: "unexpected" };
       } catch (error) {
         return { ok: false, reason: failureFromError(error, "unexpected") };
       }
@@ -305,6 +335,9 @@ export function createWebAuthGateway(): AuthGateway {
         const { error } = await configuredClient().auth.signOut({
           scope: "local",
         });
+        if (!error) {
+          forgetWebOwnerId();
+        }
         return error
           ? { ok: false, reason: "unexpected" }
           : { ok: true, value: undefined };

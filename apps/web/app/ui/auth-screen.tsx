@@ -13,6 +13,12 @@ import {
   type AuthFailure,
   type AuthGateway,
 } from "../../lib/auth-gateway";
+import {
+  clearPendingSignUpResend,
+  readPendingSignUpResend,
+  savePendingSignUpResend,
+  SIGN_UP_RESEND_COOLDOWN_SECONDS,
+} from "../../lib/auth-resend-state";
 
 export type AuthMode =
   | "account"
@@ -33,11 +39,9 @@ type FieldName =
 
 type FieldErrors = Partial<Record<FieldName, string>>;
 
-const SIGN_UP_RESEND_COOLDOWN_SECONDS = 80;
-
 const copyByFailure: Record<AuthFailure, string> = {
   "account-incomplete":
-    "Não foi possível concluir o acesso desta conta. Tente criar a conta novamente.",
+    "Esta conta precisa de revisão. Entre em contato com o suporte.",
   configuration:
     "O acesso está temporariamente indisponível. Tente novamente mais tarde.",
   credentials: "Não foi possível entrar. Confira os dados e tente novamente.",
@@ -204,6 +208,7 @@ export function AuthScreen({
   );
   const [pendingAuthLink, setPendingAuthLink] = useState<PendingAuthLink>();
   const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number>();
   const [resendSeconds, setResendSeconds] = useState(0);
   const [resendSucceeded, setResendSucceeded] = useState(false);
   const [signUpDeliveryUncertain, setSignUpDeliveryUncertain] = useState(false);
@@ -216,6 +221,31 @@ export function AuthScreen({
     gatewayRef.current ??= createWebAuthGateway();
     return gatewayRef.current;
   }
+
+  function startResendCooldown(email: string, deliveryUncertain: boolean) {
+    const availableAt = Date.now() + SIGN_UP_RESEND_COOLDOWN_SECONDS * 1_000;
+    savePendingSignUpResend({
+      deliveryUncertain,
+      email,
+      resendAvailableAt: availableAt,
+    });
+    setResendAvailableAt(availableAt);
+    setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+  }
+
+  useEffect(() => {
+    const pendingResend = readPendingSignUpResend();
+    if (mode !== "sign-up" || !pendingResend) {
+      return;
+    }
+    setSubmittedEmail(pendingResend.email);
+    setSignUpDeliveryUncertain(pendingResend.deliveryUncertain);
+    setRecoveryRequested(true);
+    setResendAvailableAt(pendingResend.resendAvailableAt);
+    setResendSeconds(
+      Math.ceil((pendingResend.resendAvailableAt - Date.now()) / 1_000),
+    );
+  }, [mode]);
 
   useEffect(() => {
     const code = new URL(window.location.href).searchParams.get("code");
@@ -266,15 +296,32 @@ export function AuthScreen({
   }, [mode, navigate]);
 
   useEffect(() => {
-    if (resendSeconds <= 0) {
+    if (!resendAvailableAt) {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      setResendSeconds((current) => Math.max(0, current - 1));
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [resendSeconds]);
+    function updateCountdown() {
+      const remaining = Math.max(
+        0,
+        Math.ceil((resendAvailableAt! - Date.now()) / 1_000),
+      );
+      setResendSeconds(remaining);
+      if (remaining === 0) {
+        clearPendingSignUpResend();
+        setResendAvailableAt(undefined);
+      }
+    }
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1_000);
+    window.addEventListener("focus", updateCountdown);
+    document.addEventListener("visibilitychange", updateCountdown);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", updateCountdown);
+      document.removeEventListener("visibilitychange", updateCountdown);
+    };
+  }, [resendAvailableAt]);
 
   async function handleAuthLink() {
     if (!pendingAuthLink) {
@@ -300,6 +347,7 @@ export function AuthScreen({
 
     setPendingAuthLink(undefined);
     if (mode === "confirm-email") {
+      clearPendingSignUpResend();
       navigate("/hoje/");
     } else {
       setIsRecoveryReady(true);
@@ -369,7 +417,7 @@ export function AuthScreen({
         setSubmittedEmail(email);
         setSignUpDeliveryUncertain(true);
         setRecoveryRequested(true);
-        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+        startResendCooldown(email, true);
         return;
       }
       setFeedback(copyByFailure[result.reason]);
@@ -377,12 +425,13 @@ export function AuthScreen({
     }
 
     if (mode === "sign-in") {
+      clearPendingSignUpResend();
       navigate("/hoje/");
     } else if (mode === "sign-up" || mode === "recover") {
       if (mode === "sign-up") {
         setSubmittedEmail(email);
         setSignUpDeliveryUncertain(false);
-        setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
+        startResendCooldown(email, false);
       }
       setRecoveryRequested(true);
     } else {
@@ -400,15 +449,16 @@ export function AuthScreen({
     setIsLoading(true);
     const result = await gateway().resendSignUpConfirmation(submittedEmail);
     setIsLoading(false);
-    setResendSeconds(SIGN_UP_RESEND_COOLDOWN_SECONDS);
 
     if (!result.ok) {
       setSignUpDeliveryUncertain(true);
+      startResendCooldown(submittedEmail, true);
       setFeedback(copyByFailure[result.reason]);
       return;
     }
 
     setSignUpDeliveryUncertain(false);
+    startResendCooldown(submittedEmail, false);
     setResendSucceeded(true);
   }
 
@@ -571,7 +621,12 @@ export function AuthScreen({
             ) : null}
           </div>
         ) : (
-          <form className="auth-form" noValidate onSubmit={handleSubmit}>
+          <form
+            className="auth-form"
+            method="post"
+            noValidate
+            onSubmit={handleSubmit}
+          >
             {mode !== "reset-password" ? (
               <Field
                 autoComplete="email"

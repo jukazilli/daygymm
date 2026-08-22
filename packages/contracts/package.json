@@ -6,7 +6,7 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "react-native": "./src/auth.ts",
+      "react-native": "./dist/react-native.js",
       "default": "./dist/index.js"
     }
   },

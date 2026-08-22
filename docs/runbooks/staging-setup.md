@@ -77,6 +77,24 @@ pnpm db:deploy:staging
 Ele aplica as migrations pendentes e lista o histórico remoto. Não há reset,
 seed de dados reais, Docker ou acesso a projetos fora do staging.
 
+### Diagnóstico de identidade e persistência
+
+O inspetor de incidentes faz somente leituras no banco de staging. Ele confirma
+se uma identidade possui perfil e consentimentos, resume a saúde agregada das
+identidades e lista as gravações recentes de séries e versões de plano sem
+imprimir e-mail, senha, token ou conteúdo clínico. Informe o e-mail apenas na
+sessão atual:
+
+```powershell
+$env:DAYGYM_DIAGNOSTIC_EMAIL = "pessoa-sintetica@example.com"
+pnpm incident:inspect:staging
+Remove-Item Env:DAYGYM_DIAGNOSTIC_EMAIL
+```
+
+O comando carrega `SUPABASE_DB_URL_STAGING` do processo ou do `.env` local
+ignorado. Ele serve para distinguir falha de persistência, falha de leitura após
+a gravação e identidade realmente incompleta; não corrige nem remove dados.
+
 ## Templates do Supabase Auth
 
 Os e-mails de confirmação e recuperação ficam versionados em
@@ -84,15 +102,17 @@ Os e-mails de confirmação e recuperação ficam versionados em
 templates e seus assuntos; ela não envia e-mails, não muda SMTP e não toca no
 banco.
 
-1. Cadastre o project ref público em
-   `SUPABASE_PROJECT_REF_STAGING` como variável do environment `staging`.
-2. Cadastre um Personal Access Token do Supabase em
-   `SUPABASE_ACCESS_TOKEN` como secret do mesmo environment. O token não deve
-   ser informado em chat, arquivo local ou log.
-3. Execute manualmente o workflow `Sync Supabase Auth staging` no SHA já
-   validado em staging.
-4. O workflow faz `PATCH` apenas nos campos de confirmação e recuperação e
-   confirma por `GET` que o conteúdo hospedado ficou idêntico ao versionado.
+O caminho operacional sem credencial persistente é abrir `Authentication >
+Emails` no dashboard do projeto, substituir os assuntos e corpos pelos arquivos
+versionados, salvar e recarregar cada editor. A verificação compara o tamanho do
+conteúdo e confirma `TokenHash`, as rotas `/confirmar-email/` e
+`/redefinir-senha/` e a ausência de `ConfirmationURL`.
+
+O workflow `Sync Supabase Auth staging` é uma automação opcional. Para adotá-lo,
+o owner precisa cadastrar `SUPABASE_PROJECT_REF_STAGING` como variável e um PAT
+em `SUPABASE_ACCESS_TOKEN` como secret do environment `staging`. Esse token não
+é necessário para o app, para o Resend ou para manter os templates já salvos e
+nunca deve ser informado em chat, arquivo local ou log.
 
 Para uma execução local autorizada, use as mesmas duas variáveis somente na
 sessão atual e execute:
@@ -105,8 +125,9 @@ pnpm supabase:auth:sync
 
 - `SUPABASE_DB_URL_STAGING` é um Secret do GitHub e pode existir em um `.env`
   local ignorado apenas para executar uma migration manual autorizada.
-- `SUPABASE_ACCESS_TOKEN` existe somente no environment `staging` e é usado
-  exclusivamente pelo workflow manual de configuração hospedada do Auth.
+- `SUPABASE_ACCESS_TOKEN` não está configurado. Se a automação opcional for
+  adotada, ele só pode existir no environment `staging` e ser usado pelo
+  workflow manual de configuração hospedada do Auth.
 - URLs de banco e secrets de serviço entram no Secret Manager por fluxo seguro;
   nunca entram em commits, variáveis públicas, outputs do Terraform ou logs.
 - `daygym-database-url` contém exclusivamente a conexão da role

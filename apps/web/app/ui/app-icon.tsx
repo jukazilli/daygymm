@@ -1,0 +1,78 @@
+import {
+  Archive,
+  ArrowRight,
+  CalendarDays,
+  ChartNoAxesColumnIncreasing,
+  Check,
+  ChevronLeft,
+  ChevronsUpDown,
+  CirclePlus,
+  Compass,
+  Dumbbell,
+  DoorOpen,
+  FilePenLine,
+  FileSpreadsheet,
+  Home,
+  History,
+  Lightbulb,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Repeat2,
+  Settings,
+  ShoppingBag,
+  SkipForward,
+  Trash2,
+  Upload,
+  UserRound,
+  Utensils,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+
+const icons = {
+  archive: Archive,
+  back: ChevronLeft,
+  calendar: CalendarDays,
+  check: Check,
+  close: X,
+  feed: Compass,
+  exit: DoorOpen,
+  home: Home,
+  history: History,
+  tip: Lightbulb,
+  import: FileSpreadsheet,
+  increase: Plus,
+  plan: FilePenLine,
+  pause: Pause,
+  play: Play,
+  decrease: Minus,
+  plus: CirclePlus,
+  profile: UserRound,
+  progress: ChartNoAxesColumnIncreasing,
+  reset: RotateCcw,
+  settings: Settings,
+  select: ChevronsUpDown,
+  shop: ShoppingBag,
+  skip: SkipForward,
+  swap: Repeat2,
+  trash: Trash2,
+  upload: Upload,
+  utensils: Utensils,
+  workouts: Dumbbell,
+  forward: ArrowRight,
+} satisfies Record<string, LucideIcon>;
+
+export type AppIconName = keyof typeof icons;
+
+export function AppIcon({
+  name,
+  size = 24,
+}: Readonly<{ name: AppIconName; size?: number }>) {
+  const Icon = icons[name];
+  return (
+    <Icon aria-hidden="true" focusable="false" size={size} strokeWidth={2.2} />
+  );
+}

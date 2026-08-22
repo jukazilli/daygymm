@@ -18,6 +18,10 @@ procedimentos, nunca valores de sessão ou material criptográfico.
    `sqlite_master` antes de migrations ou escrita.
 5. Migrations são contíguas, executadas individualmente em transação exclusiva
    e registradas por `PRAGMA user_version`. Nenhum erro apaga ou recria o banco.
+6. O schema v2 mantém `training_session_snapshots` e
+   `training_outbox_operations` no mesmo banco SQLCipher. Snapshot + novo
+   comando, confirmação + substituições e adoção da versão canônica são
+   transações indivisíveis e sempre filtradas pelo UUID do titular.
 
 ## Estados e diagnóstico
 
@@ -47,14 +51,19 @@ valor de usuário ou conteúdo de treino.
 1. Executar `pnpm check:mobile-storage`, testes mobile e gates globais.
 2. Materializar CNG e confirmar `expo.sqlite.useSQLCipher=true`,
    `android:allowBackup="false"` e regras do SecureStore.
-3. Em development build real, criar/reabrir banco, reiniciar app, trocar sessão,
+3. Confirmar que a migration v2 criou snapshot, outbox, chave composta por
+   titular/operação e índice causal por titular/sequência.
+4. Em development build real, criar/reabrir banco, reiniciar app, trocar sessão,
    executar logout e provocar migration inválida sem perda do arquivo.
-4. Repetir reinstalação e backup/restore em Android e iOS antes de fechar
+5. Executar o roteiro
+   [US-009B2 em aparelho](./us-009b2-device-proof.md) por 30 minutos.
+6. Repetir reinstalação e backup/restore em Android e iOS antes de fechar
    FND-017.
 
 ## Estado atual
 
-A implementação, testes de contrato e materialização Android CNG estão
-validados localmente. FND-017 permanece `In Progress` até existirem development
-build EAS, teste em device e evidência de backup/reinstalação nas duas
+A fundação, o schema v2 e o adapter de snapshot/outbox estão validados por
+testes locais. Isso conclui a US-009B2a, mas não a história: US-009B2b e FND-017
+permanecem `In Progress` até existirem development build EAS, jornada móvel de
+treino conectada, teste em device e evidência de backup/reinstalação nas duas
 plataformas.

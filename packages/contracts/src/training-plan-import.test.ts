@@ -17,6 +17,7 @@ const validProposal = {
           modality: "strength",
           notes: null,
           order: 1,
+          plannedWeightKg: 40,
           repsMax: 12,
           repsMin: 8,
           restSeconds: 90,
@@ -58,6 +59,27 @@ describe("officialXlsxPlanProposalSchema", () => {
       ...validProposal,
       sessions: [validProposal.sessions[0], validProposal.sessions[0]],
     };
+    expect(officialXlsxPlanProposalSchema.safeParse(invalid).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects planned load with more than two decimal places", () => {
+    const invalid = {
+      ...validProposal,
+      sessions: [
+        {
+          ...validProposal.sessions[0],
+          items: [
+            {
+              ...validProposal.sessions[0].items[0],
+              plannedWeightKg: 40.123,
+            },
+          ],
+        },
+      ],
+    };
+
     expect(officialXlsxPlanProposalSchema.safeParse(invalid).success).toBe(
       false,
     );

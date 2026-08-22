@@ -16,7 +16,15 @@ import {
 } from "../../lib/official-xlsx-parser";
 import { createWebPlanSourceGateway } from "../../lib/plan-source-gateway";
 import { createWebTrainingPlanGateway } from "../../lib/training-plan-gateway";
-import { AppLoadingSkeleton, AppShell } from "./app-shell";
+import { formatTrainingDuration } from "../../lib/training-duration";
+import { trainingWeekdayName } from "../../lib/training-weekdays";
+import { AppIcon } from "./app-icon";
+import {
+  AppLoadingSkeleton,
+  AppShell,
+  FixedActionBar,
+  FocusedBackAction,
+} from "./app-shell";
 
 interface OfficialXlsxImportScreenProps {
   readonly navigate?: (path: string) => void;
@@ -32,10 +40,11 @@ function itemSummary(
   item: OfficialXlsxPlanProposal["sessions"][number]["items"][number],
 ) {
   if (item.repsMin !== null && item.repsMax !== null) {
-    return `${item.sets} × ${item.repsMin}–${item.repsMax}`;
+    const weight = item.plannedWeightKg ? ` · ${item.plannedWeightKg} kg` : "";
+    return `${item.sets} × ${item.repsMin}–${item.repsMax}${weight}`;
   }
   if (item.durationSeconds !== null) {
-    return `${item.sets} × ${item.durationSeconds}s`;
+    return `${item.sets} × ${formatTrainingDuration(item.durationSeconds)}`;
   }
   if (item.distanceMeters !== null) {
     return `${item.sets} × ${item.distanceMeters}m`;
@@ -160,14 +169,19 @@ export function OfficialXlsxImportScreen({
   }
 
   return (
-    <AppShell active="workouts">
+    <AppShell
+      active="workouts"
+      hasFixedAction={Boolean(accessReady && (parsed || result))}
+      variant="focused"
+    >
+      <FocusedBackAction href="/treinos/" />
       {!accessReady ? (
         <AppLoadingSkeleton label="Preparando importação" />
       ) : null}
       {accessReady && result ? (
         <section className="app-state-card import-success-card">
           <span className="import-success-mark" aria-hidden="true">
-            ✓
+            <AppIcon name="check" size={32} />
           </span>
           <p className="eyebrow">Plano importado</p>
           <h1>{result.name}</h1>
@@ -180,9 +194,6 @@ export function OfficialXlsxImportScreen({
               Esta planilha já estava salva.
             </p>
           ) : null}
-          <Link className="button-primary" href="/treinos/">
-            Abrir plano
-          </Link>
         </section>
       ) : null}
       {accessReady && !result ? (
@@ -215,7 +226,7 @@ export function OfficialXlsxImportScreen({
                 type="file"
               />
               <span className="import-file-icon" aria-hidden="true">
-                ↑
+                <AppIcon name="upload" size={32} />
               </span>
               <strong>
                 {parsed ? "Trocar planilha" : "Selecionar planilha"}
@@ -237,7 +248,7 @@ export function OfficialXlsxImportScreen({
                   </h2>
                 </div>
                 <label className="compact-field">
-                  <span>Nome do plano</span>
+                  <span>Nome do treino</span>
                   <input
                     maxLength={80}
                     onChange={(event) => changePlanName(event.target.value)}
@@ -285,7 +296,9 @@ export function OfficialXlsxImportScreen({
                     key={session.dayOrder}
                   >
                     <div>
-                      <span>Dia {session.dayOrder}</span>
+                      <span>
+                        {trainingWeekdayName(((session.dayOrder - 1) % 7) + 1)}
+                      </span>
                       <h3>{session.name}</h3>
                     </div>
                     <ul>
@@ -305,14 +318,6 @@ export function OfficialXlsxImportScreen({
                   {feedback}
                 </p>
               ) : null}
-              <button
-                className="button-primary import-confirm-button"
-                disabled={!canConfirm || phase === "saving"}
-                onClick={() => void confirmImport()}
-                type="button"
-              >
-                {phase === "saving" ? "Importando…" : "Confirmar importação"}
-              </button>
             </section>
           ) : null}
 
@@ -328,7 +333,7 @@ export function OfficialXlsxImportScreen({
             <div className="import-example-row" aria-label="Exemplo de linha">
               <span>1 · Treino A</span>
               <strong>Agachamento livre</strong>
-              <span>3 × 8–12 · 90s</span>
+              <span>3 × 8–12 · 00:01:30</span>
             </div>
             <p>
               Fórmulas, macros, links, proteção e objetos bloqueiam a
@@ -336,6 +341,25 @@ export function OfficialXlsxImportScreen({
             </p>
           </section>
         </div>
+      ) : null}
+      {accessReady && result ? (
+        <FixedActionBar>
+          <Link className="button-primary" href="/treinos/">
+            Abrir plano
+          </Link>
+        </FixedActionBar>
+      ) : null}
+      {accessReady && parsed && !result ? (
+        <FixedActionBar>
+          <button
+            className="button-primary"
+            disabled={!canConfirm || phase !== "idle"}
+            onClick={() => void confirmImport()}
+            type="button"
+          >
+            {phase === "saving" ? "Importando…" : "Confirmar importação"}
+          </button>
+        </FixedActionBar>
       ) : null}
     </AppShell>
   );
