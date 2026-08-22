@@ -212,7 +212,10 @@ describe("ActiveTrainingScreen", () => {
         ok: true,
         value: {
           completedAt: new Date().toISOString(),
+          completedSetCount: 2,
+          completionStatus: "complete",
           durationSeconds: 420,
+          plannedSetCount: 2,
           sessionId: activeRun.runId,
           wasCreated: true,
         },
@@ -325,7 +328,93 @@ describe("ActiveTrainingScreen", () => {
       2,
       expect.objectContaining({ actualWeightKg: 40, setNumber: 2 }),
     );
-    expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId);
+    expect(gateway.finish).toHaveBeenCalledWith(activeRun.runId, "complete");
+  });
+
+  it("guides an explicit partial finish and shows the pending sets", async () => {
+    const user = userEvent.setup();
+    const performedSet = {
+      actualDistanceMeters: null,
+      actualDurationSeconds: null,
+      actualReps: 10,
+      actualWeightKg: 40,
+      completedAt: "2026-08-14T03:32:00.000+00:00",
+      plannedDistanceMeters: null,
+      plannedDurationSeconds: null,
+      plannedRepsMax: 12,
+      plannedRepsMin: 8,
+      plannedWeightKg: 40,
+      revision: 1,
+      setExecutionId: "76000000-0000-4000-8000-000000000006",
+      setNumber: 1,
+      updatedAt: "2026-08-14T03:32:00.000+00:00",
+    };
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            setExecutions: [performedSet],
+            startedAt: "2026-08-14T03:31:00.000+00:00",
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.000+00:00",
+    };
+    const finish = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        completedAt: "2026-08-14T03:35:00.000+00:00",
+        completedSetCount: 1,
+        completionStatus: "partial",
+        durationSeconds: 300,
+        plannedSetCount: 2,
+        sessionId: activeRun.runId,
+        wasCreated: true,
+      },
+    });
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish,
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Finalizar treino" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Ainda há séries pendentes" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Você concluiu 1 de 2 séries.")).toBeTruthy();
+
+    await user.click(
+      screen.getByRole("button", { name: "Revisar pendências" }),
+    );
+    expect(finish).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Finalizar treino" }));
+    await user.click(
+      screen.getByRole("button", { name: "Concluir parcialmente" }),
+    );
+
+    expect(
+      await screen.findByText("Treino concluído parcialmente."),
+    ).toBeTruthy();
+    expect(screen.getByText("1 série")).toBeTruthy();
+    expect(finish).toHaveBeenCalledWith(activeRun.runId, "partial");
   });
 
   it("keeps a confirmed set successful without a full readback", async () => {

@@ -173,7 +173,10 @@ export interface SetRevisionRpcRow extends Record<string, unknown> {
 
 export interface TrainingFinishRpcRow extends Record<string, unknown> {
   completed_at: string;
+  completed_set_count: number;
+  completion_status: "complete" | "partial";
   duration_seconds: number;
+  planned_set_count: number;
   session_id: string;
   was_created: boolean;
 }

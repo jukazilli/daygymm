@@ -10,6 +10,7 @@ import {
   type SetCompletion,
   type SetRevision,
   type TrainingPauseState,
+  type TrainingCompletionStatus,
   type TrainingSessionConflictResolution,
   type TrainingSessionGateway,
   type TrainingSessionLocalStore,
@@ -672,17 +673,33 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
     return { ok: true, value: { runId, wasCancelled: true } } as const;
   }
 
-  async finish(runId: string) {
+  async finish(
+    runId: string,
+    completionStatus: TrainingCompletionStatus = "complete",
+  ) {
     const context = await this.localContext();
     if (!context) {
-      return this.remote.finish(runId);
+      return this.remote.finish(runId, completionStatus);
     }
     const run = context.snapshot.activeRun;
+    if (!run || run.runId !== runId || run.pausedAt) {
+      return { ok: false, reason: "invalid" } as const;
+    }
+    const plannedSetCount = run.session.items.reduce(
+      (total, item) => total + item.sets,
+      0,
+    );
+    const completedSetCount = run.session.items.reduce(
+      (total, item) => total + item.setExecutions.length,
+      0,
+    );
+    const isComplete =
+      run.session.items.every((item) => item.completedAt) &&
+      completedSetCount === plannedSetCount;
     if (
-      !run ||
-      run.runId !== runId ||
-      run.pausedAt ||
-      run.session.items.some((item) => !item.completedAt)
+      (completionStatus === "complete" && !isComplete) ||
+      (completionStatus === "partial" &&
+        (completedSetCount < 1 || completedSetCount >= plannedSetCount))
     ) {
       return { ok: false, reason: "invalid" } as const;
     }
@@ -696,12 +713,17 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
     );
     const operation = this.operation(
       "finish-session",
-      { occurredAt, runId },
-      `training-finish:${runId}`,
+      { completionStatus, occurredAt, runId },
+      completionStatus === "partial"
+        ? `training-finish-partial:${runId}`
+        : `training-finish:${runId}`,
     );
     const value: CompletedTrainingSession = {
       completedAt: occurredAt,
+      completedSetCount,
+      completionStatus,
       durationSeconds,
+      plannedSetCount,
       sessionId: runId,
       wasCreated: true,
     };
@@ -712,7 +734,7 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
         applyFinishedTraining(context.snapshot, runId, occurredAt),
       ))
     ) {
-      return this.remote.finish(runId);
+      return this.remote.finish(runId, completionStatus);
     }
     return { ok: true, value } as const;
   }
@@ -1074,6 +1096,7 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
         const result = await this.remote.finishAt(
           operation.input.runId,
           operation.input.occurredAt,
+          operation.input.completionStatus ?? "complete",
         );
         return result.ok ? { ok: true } : result;
       }

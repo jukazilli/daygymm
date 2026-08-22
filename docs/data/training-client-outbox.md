@@ -206,6 +206,28 @@ acrescentar tempo, minimizar/reabrir o descanso e os valores do resumo. Este
 recorte não cria equivalências de exercício nem inventa volume para séries não
 realizadas.
 
+### US-010B — conclusão parcial explícita
+
+- `Finalizar treino` continua direto quando todas as séries foram confirmadas;
+- quando ainda existem séries pendentes, um diálogo curto oferece `Continuar
+  treino`, `Revisar pendências` e `Concluir parcialmente`, mantendo a opção
+  segura em primeiro plano;
+- a conclusão parcial exige ao menos uma série confirmada e mantém separadamente
+  o total planejado e o total realizado; nenhuma série pendente entra no volume
+  ou no histórico executado;
+- `complete` e `partial` usam chaves idempotentes distintas, atravessam a mesma
+  fila local-first e preservam o instante original durante o replay;
+- o evento `TrainingSessionPartiallyCompleted` não reutiliza a semântica de
+  conclusão total e, por isso, não habilita efeitos futuros reservados a um
+  treino completo;
+- o resumo declara `Treino concluído parcialmente`, exibe as séries pendentes e
+  mantém a sincronização pendente visível quando a ação foi salva offline.
+
+O corte está rastreado na
+[issue #43](https://github.com/jukazilli/daygymm/issues/43). Substituição com
+alternativa aprovada, PRs, notas e recomendação explicada de progressão
+permanecem nos próximos recortes da US-010.
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
@@ -257,10 +279,11 @@ US-009B2b ainda deve executar o
 [roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md) sobre um
 development build do commit `ad56772`, com dois fechamentos/reaberturas e zero
 duplicação em pelo menos um aparelho. A segunda plataforma permanece no aceite
-abrangente da FND-017. Substituição com alternativa aprovada, conclusão parcial,
-PRs elegíveis, notas e recomendação de progressão continuam pertencendo aos
-próximos recortes da US-010. A COR-006 fechou a recomposição temporal e a
-US-010A acrescentou ajuste, vibração opcional e resumo essencial.
+abrangente da FND-017. Substituição com alternativa aprovada, PRs elegíveis,
+notas e recomendação de progressão continuam pertencendo aos próximos recortes
+da US-010. A COR-006 fechou a recomposição temporal, a US-010A acrescentou
+ajuste, vibração opcional e resumo essencial, e a US-010B passou a distinguir
+conclusão total de parcial sem inventar volume.
 
 ### Refinamento da execução focada — US-008/US-010
 

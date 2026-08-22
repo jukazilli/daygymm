@@ -530,15 +530,20 @@ export function createSupabaseTrainingSessionGateway({
   const finishAt: ReplayableTrainingSessionGateway["finishAt"] = async (
     runId,
     completedAt,
+    completionStatus = "complete",
   ) => {
     try {
       const client = getClient();
       const { data, error } = await retryIdempotentSupabaseRequest(() =>
-        client.rpc("finish_training_session_at", {
+        client.rpc("finish_training_session_with_status_at", {
           p_completed_at: completedAt,
+          p_completion_status: completionStatus,
           p_correlation_id: uuid(),
           p_event_id: uuid(),
-          p_operation_id: `training-finish:${runId}`,
+          p_operation_id:
+            completionStatus === "partial"
+              ? `training-finish-partial:${runId}`
+              : `training-finish:${runId}`,
           p_run_id: runId,
           p_session_id: runId,
         }),
@@ -551,7 +556,10 @@ export function createSupabaseTrainingSessionGateway({
         ok: true,
         value: completedTrainingSessionSchema.parse({
           completedAt: row.completed_at,
+          completedSetCount: row.completed_set_count,
+          completionStatus: row.completion_status,
           durationSeconds: row.duration_seconds,
+          plannedSetCount: row.planned_set_count,
           sessionId: row.session_id,
           wasCreated: row.was_created,
         }),
@@ -736,7 +744,8 @@ export function createSupabaseTrainingSessionGateway({
       }
     },
 
-    finish: (runId) => finishAt(runId, now().toISOString()),
+    finish: (runId, completionStatus) =>
+      finishAt(runId, now().toISOString(), completionStatus),
     finishAt,
   };
 }

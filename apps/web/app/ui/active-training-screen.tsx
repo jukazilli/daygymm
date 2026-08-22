@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type {
   ActiveTrainingRun,
+  CompletedTrainingSession,
   LocalFirstTrainingSessionGateway,
   PracticalTrainingExercise,
   PracticalTrainingSet,
@@ -12,6 +13,7 @@ import type {
   SetCompletionInput,
   SetRevisionInput,
   TrainingSessionGateway,
+  TrainingCompletionStatus,
   TrainingSessionSyncState,
 } from "@daygym/contracts";
 
@@ -199,13 +201,14 @@ interface FinishedTrainingSummary {
   readonly distanceMeters: number;
   readonly durationSeconds: number;
   readonly plannedSets: number;
+  readonly completionStatus: TrainingCompletionStatus;
   readonly recordedDurationSeconds: number;
   readonly volumeKg: number;
 }
 
 function trainingSummary(
   run: ActiveTrainingRun,
-  durationSeconds: number,
+  completed: CompletedTrainingSession,
 ): FinishedTrainingSummary {
   const sets = run.session.items.flatMap((item) => item.setExecutions);
   const plannedSets = run.session.items.reduce(
@@ -219,11 +222,12 @@ function trainingSummary(
         ? Math.min(100, Math.round((completedSets / plannedSets) * 100))
         : 0,
     completedSets,
+    completionStatus: completed.completionStatus,
     distanceMeters: sets.reduce(
       (total, set) => total + (set.actualDistanceMeters ?? 0),
       0,
     ),
-    durationSeconds,
+    durationSeconds: completed.durationSeconds,
     plannedSets,
     recordedDurationSeconds: sets.reduce(
       (total, set) => total + (set.actualDurationSeconds ?? 0),
@@ -237,6 +241,86 @@ function trainingSummary(
       ),
     ),
   };
+}
+
+function PartialTrainingDialog({
+  busy,
+  completedSets,
+  onClose,
+  onConfirm,
+  onReview,
+  plannedSets,
+}: Readonly<{
+  busy: boolean;
+  completedSets: number;
+  onClose: () => void;
+  onConfirm: () => void;
+  onReview: () => void;
+  plannedSets: number;
+}>) {
+  const continueRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    continueRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  return (
+    <div
+      className="session-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="partial-training-title"
+        aria-modal="true"
+        className="session-dialog"
+        role="dialog"
+      >
+        <h2 id="partial-training-title">Ainda há séries pendentes</h2>
+        <p>
+          Você concluiu {completedSets} de {plannedSets} séries.
+        </p>
+        <div className="session-dialog-actions">
+          <button
+            className="button-primary"
+            disabled={busy}
+            onClick={onClose}
+            ref={continueRef}
+            type="button"
+          >
+            Continuar treino
+          </button>
+          <button
+            className="button-secondary"
+            disabled={busy}
+            onClick={onReview}
+            type="button"
+          >
+            Revisar pendências
+          </button>
+          <button
+            className="button-text partial-training-confirm"
+            disabled={busy}
+            onClick={onConfirm}
+            type="button"
+          >
+            {busy ? "Finalizando…" : "Concluir parcialmente"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function SetRevisionDialog({
@@ -1641,6 +1725,7 @@ export function ActiveTrainingScreen({
     "cancel" | "pause" | "restart"
   >();
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [partialFinishDialogOpen, setPartialFinishDialogOpen] = useState(false);
   const [navigationTutorialOpen, setNavigationTutorialOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [finishedSummary, setFinishedSummary] =
@@ -2044,14 +2129,16 @@ export function ActiveTrainingScreen({
     return refreshed !== null;
   }
 
-  async function finishTraining() {
+  async function finishTraining(
+    completionStatus: TrainingCompletionStatus = "complete",
+  ) {
     const run = state?.activeRun;
     if (!run || run.pausedAt || busy) {
       return;
     }
     setBusy(true);
     setError(undefined);
-    const result = await gateway().finish(run.runId);
+    const result = await gateway().finish(run.runId, completionStatus);
     setBusy(false);
     if (!result.ok) {
       if (result.reason === "session") {
@@ -2061,7 +2148,8 @@ export function ActiveTrainingScreen({
       setError(sessionError(result.reason));
       return;
     }
-    setFinishedSummary(trainingSummary(run, result.value.durationSeconds));
+    setPartialFinishDialogOpen(false);
+    setFinishedSummary(trainingSummary(run, result.value));
   }
 
   async function pauseTraining() {
@@ -2187,12 +2275,28 @@ export function ActiveTrainingScreen({
     return (
       <main className="session-shell session-finished">
         <p className="eyebrow">Treino salvo</p>
-        <h1>Treino concluído.</h1>
+        <h1>
+          {finishedSummary.completionStatus === "partial"
+            ? "Treino concluído parcialmente."
+            : "Treino concluído."}
+        </h1>
         <dl className="training-summary">
           <div className="training-summary-highlight">
             <dt>Duração</dt>
             <dd>{formatTrainingDuration(finishedSummary.durationSeconds)}</dd>
           </div>
+          {finishedSummary.completionStatus === "partial" ? (
+            <div>
+              <dt>Pendentes</dt>
+              <dd>
+                {finishedSummary.plannedSets - finishedSummary.completedSets}{" "}
+                {finishedSummary.plannedSets - finishedSummary.completedSets ===
+                1
+                  ? "série"
+                  : "séries"}
+              </dd>
+            </div>
+          ) : null}
           <div className="training-summary-highlight">
             <dt>Aderência</dt>
             <dd>
@@ -2506,11 +2610,17 @@ export function ActiveTrainingScreen({
               </li>
             ))}
           </ol>
-          {allCompleted && !run.pausedAt ? (
+          {completedSetCount > 0 && !run.pausedAt ? (
             <button
               className="button-primary workout-list-finish"
               disabled={busy}
-              onClick={finishTraining}
+              onClick={() => {
+                if (allCompleted) {
+                  void finishTraining("complete");
+                } else {
+                  setPartialFinishDialogOpen(true);
+                }
+              }}
               type="button"
             >
               {busy ? "Finalizando…" : "Finalizar treino"}
@@ -2596,11 +2706,17 @@ export function ActiveTrainingScreen({
               onStart={() => void startCurrentExercise()}
             />
           )}
-          {allCompleted ? (
+          {completedSetCount > 0 ? (
             <button
               className="button-primary finish-training-button"
               disabled={busy}
-              onClick={finishTraining}
+              onClick={() => {
+                if (allCompleted) {
+                  void finishTraining("complete");
+                } else {
+                  setPartialFinishDialogOpen(true);
+                }
+              }}
               type="button"
             >
               {busy ? "Finalizando…" : "Finalizar treino"}
@@ -2622,6 +2738,25 @@ export function ActiveTrainingScreen({
           onConfirm={() => void pauseTraining()}
           onRestart={() => void restartTraining()}
           pendingAction={dialogAction}
+        />
+      ) : null}
+      {partialFinishDialogOpen ? (
+        <PartialTrainingDialog
+          busy={busy}
+          completedSets={completedSetCount}
+          onClose={() => setPartialFinishDialogOpen(false)}
+          onConfirm={() => void finishTraining("partial")}
+          onReview={() => {
+            const firstPendingIndex = run.session.items.findIndex(
+              (item) => item.setExecutions.length < item.sets,
+            );
+            if (firstPendingIndex >= 0) {
+              setSelectedIndex(firstPendingIndex);
+            }
+            setSessionView("list");
+            setPartialFinishDialogOpen(false);
+          }}
+          plannedSets={plannedSetCount}
         />
       ) : null}
       {conflictDialogOpen ? (

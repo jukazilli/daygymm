@@ -86,6 +86,21 @@ describe("internal event v1 contracts", () => {
     expect(parseDomainEventV1(serializedByProducer)).toEqual(event);
   });
 
+  it("distinguishes a partial training completion from a complete one", () => {
+    expect(
+      domainEventV1Schema.parse({
+        ...envelope,
+        event_name: "TrainingSessionPartiallyCompleted",
+        payload: {
+          session_id: "session-01",
+          user_id: "user-01",
+          occurred_at: "2026-08-13T06:00:00.000Z",
+          version: 1,
+        },
+      }).event_name,
+    ).toBe("TrainingSessionPartiallyCompleted");
+  });
+
   it("rejects an unknown version and undeclared payload data", () => {
     expect(() =>
       domainEventV1Schema.parse({

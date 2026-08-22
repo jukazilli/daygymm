@@ -211,10 +211,15 @@ export const setRevisionSchema = z
   })
   .strict();
 
+export const trainingCompletionStatusSchema = z.enum(["complete", "partial"]);
+
 export const completedTrainingSessionSchema = z
   .object({
     completedAt: z.string().datetime({ offset: true }),
+    completedSetCount: z.number().int().nonnegative(),
+    completionStatus: trainingCompletionStatusSchema,
     durationSeconds: z.number().int().nonnegative(),
+    plannedSetCount: z.number().int().positive(),
     sessionId: uuidSchema,
     wasCreated: z.boolean(),
   })
@@ -243,6 +248,9 @@ export type SetRevisionInput = z.infer<typeof setRevisionInputSchema>;
 export type SetRevision = z.infer<typeof setRevisionSchema>;
 export type CompletedTrainingSession = z.infer<
   typeof completedTrainingSessionSchema
+>;
+export type TrainingCompletionStatus = z.infer<
+  typeof trainingCompletionStatusSchema
 >;
 export interface CancelledTrainingSession {
   readonly runId: string;
@@ -284,6 +292,7 @@ export interface TrainingSessionGateway {
   ): Promise<TrainingSessionResult<SetCompletion>>;
   finish(
     runId: string,
+    completionStatus?: TrainingCompletionStatus,
   ): Promise<TrainingSessionResult<CompletedTrainingSession>>;
   load(
     preferredSessionId?: string,
@@ -310,6 +319,7 @@ export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway
   finishAt(
     runId: string,
     completedAt: string,
+    completionStatus?: TrainingCompletionStatus,
   ): Promise<TrainingSessionResult<CompletedTrainingSession>>;
   pauseAt(
     runId: string,

@@ -4,6 +4,7 @@ import {
   practicalTrainingStateSchema,
   setCompletionInputSchema,
   setRevisionInputSchema,
+  trainingCompletionStatusSchema,
   type PracticalTrainingState,
 } from "./training-session.js";
 
@@ -26,6 +27,10 @@ const timedRunInputSchema = z
     runId: z.string().uuid(),
   })
   .strict();
+
+const finishRunInputSchema = timedRunInputSchema.extend({
+  completionStatus: trainingCompletionStatusSchema.optional(),
+});
 
 export const queuedTrainingOperationSchema = z.discriminatedUnion("kind", [
   operationBaseSchema.extend({
@@ -70,7 +75,7 @@ export const queuedTrainingOperationSchema = z.discriminatedUnion("kind", [
     kind: z.literal("cancel-session"),
   }),
   operationBaseSchema.extend({
-    input: timedRunInputSchema,
+    input: finishRunInputSchema,
     kind: z.literal("finish-session"),
   }),
 ]);

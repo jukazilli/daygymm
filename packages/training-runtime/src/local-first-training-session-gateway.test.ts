@@ -466,6 +466,52 @@ describe("TrainingSessionLocalFirstRuntime", () => {
     expect(gateway.getSyncState().status).toBe("synced");
   });
 
+  it("finishes partially offline and replays the explicit outcome", async () => {
+    const connectivity = new MutableConnectivity(false);
+    const finishAt = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        completedAt: "2026-08-15T20:02:00.000Z",
+        completedSetCount: 1,
+        completionStatus: "partial",
+        durationSeconds: 120,
+        plannedSetCount: 2,
+        sessionId: runId,
+        wasCreated: true,
+      },
+    });
+    const remote = remoteGateway({
+      completeSet: vi.fn().mockResolvedValue(successfulCompletion()),
+      finishAt,
+      load: vi.fn().mockResolvedValue({ ok: true, value: idleState() }),
+    });
+    const gateway = localGateway(store, connectivity, remote);
+    await gateway.completeSet(setInput);
+
+    const finished = await gateway.finish(runId, "partial");
+    expect(finished).toMatchObject({
+      ok: true,
+      value: {
+        completedSetCount: 1,
+        completionStatus: "partial",
+        plannedSetCount: 2,
+      },
+    });
+    expect([...store.operations.values()].at(-1)).toMatchObject({
+      input: { completionStatus: "partial", runId },
+      kind: "finish-session",
+    });
+
+    connectivity.setOnline(true);
+    await gateway.synchronize();
+
+    expect(finishAt).toHaveBeenCalledWith(
+      runId,
+      "2026-08-15T20:02:00.000Z",
+      "partial",
+    );
+  });
+
   it("replays start, exercise, pause, resume and cancel in causal order", async () => {
     await store.saveSnapshot(ownerId, idleState());
     const connectivity = new MutableConnectivity(false);

@@ -37,6 +37,21 @@ export const trainingSessionCompletedEventSchema = z
   })
   .strict();
 
+export const trainingSessionPartiallyCompletedEventSchema = z
+  .object({
+    ...envelopeFields,
+    event_name: z.literal("TrainingSessionPartiallyCompleted"),
+    payload: z
+      .object({
+        session_id: technicalIdSchema,
+        user_id: technicalIdSchema,
+        occurred_at: utcTimestampSchema,
+        version: z.number().int().positive(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const planVersionPublishedEventSchema = z
   .object({
     ...envelopeFields,
@@ -107,6 +122,7 @@ export const partnerOfferChangedEventSchema = z
 
 export const domainEventV1Schema = z.discriminatedUnion("event_name", [
   trainingSessionCompletedEventSchema,
+  trainingSessionPartiallyCompletedEventSchema,
   planVersionPublishedEventSchema,
   professionalAccessRevokedEventSchema,
   rewardGrantedEventSchema,

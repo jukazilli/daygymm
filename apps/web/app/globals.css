@@ -2571,6 +2571,12 @@ button.session-sync-indicator {
   width: 100%;
 }
 
+.partial-training-confirm {
+  min-height: 3rem;
+  color: var(--color-action);
+  font-weight: 700;
+}
+
 .session-finished,
 .session-empty {
   display: grid;
