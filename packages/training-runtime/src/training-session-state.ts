@@ -1,5 +1,7 @@
 import type {
   ActiveTrainingRun,
+  ExerciseSubstitutionInput,
+  ExerciseSubstitutionResult,
   PracticalTrainingSet,
   PracticalTrainingState,
   SetCompletion,
@@ -199,6 +201,42 @@ export function applyStartedExercise(
   const items = activeRun.session.items.map((item) =>
     item.itemId === itemId && !item.completedAt
       ? { ...item, startedAt: item.startedAt ?? startedAt }
+      : item,
+  );
+  const session = { ...activeRun.session, items };
+  return {
+    ...state,
+    activeRun: { ...activeRun, session },
+    nextSession:
+      state.nextSession?.sessionId === session.sessionId
+        ? session
+        : state.nextSession,
+  };
+}
+
+export function applyExerciseSubstitution(
+  state: PracticalTrainingState,
+  input: ExerciseSubstitutionInput,
+  substitution: ExerciseSubstitutionResult,
+): PracticalTrainingState {
+  const activeRun = state.activeRun;
+  if (!activeRun || activeRun.runId !== input.runId) {
+    return state;
+  }
+  const items = activeRun.session.items.map((item) =>
+    item.itemId === input.itemId && item.setExecutions.length === 0
+      ? {
+          ...item,
+          exerciseName: substitution.exerciseName,
+          previousSetReferences: [],
+          substitution: {
+            alternativeId: substitution.alternativeId,
+            exerciseName: substitution.exerciseName,
+            plannedExerciseName: substitution.plannedExerciseName,
+            reason: substitution.reason,
+            substitutedAt: substitution.substitutedAt,
+          },
+        }
       : item,
   );
   const session = { ...activeRun.session, items };

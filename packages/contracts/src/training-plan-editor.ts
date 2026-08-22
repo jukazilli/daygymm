@@ -24,6 +24,14 @@ export const trainingLoadModeSchema = z.enum([
   "none",
 ]);
 
+export const trainingPlanAlternativeSchema = z
+  .object({
+    alternativeId: uuidSchema,
+    exerciseName: z.string().trim().min(1).max(120),
+    order: z.number().int().min(1).max(5),
+  })
+  .strict();
+
 export const trainingPlanDraftItemSchema = z
   .object({
     circuitGroup: z.string().trim().min(1).max(40).nullable(),
@@ -41,6 +49,7 @@ export const trainingPlanDraftItemSchema = z
     modality: trainingModalitySchema,
     notes: z.string().trim().max(500).nullable(),
     order: z.number().int().min(1).max(100),
+    alternatives: z.array(trainingPlanAlternativeSchema).max(5).default([]),
     plannedWeightKg: optionalWeightSchema,
     repsMax: optionalInteger(1_000),
     repsMin: optionalInteger(1_000),
@@ -50,6 +59,19 @@ export const trainingPlanDraftItemSchema = z
   })
   .strict()
   .superRefine((item, issue) => {
+    const alternativeNames = item.alternatives.map((alternative) =>
+      alternative.exerciseName.toLocaleLowerCase("pt-BR"),
+    );
+    if (
+      new Set(alternativeNames).size !== alternativeNames.length ||
+      alternativeNames.includes(item.exerciseName.toLocaleLowerCase("pt-BR"))
+    ) {
+      issue.addIssue({
+        code: "custom",
+        message: "Approved alternatives must have unique exercise names.",
+        path: ["alternatives"],
+      });
+    }
     if (
       item.repsMin !== null &&
       item.repsMax !== null &&
@@ -245,6 +267,9 @@ export interface TrainingPlanRestoreResult {
 }
 
 export type TrainingLoadMode = z.infer<typeof trainingLoadModeSchema>;
+export type TrainingPlanAlternative = z.infer<
+  typeof trainingPlanAlternativeSchema
+>;
 export type TrainingPlanDraftItem = z.infer<typeof trainingPlanDraftItemSchema>;
 export type TrainingPlanDraftSession = z.infer<
   typeof trainingPlanDraftSessionSchema

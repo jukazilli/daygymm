@@ -25,6 +25,7 @@ const plannedSession = {
   dayOrder: 1,
   items: [
     {
+      approvedAlternatives: [],
       circuitGroup: null,
       completedAt: null,
       distanceMeters: null,
@@ -34,6 +35,7 @@ const plannedSession = {
       modality: "strength" as const,
       notes: "Movimento controlado",
       order: 1,
+      plannedExerciseName: "Agachamento",
       plannedWeightKg: 40,
       previousSetReferences: [
         {
@@ -53,6 +55,7 @@ const plannedSession = {
       sets: 2,
       setExecutions: [],
       startedAt: null,
+      substitution: null,
     },
   ],
   name: "Treino A",
@@ -102,6 +105,75 @@ afterEach(() => {
 });
 
 describe("ActiveTrainingScreen", () => {
+  it("uses only an approved alternative and keeps the planned exercise visible", async () => {
+    window.localStorage.setItem("daygym:exercise-swipe-tutorial:v1", "seen");
+    const user = userEvent.setup();
+    const activeRun: ActiveTrainingRun = {
+      pausedAt: null,
+      pausedDurationSeconds: 0,
+      runId: "75000000-0000-4000-8000-000000000005",
+      session: {
+        ...plannedSession,
+        items: [
+          {
+            ...plannedSession.items[0]!,
+            approvedAlternatives: [
+              {
+                alternativeId: "78000000-0000-4000-8000-000000000008",
+                exerciseName: "Leg press 45",
+                order: 1,
+              },
+            ],
+          },
+        ],
+      },
+      startedAt: "2026-08-14T03:30:00.000Z",
+    };
+    const substituteExercise = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        alternativeId: "78000000-0000-4000-8000-000000000008",
+        exerciseName: "Leg press 45",
+        plannedExerciseName: "Agachamento",
+        reason: "equipment_unavailable",
+        substitutedAt: "2026-08-14T03:31:00.000Z",
+        wasCreated: true,
+      },
+    });
+    const gateway: TrainingSessionGateway = {
+      cancel: vi.fn(),
+      completeExercise: vi.fn(),
+      completeSet: vi.fn(),
+      finish: vi.fn(),
+      load: vi.fn().mockResolvedValue({ ok: true, value: state(activeRun) }),
+      pause: vi.fn(),
+      reviseSet: vi.fn(),
+      resume: vi.fn(),
+      start: vi.fn(),
+      startExercise: vi.fn(),
+      substituteExercise,
+    };
+
+    render(createElement(ActiveTrainingScreen, { gateway }));
+    await openActiveExercise(user);
+    await user.click(
+      screen.getByRole("button", { name: "Trocar Agachamento" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Trocar exercício" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Confirmar troca" }));
+
+    expect(substituteExercise).toHaveBeenCalledWith({
+      alternativeId: "78000000-0000-4000-8000-000000000008",
+      itemId: plannedSession.items[0]!.itemId,
+      reason: "equipment_unavailable",
+      runId: activeRun.runId,
+    });
+    expect(await screen.findByText("Leg press 45")).toBeTruthy();
+    expect(screen.getByText("No lugar de Agachamento")).toBeTruthy();
+  });
+
   it("runs the imported session from start through completion", async () => {
     vi.spyOn(Date, "now").mockReturnValue(
       new Date("2026-08-14T03:32:00.000Z").getTime(),
@@ -553,6 +625,7 @@ describe("ActiveTrainingScreen", () => {
       resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),
+      substituteExercise: vi.fn(),
       subscribeSyncState(listener) {
         notifySyncState = listener;
         listener(this.getSyncState());
@@ -805,6 +878,7 @@ describe("ActiveTrainingScreen", () => {
       resume: vi.fn(),
       start: vi.fn(),
       startExercise: vi.fn(),
+      substituteExercise: vi.fn(),
       subscribeSyncState(listener) {
         listener(this.getSyncState());
         return () => undefined;

@@ -4,6 +4,7 @@ import {
   practicalTrainingStateSchema,
   setCompletionInputSchema,
   setRevisionInputSchema,
+  exerciseSubstitutionInputSchema,
   trainingCompletionStatusSchema,
   type PracticalTrainingState,
 } from "./training-session.js";
@@ -33,6 +34,12 @@ const finishRunInputSchema = timedRunInputSchema.extend({
 });
 
 export const queuedTrainingOperationSchema = z.discriminatedUnion("kind", [
+  operationBaseSchema.extend({
+    input: exerciseSubstitutionInputSchema.extend({
+      substitutedAt: trainingOutboxTimestampSchema,
+    }),
+    kind: z.literal("substitute-exercise"),
+  }),
   operationBaseSchema.extend({
     input: z
       .object({

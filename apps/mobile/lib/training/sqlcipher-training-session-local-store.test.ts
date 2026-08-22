@@ -41,6 +41,7 @@ function activeState(): PracticalTrainingState {
     dayOrder: 1,
     items: [
       {
+        approvedAlternatives: [],
         circuitGroup: null,
         completedAt: null,
         distanceMeters: null,
@@ -50,6 +51,7 @@ function activeState(): PracticalTrainingState {
         modality: "strength" as const,
         notes: null,
         order: 1,
+        plannedExerciseName: "Agachamento",
         plannedWeightKg: 40,
         previousSetReferences: [],
         repsMax: 12,
@@ -59,6 +61,7 @@ function activeState(): PracticalTrainingState {
         sets: 2,
         setExecutions: [],
         startedAt: "2026-08-16T20:01:00.000Z",
+        substitution: null,
       },
     ],
     name: "Treino A",

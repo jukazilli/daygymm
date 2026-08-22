@@ -27,6 +27,7 @@ const existingDraft: TrainingPlanDraft = {
       dayOrder: 1,
       items: [
         {
+          alternatives: [],
           circuitGroup: null,
           distanceMeters: null,
           durationSeconds: null,
@@ -45,6 +46,7 @@ const existingDraft: TrainingPlanDraft = {
           sets: 3,
         },
         {
+          alternatives: [],
           circuitGroup: null,
           distanceMeters: null,
           durationSeconds: 1_200,
@@ -213,6 +215,62 @@ describe("TrainingPlanEditorScreen", () => {
       await screen.findByRole("button", { name: "Editar Treino A" }),
     ).toBeTruthy();
     expect(gateway.load).toHaveBeenCalledWith(existingPlanId);
+  });
+
+  it("configures approved alternatives without crowding the exercise editor", async () => {
+    const user = userEvent.setup();
+    const gateway = createGateway(existingDraft);
+
+    render(
+      createElement(TrainingPlanEditorScreen, {
+        gateway,
+        navigate: vi.fn(),
+      }),
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Editar Treino A" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Editar Supino reto" }),
+    );
+    expect(screen.queryByText("Alternativa 1")).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "Adicionar alternativa" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Alternativas aprovadas",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Adicionar alternativa" }),
+    );
+    const conclude = within(dialog).getByRole("button", { name: "Concluir" });
+    expect((conclude as HTMLButtonElement).disabled).toBe(true);
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Nome da alternativa 1" }),
+      "Supino máquina",
+    );
+    expect((conclude as HTMLButtonElement).disabled).toBe(false);
+    await user.click(conclude);
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(gateway.publish).toHaveBeenCalledOnce());
+    expect(gateway.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [
+          expect.objectContaining({
+            items: expect.arrayContaining([
+              expect.objectContaining({
+                alternatives: [
+                  expect.objectContaining({ exerciseName: "Supino máquina" }),
+                ],
+                exerciseName: "Supino reto",
+              }),
+            ]),
+          }),
+        ],
+      }),
+    );
   });
 
   it("drills from the training list into exercises without losing edits", async () => {

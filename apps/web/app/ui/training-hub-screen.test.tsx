@@ -103,6 +103,7 @@ describe("TrainingHubScreen", () => {
       dayOrder: 1,
       items: [
         {
+          approvedAlternatives: [],
           circuitGroup: null,
           completedAt: null,
           distanceMeters: null,
@@ -112,6 +113,7 @@ describe("TrainingHubScreen", () => {
           modality: "strength" as const,
           notes: null,
           order: 1,
+          plannedExerciseName: "Supino",
           plannedWeightKg: null,
           previousSetReferences: [],
           repsMax: 12,
@@ -121,6 +123,7 @@ describe("TrainingHubScreen", () => {
           sets: 3,
           setExecutions: [],
           startedAt: null,
+          substitution: null,
         },
       ],
       name: "Treino A",

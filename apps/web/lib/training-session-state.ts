@@ -4,6 +4,7 @@ export {
   applyCompletedTrainingSetWithRest,
   extendActiveTrainingRest,
   applyFinishedTraining,
+  applyExerciseSubstitution,
   applyRevisedTrainingSet,
   applyStartedExercise,
   applyStartedTraining,

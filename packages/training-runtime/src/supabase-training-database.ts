@@ -48,6 +48,33 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
   version_id: string;
 }
 
+export interface TrainingPlanItemAlternativeRow extends Record<
+  string,
+  unknown
+> {
+  alternative_id: string;
+  alternative_order: number;
+  exercise_name: string;
+  plan_item_id: string;
+  user_id: string;
+  version_id: string;
+}
+
+export interface TrainingSessionRunSubstitutionRow extends Record<
+  string,
+  unknown
+> {
+  alternative_id: string;
+  executed_exercise_name: string;
+  operation_id: string;
+  plan_item_id: string;
+  planned_exercise_name: string;
+  reason: "comfort" | "equipment_unavailable" | "other" | "preference";
+  run_id: string;
+  substituted_at: string;
+  user_id: string;
+}
+
 export interface TrainingSessionRunRow extends Record<string, unknown> {
   operation_id: string;
   paused_at: string | null;
@@ -191,4 +218,13 @@ export interface TrainingPauseRpcRow extends Record<string, unknown> {
   paused_duration_seconds: number;
   run_id: string;
   was_changed: boolean;
+}
+
+export interface TrainingSubstitutionRpcRow extends Record<string, unknown> {
+  alternative_id: string;
+  exercise_name: string;
+  planned_exercise_name: string;
+  reason: "comfort" | "equipment_unavailable" | "other" | "preference";
+  substituted_at: string;
+  was_created: boolean;
 }

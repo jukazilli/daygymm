@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ActiveTrainingRun,
   CompletedTrainingSession,
+  ExerciseSubstitutionInput,
   LocalFirstTrainingSessionGateway,
   PracticalTrainingExercise,
   PracticalTrainingSet,
@@ -18,7 +19,10 @@ import type {
 } from "@daygym/contracts";
 
 import { createLocalFirstTrainingSessionGateway } from "../../lib/local-first-training-session-gateway";
-import { applyCompletedTrainingSetWithRest } from "../../lib/training-session-state";
+import {
+  applyCompletedTrainingSetWithRest,
+  applyExerciseSubstitution,
+} from "../../lib/training-session-state";
 import {
   formatTrainingDuration,
   maximumExerciseDurationSeconds,
@@ -203,6 +207,10 @@ interface FinishedTrainingSummary {
   readonly plannedSets: number;
   readonly completionStatus: TrainingCompletionStatus;
   readonly recordedDurationSeconds: number;
+  readonly substitutions: readonly {
+    readonly exerciseName: string;
+    readonly plannedExerciseName: string;
+  }[];
   readonly volumeKg: number;
 }
 
@@ -232,6 +240,16 @@ function trainingSummary(
     recordedDurationSeconds: sets.reduce(
       (total, set) => total + (set.actualDurationSeconds ?? 0),
       0,
+    ),
+    substitutions: run.session.items.flatMap((item) =>
+      item.substitution
+        ? [
+            {
+              exerciseName: item.substitution.exerciseName,
+              plannedExerciseName: item.substitution.plannedExerciseName,
+            },
+          ]
+        : [],
     ),
     volumeKg: roundedWeight(
       sets.reduce(
@@ -944,6 +962,156 @@ export function SetCompletionSheet({
   );
 }
 
+const substitutionReasonLabels: Record<
+  ExerciseSubstitutionInput["reason"],
+  string
+> = {
+  comfort: "Mais confortável hoje",
+  equipment_unavailable: "Equipamento indisponível",
+  other: "Outro motivo",
+  preference: "Preferência de execução",
+};
+
+function ExerciseSubstitutionDialog({
+  busy,
+  exercise,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  busy: boolean;
+  exercise: PracticalTrainingExercise;
+  onClose: () => void;
+  onConfirm: (
+    alternativeId: string,
+    reason: ExerciseSubstitutionInput["reason"],
+  ) => Promise<boolean>;
+}>) {
+  const [alternativeId, setAlternativeId] = useState(
+    exercise.approvedAlternatives[0]?.alternativeId ?? "",
+  );
+  const [reason, setReason] = useState<ExerciseSubstitutionInput["reason"]>(
+    "equipment_unavailable",
+  );
+  const [failed, setFailed] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  async function confirm() {
+    if (!alternativeId || busy) {
+      return;
+    }
+    setFailed(false);
+    if (!(await onConfirm(alternativeId, reason))) {
+      setFailed(true);
+    }
+  }
+
+  return (
+    <div className="session-dialog-backdrop" role="presentation">
+      <section
+        aria-describedby="exercise-substitution-copy"
+        aria-labelledby="exercise-substitution-title"
+        aria-modal="true"
+        className="session-dialog exercise-substitution-dialog"
+        role="dialog"
+      >
+        <div className="guide-dialog-heading">
+          <span className="guide-dialog-icon">
+            <AppIcon name="swap" />
+          </span>
+          <h2 id="exercise-substitution-title">
+            {exercise.approvedAlternatives.length > 0
+              ? "Trocar exercício"
+              : "Nenhuma alternativa aprovada"}
+          </h2>
+        </div>
+        <p id="exercise-substitution-copy">
+          {exercise.approvedAlternatives.length > 0
+            ? `Escolha uma alternativa aprovada para ${exercise.plannedExerciseName}. Séries, repetições e descanso serão preservados.`
+            : `O plano não possui uma alternativa aprovada para ${exercise.plannedExerciseName}. Continue com o exercício atual ou volte à lista.`}
+        </p>
+        {exercise.approvedAlternatives.length > 0 ? (
+          <div className="exercise-substitution-fields">
+            <label>
+              <span>Alternativa</span>
+              <select
+                onChange={(event) => setAlternativeId(event.target.value)}
+                value={alternativeId}
+              >
+                {exercise.approvedAlternatives.map((alternative) => (
+                  <option
+                    key={alternative.alternativeId}
+                    value={alternative.alternativeId}
+                  >
+                    {alternative.exerciseName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Motivo</span>
+              <select
+                onChange={(event) =>
+                  setReason(
+                    event.target.value as ExerciseSubstitutionInput["reason"],
+                  )
+                }
+                value={reason}
+              >
+                {Object.entries(substitutionReasonLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+          </div>
+        ) : null}
+        {failed ? (
+          <p className="status-message status-error" role="alert">
+            Não foi possível trocar agora. Tente novamente.
+          </p>
+        ) : null}
+        <div className="session-dialog-actions">
+          {exercise.approvedAlternatives.length > 0 ? (
+            <button
+              className="button-primary"
+              disabled={busy || !alternativeId}
+              onClick={() => void confirm()}
+              type="button"
+            >
+              {busy ? "Trocando…" : "Confirmar troca"}
+            </button>
+          ) : null}
+          <button
+            className="button-secondary"
+            disabled={busy}
+            onClick={onClose}
+            ref={closeRef}
+            type="button"
+          >
+            {exercise.approvedAlternatives.length > 0
+              ? "Manter exercício"
+              : "Entendi"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ExerciseExecution({
   busy,
   exercise,
@@ -952,6 +1120,7 @@ function ExerciseExecution({
   onReviseSet,
   onSkip,
   onStart,
+  onSubstitute,
 }: Readonly<{
   busy: boolean;
   exercise: PracticalTrainingExercise;
@@ -962,9 +1131,14 @@ function ExerciseExecution({
   onReviseSet: (request: SetRevisionRequest) => Promise<boolean>;
   onSkip?: () => void;
   onStart: () => void;
+  onSubstitute: (
+    alternativeId: string,
+    reason: ExerciseSubstitutionInput["reason"],
+  ) => Promise<boolean>;
 }>) {
   const revisionTriggerRef = useRef<HTMLButtonElement>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
+  const [substitutionOpen, setSubstitutionOpen] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const nextSet = exercise.setExecutions.length + 1;
   const lastSet = exercise.setExecutions.at(-1);
@@ -1095,6 +1269,11 @@ function ExerciseExecution({
         <div className="exercise-current-set">
           <p className="exercise-series-label">Série 1 de {exercise.sets}</p>
           <p className="exercise-target">{currentSetTarget(exercise, 1)}</p>
+          {exercise.substitution ? (
+            <p className="exercise-substitution-note">
+              No lugar de {exercise.substitution.plannedExerciseName}
+            </p>
+          ) : null}
         </div>
         <div className="exercise-control-bar">
           <button
@@ -1110,6 +1289,20 @@ function ExerciseExecution({
             </span>
             <span>Iniciar</span>
           </button>
+          {!exercise.substitution ? (
+            <button
+              aria-label={`Trocar ${exercise.plannedExerciseName}`}
+              className="exercise-control-action"
+              disabled={busy}
+              onClick={() => setSubstitutionOpen(true)}
+              type="button"
+            >
+              <span className="exercise-control-icon">
+                <AppIcon name="swap" size={27} />
+              </span>
+              <span>Trocar</span>
+            </button>
+          ) : null}
           {onSkip ? (
             <button
               aria-label="Pular para o próximo exercício"
@@ -1128,6 +1321,20 @@ function ExerciseExecution({
             <FinishTrainingControl busy={busy} onFinish={onFinish} />
           ) : null}
         </div>
+        {substitutionOpen ? (
+          <ExerciseSubstitutionDialog
+            busy={busy}
+            exercise={exercise}
+            onClose={() => setSubstitutionOpen(false)}
+            onConfirm={async (alternativeId, reason) => {
+              const changed = await onSubstitute(alternativeId, reason);
+              if (changed) {
+                setSubstitutionOpen(false);
+              }
+              return changed;
+            }}
+          />
+        ) : null}
       </div>
     );
   }
@@ -1220,6 +1427,11 @@ function ExerciseExecution({
             Última vez · {previousResult.completedAt} · {previousResult.result}
           </p>
         ) : null}
+        {exercise.substitution ? (
+          <p className="exercise-substitution-note">
+            No lugar de {exercise.substitution.plannedExerciseName}
+          </p>
+        ) : null}
         {saveFailed ? (
           <p className="status-message status-error" role="alert">
             Não foi possível salvar agora. Tente novamente.
@@ -1239,6 +1451,20 @@ function ExerciseExecution({
                 <AppIcon name="reset" size={26} />
               </span>
               <span>Ajustar</span>
+            </button>
+          ) : null}
+          {exercise.setExecutions.length === 0 && !exercise.substitution ? (
+            <button
+              aria-label={`Trocar ${exercise.plannedExerciseName}`}
+              className="exercise-control-action"
+              disabled={busy}
+              onClick={() => setSubstitutionOpen(true)}
+              type="button"
+            >
+              <span className="exercise-control-icon">
+                <AppIcon name="swap" size={27} />
+              </span>
+              <span>Trocar</span>
             </button>
           ) : null}
           <button
@@ -1279,6 +1505,20 @@ function ExerciseExecution({
           exercise={exercise}
           onClose={closeRevisionFlow}
           onRevise={onReviseSet}
+        />
+      ) : null}
+      {substitutionOpen ? (
+        <ExerciseSubstitutionDialog
+          busy={busy}
+          exercise={exercise}
+          onClose={() => setSubstitutionOpen(false)}
+          onConfirm={async (alternativeId, reason) => {
+            const changed = await onSubstitute(alternativeId, reason);
+            if (changed) {
+              setSubstitutionOpen(false);
+            }
+            return changed;
+          }}
         />
       ) : null}
     </div>
@@ -2040,6 +2280,55 @@ export function ActiveTrainingScreen({
     return true;
   }
 
+  async function substituteCurrentExercise(
+    alternativeId: string,
+    reason: ExerciseSubstitutionInput["reason"],
+  ) {
+    const run = state?.activeRun;
+    const currentExercise = run?.session.items[selectedIndex];
+    if (
+      !run ||
+      run.pausedAt ||
+      !currentExercise ||
+      currentExercise.completedAt ||
+      currentExercise.setExecutions.length > 0 ||
+      currentExercise.substitution ||
+      busy
+    ) {
+      return false;
+    }
+    const input: ExerciseSubstitutionInput = {
+      alternativeId,
+      itemId: currentExercise.itemId,
+      reason,
+      runId: run.runId,
+    };
+    setBusy(true);
+    setError(undefined);
+    const currentGateway = gateway();
+    if (!currentGateway.substituteExercise) {
+      setBusy(false);
+      setError("A substituição ainda não está disponível neste dispositivo.");
+      return false;
+    }
+    const result = await currentGateway.substituteExercise(input);
+    setBusy(false);
+    if (!result.ok) {
+      if (result.reason === "session") {
+        navigate("/entrar/");
+        return false;
+      }
+      setError(sessionError(result.reason));
+      return false;
+    }
+    setState((current) =>
+      current
+        ? applyExerciseSubstitution(current, input, result.value)
+        : current,
+    );
+    return true;
+  }
+
   async function completeRest() {
     const restState = state?.activeRest;
     if (!restState) {
@@ -2370,6 +2659,24 @@ export function ActiveTrainingScreen({
             </div>
           ) : null}
         </dl>
+        {finishedSummary.substitutions.length > 0 ? (
+          <section
+            aria-labelledby="training-summary-substitutions"
+            className="training-summary-substitutions"
+          >
+            <h2 id="training-summary-substitutions">Exercícios substituídos</h2>
+            <ul>
+              {finishedSummary.substitutions.map((substitution) => (
+                <li
+                  key={`${substitution.plannedExerciseName}:${substitution.exerciseName}`}
+                >
+                  <strong>{substitution.exerciseName}</strong>
+                  <span>No lugar de {substitution.plannedExerciseName}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {syncState.pendingCount > 0 ? (
           <p className="training-summary-sync" role="status">
             Salvo neste aparelho · sincronização pendente
@@ -2645,6 +2952,11 @@ export function ActiveTrainingScreen({
                   </span>
                   <span className="workout-exercise-copy">
                     <strong>{exercise.exerciseName}</strong>
+                    {exercise.substitution ? (
+                      <small>
+                        No lugar de {exercise.substitution.plannedExerciseName}
+                      </small>
+                    ) : null}
                     <small>{exerciseTarget(exercise)}</small>
                     <small>
                       {formatClock(exercise.restSeconds)} de descanso
@@ -2751,6 +3063,7 @@ export function ActiveTrainingScreen({
                 skipIndex >= 0 ? () => setSelectedIndex(skipIndex) : undefined
               }
               onStart={() => void startCurrentExercise()}
+              onSubstitute={substituteCurrentExercise}
             />
           )}
         </section>

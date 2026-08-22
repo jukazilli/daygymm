@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -66,6 +67,7 @@ function randomUuid() {
 
 function blankItem(order: number): TrainingPlanDraftItem {
   return {
+    alternatives: [],
     circuitGroup: null,
     distanceMeters: null,
     durationSeconds: null,
@@ -370,173 +372,335 @@ function ExerciseEditor({
   onChange: (item: TrainingPlanDraftItem) => void;
   onRemove: () => void;
 }>) {
+  const [alternativesOpen, setAlternativesOpen] = useState(false);
+  const closeAlternatives = useCallback(() => setAlternativesOpen(false), []);
   return (
-    <article className="plan-exercise-editor">
-      <div className="plan-editor-card-heading">
-        <strong>Exercício {item.order}</strong>
-        <button
-          className="button-text button-danger-text"
-          disabled={!canRemove}
-          onClick={onRemove}
-          type="button"
-        >
-          Remover
-        </button>
-      </div>
-      <div className="plan-field-grid plan-field-grid-two">
-        <label>
-          <span>Exercício</span>
-          <input
-            maxLength={120}
-            onChange={(event) =>
-              onChange({ ...item, exerciseName: event.target.value })
-            }
-            required
-            value={item.exerciseName}
-          />
-        </label>
-        <label>
-          <span>Tipo</span>
-          <PlanSelect
-            onChange={(event) =>
-              onChange(
-                modalityItem(item, event.target.value as TrainingModality),
-              )
-            }
-            value={item.modality}
+    <>
+      <article className="plan-exercise-editor">
+        <div className="plan-editor-card-heading">
+          <strong>Exercício {item.order}</strong>
+          <button
+            className="button-text button-danger-text"
+            disabled={!canRemove}
+            onClick={onRemove}
+            type="button"
           >
-            {Object.entries(modalityLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </PlanSelect>
-        </label>
-        <label>
-          <span>Séries</span>
-          <input
-            max="20"
-            min="1"
-            onChange={(event) =>
-              onChange({ ...item, sets: Number(event.target.value) })
-            }
-            required
-            type="number"
-            value={item.sets}
-          />
-        </label>
-        <label>
-          <span>Descanso (HH:MM:SS)</span>
-          <DurationInput
-            maximum={maximumRestDurationSeconds}
-            minimum={0}
-            onChange={(restSeconds) => {
-              if (restSeconds !== null) {
-                onChange({ ...item, restSeconds });
-              }
-            }}
-            required
-            seconds={item.restSeconds}
-          />
-        </label>
-        {item.modality === "strength" ? (
-          <>
-            <label>
-              <span>Repetições mínimas</span>
-              <input
-                max="1000"
-                min="1"
-                onChange={(event) =>
-                  onChange({
-                    ...item,
-                    repsMin: numberValue(event.target.value),
-                  })
-                }
-                required
-                type="number"
-                value={item.repsMin ?? ""}
-              />
-            </label>
-            <label>
-              <span>Repetições máximas</span>
-              <input
-                max="1000"
-                min="1"
-                onChange={(event) =>
-                  onChange({
-                    ...item,
-                    repsMax: numberValue(event.target.value),
-                  })
-                }
-                required
-                type="number"
-                value={item.repsMax ?? ""}
-              />
-            </label>
-          </>
-        ) : null}
-        {item.modality === "time" ||
-        item.modality === "distance" ||
-        item.modality === "cardio" ? (
+            Remover
+          </button>
+        </div>
+        <div className="plan-field-grid plan-field-grid-two">
           <label>
-            <span>Duração (HH:MM:SS)</span>
-            <DurationInput
-              maximum={maximumExerciseDurationSeconds}
-              minimum={1}
-              onChange={(durationSeconds) =>
-                onChange({ ...item, durationSeconds })
-              }
-              required={item.modality === "time"}
-              seconds={item.durationSeconds}
-            />
-          </label>
-        ) : null}
-        {item.modality === "distance" || item.modality === "cardio" ? (
-          <label>
-            <span>Distância (metros)</span>
+            <span>Exercício</span>
             <input
-              max="100000"
-              min="1"
+              maxLength={120}
               onChange={(event) =>
-                onChange({
-                  ...item,
-                  distanceMeters: numberValue(event.target.value),
-                })
-              }
-              type="number"
-              value={item.distanceMeters ?? ""}
-            />
-          </label>
-        ) : null}
-        {item.modality === "circuit" ? (
-          <label>
-            <span>Nome do circuito</span>
-            <input
-              maxLength={40}
-              onChange={(event) =>
-                onChange({ ...item, circuitGroup: event.target.value })
+                onChange({ ...item, exerciseName: event.target.value })
               }
               required
-              value={item.circuitGroup ?? ""}
+              value={item.exerciseName}
             />
           </label>
+          <label>
+            <span>Tipo</span>
+            <PlanSelect
+              onChange={(event) =>
+                onChange(
+                  modalityItem(item, event.target.value as TrainingModality),
+                )
+              }
+              value={item.modality}
+            >
+              {Object.entries(modalityLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </PlanSelect>
+          </label>
+          <label>
+            <span>Séries</span>
+            <input
+              max="20"
+              min="1"
+              onChange={(event) =>
+                onChange({ ...item, sets: Number(event.target.value) })
+              }
+              required
+              type="number"
+              value={item.sets}
+            />
+          </label>
+          <label>
+            <span>Descanso (HH:MM:SS)</span>
+            <DurationInput
+              maximum={maximumRestDurationSeconds}
+              minimum={0}
+              onChange={(restSeconds) => {
+                if (restSeconds !== null) {
+                  onChange({ ...item, restSeconds });
+                }
+              }}
+              required
+              seconds={item.restSeconds}
+            />
+          </label>
+          {item.modality === "strength" ? (
+            <>
+              <label>
+                <span>Repetições mínimas</span>
+                <input
+                  max="1000"
+                  min="1"
+                  onChange={(event) =>
+                    onChange({
+                      ...item,
+                      repsMin: numberValue(event.target.value),
+                    })
+                  }
+                  required
+                  type="number"
+                  value={item.repsMin ?? ""}
+                />
+              </label>
+              <label>
+                <span>Repetições máximas</span>
+                <input
+                  max="1000"
+                  min="1"
+                  onChange={(event) =>
+                    onChange({
+                      ...item,
+                      repsMax: numberValue(event.target.value),
+                    })
+                  }
+                  required
+                  type="number"
+                  value={item.repsMax ?? ""}
+                />
+              </label>
+            </>
+          ) : null}
+          {item.modality === "time" ||
+          item.modality === "distance" ||
+          item.modality === "cardio" ? (
+            <label>
+              <span>Duração (HH:MM:SS)</span>
+              <DurationInput
+                maximum={maximumExerciseDurationSeconds}
+                minimum={1}
+                onChange={(durationSeconds) =>
+                  onChange({ ...item, durationSeconds })
+                }
+                required={item.modality === "time"}
+                seconds={item.durationSeconds}
+              />
+            </label>
+          ) : null}
+          {item.modality === "distance" || item.modality === "cardio" ? (
+            <label>
+              <span>Distância (metros)</span>
+              <input
+                max="100000"
+                min="1"
+                onChange={(event) =>
+                  onChange({
+                    ...item,
+                    distanceMeters: numberValue(event.target.value),
+                  })
+                }
+                type="number"
+                value={item.distanceMeters ?? ""}
+              />
+            </label>
+          ) : null}
+          {item.modality === "circuit" ? (
+            <label>
+              <span>Nome do circuito</span>
+              <input
+                maxLength={40}
+                onChange={(event) =>
+                  onChange({ ...item, circuitGroup: event.target.value })
+                }
+                required
+                value={item.circuitGroup ?? ""}
+              />
+            </label>
+          ) : null}
+        </div>
+        {item.modality === "strength" ? (
+          <LoadConfiguration item={item} onChange={onChange} />
         ) : null}
-      </div>
-      {item.modality === "strength" ? (
-        <LoadConfiguration item={item} onChange={onChange} />
-      ) : null}
-      <label>
-        <span>Observação</span>
-        <textarea
-          maxLength={500}
-          onChange={(event) =>
-            onChange({ ...item, notes: event.target.value || null })
-          }
-          rows={2}
-          value={item.notes ?? ""}
+        <label>
+          <span>Observação</span>
+          <textarea
+            maxLength={500}
+            onChange={(event) =>
+              onChange({ ...item, notes: event.target.value || null })
+            }
+            rows={2}
+            value={item.notes ?? ""}
+          />
+        </label>
+        <button
+          className="button-secondary"
+          onClick={() => setAlternativesOpen(true)}
+          type="button"
+        >
+          <AppIcon name="swap" size={20} />
+          <span>
+            {item.alternatives.length > 0
+              ? `${item.alternatives.length} ${item.alternatives.length === 1 ? "alternativa aprovada" : "alternativas aprovadas"}`
+              : "Adicionar alternativa"}
+          </span>
+        </button>
+      </article>
+      {alternativesOpen ? (
+        <ApprovedAlternativesDialog
+          alternatives={item.alternatives}
+          exerciseName={item.exerciseName}
+          onChange={(alternatives) => onChange({ ...item, alternatives })}
+          onClose={closeAlternatives}
         />
-      </label>
-    </article>
+      ) : null}
+    </>
+  );
+}
+
+function ApprovedAlternativesDialog({
+  alternatives,
+  exerciseName,
+  onChange,
+  onClose,
+}: Readonly<{
+  alternatives: TrainingPlanDraftItem["alternatives"];
+  exerciseName: string;
+  onChange: (alternatives: TrainingPlanDraftItem["alternatives"]) => void;
+  onClose: () => void;
+}>) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const normalizedExerciseName = exerciseName.trim().toLocaleLowerCase("pt-BR");
+  const normalizedAlternatives = alternatives.map((alternative) =>
+    alternative.exerciseName.trim().toLocaleLowerCase("pt-BR"),
+  );
+  const alternativeError = normalizedAlternatives.some((name) => !name)
+    ? "Preencha o nome de cada alternativa."
+    : normalizedAlternatives.some(
+          (name, index) => normalizedAlternatives.indexOf(name) !== index,
+        )
+      ? "Cada alternativa deve ter um nome diferente."
+      : normalizedAlternatives.some(
+            (name) => name === normalizedExerciseName && name.length > 0,
+          )
+        ? "A alternativa deve ser diferente do exercício planejado."
+        : null;
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="session-dialog-backdrop" role="presentation">
+      <section
+        aria-describedby="approved-alternatives-copy"
+        aria-labelledby="approved-alternatives-title"
+        aria-modal="true"
+        className="session-dialog"
+        role="dialog"
+      >
+        <div className="guide-dialog-heading">
+          <span className="guide-dialog-icon">
+            <AppIcon name="swap" />
+          </span>
+          <h2 id="approved-alternatives-title">Alternativas aprovadas</h2>
+        </div>
+        <p id="approved-alternatives-copy">
+          Durante o treino, {exerciseName || "este exercício"} só poderá ser
+          trocado por uma opção desta lista. A prescrição de séries e descanso
+          será preservada.
+        </p>
+        <div className="approved-alternatives-list">
+          {alternatives.map((alternative, index) => (
+            <label key={alternative.alternativeId}>
+              <span>Alternativa {index + 1}</span>
+              <span className="approved-alternative-field">
+                <input
+                  aria-label={`Nome da alternativa ${index + 1}`}
+                  maxLength={120}
+                  onChange={(event) =>
+                    onChange(
+                      alternatives.map((candidate, candidateIndex) =>
+                        candidateIndex === index
+                          ? { ...candidate, exerciseName: event.target.value }
+                          : candidate,
+                      ),
+                    )
+                  }
+                  required
+                  value={alternative.exerciseName}
+                />
+                <button
+                  aria-label={`Remover alternativa ${index + 1}`}
+                  className="icon-button"
+                  onClick={() =>
+                    onChange(
+                      alternatives
+                        .filter((_, candidateIndex) => candidateIndex !== index)
+                        .map((candidate, candidateIndex) => ({
+                          ...candidate,
+                          order: candidateIndex + 1,
+                        })),
+                    )
+                  }
+                  type="button"
+                >
+                  <AppIcon name="trash" size={19} />
+                </button>
+              </span>
+            </label>
+          ))}
+        </div>
+        {alternatives.length < 5 ? (
+          <button
+            className="button-secondary"
+            onClick={() =>
+              onChange([
+                ...alternatives,
+                {
+                  alternativeId: randomUuid(),
+                  exerciseName: "",
+                  order: alternatives.length + 1,
+                },
+              ])
+            }
+            type="button"
+          >
+            <AppIcon name="plus" size={19} />
+            <span>Adicionar alternativa</span>
+          </button>
+        ) : null}
+        {alternativeError ? (
+          <p className="field-error" role="alert">
+            {alternativeError}
+          </p>
+        ) : null}
+        <button
+          className="button-primary"
+          disabled={Boolean(alternativeError)}
+          onClick={onClose}
+          ref={closeRef}
+          type="button"
+        >
+          Concluir
+        </button>
+      </section>
+    </div>
   );
 }
 

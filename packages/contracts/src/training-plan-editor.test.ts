@@ -7,6 +7,7 @@ import {
 } from "./training-plan-editor.js";
 
 const strengthItem = {
+  alternatives: [],
   circuitGroup: null,
   distanceMeters: null,
   durationSeconds: null,

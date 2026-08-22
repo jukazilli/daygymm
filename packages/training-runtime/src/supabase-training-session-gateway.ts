@@ -3,6 +3,8 @@ import {
   completedTrainingSessionSchema,
   exerciseCompletionSchema,
   exerciseStartSchema,
+  exerciseSubstitutionInputSchema,
+  exerciseSubstitutionResultSchema,
   practicalTrainingStateSchema,
   setCompletionInputSchema,
   setCompletionSchema,
@@ -30,13 +32,16 @@ import type {
   TrainingFinishRpcRow,
   TrainingPauseRpcRow,
   TrainingPlanItemRow,
+  TrainingPlanItemAlternativeRow,
   TrainingPlanRow,
   TrainingPlanScheduleEntryRow,
   TrainingPlanSessionRow,
   TrainingSessionRunItemRow,
+  TrainingSessionRunSubstitutionRow,
   TrainingSessionRunSetRow,
   TrainingSessionRunRow,
   TrainingStartRpcRow,
+  TrainingSubstitutionRpcRow,
 } from "./supabase-training-database";
 
 function failureFromError(error: unknown): TrainingSessionFailure {
@@ -104,9 +109,18 @@ function mapPlan(row: TrainingPlanRow) {
 
 function mapPlanItem(
   row: TrainingPlanItemRow,
+  alternatives: readonly TrainingPlanItemAlternativeRow[],
   completedAt: string | null = null,
 ): PracticalTrainingExercise {
   return {
+    approvedAlternatives: alternatives
+      .filter((alternative) => alternative.plan_item_id === row.item_id)
+      .sort((left, right) => left.alternative_order - right.alternative_order)
+      .map((alternative) => ({
+        alternativeId: alternative.alternative_id,
+        exerciseName: alternative.exercise_name,
+        order: alternative.alternative_order,
+      })),
     circuitGroup: row.circuit_group,
     completedAt,
     distanceMeters: row.distance_meters,
@@ -116,6 +130,7 @@ function mapPlanItem(
     modality: row.modality as PracticalTrainingExercise["modality"],
     notes: row.notes,
     order: row.item_order,
+    plannedExerciseName: row.exercise_name,
     plannedWeightKg: row.planned_weight_kg,
     previousSetReferences: [],
     repsMax: row.reps_max,
@@ -125,6 +140,7 @@ function mapPlanItem(
     sets: row.sets,
     setExecutions: [],
     startedAt: null,
+    substitution: null,
   };
 }
 
@@ -151,30 +167,46 @@ function mapRunItem(
   row: TrainingSessionRunItemRow,
   sets: TrainingSessionRunSetRow[],
   references: PreviousTrainingSetReferenceRpcRow[],
+  alternatives: readonly TrainingPlanItemAlternativeRow[],
+  substitutions: readonly TrainingSessionRunSubstitutionRow[],
 ): PracticalTrainingExercise {
+  const substitution = substitutions.find(
+    (candidate) => candidate.plan_item_id === row.plan_item_id,
+  );
   return {
+    approvedAlternatives: alternatives
+      .filter((alternative) => alternative.plan_item_id === row.plan_item_id)
+      .sort((left, right) => left.alternative_order - right.alternative_order)
+      .map((alternative) => ({
+        alternativeId: alternative.alternative_id,
+        exerciseName: alternative.exercise_name,
+        order: alternative.alternative_order,
+      })),
     circuitGroup: row.circuit_group,
     completedAt: row.completed_at,
     distanceMeters: row.distance_meters,
     durationSeconds: row.duration_seconds,
-    exerciseName: row.exercise_name,
+    exerciseName: substitution?.executed_exercise_name ?? row.exercise_name,
     itemId: row.plan_item_id,
     modality: row.modality as PracticalTrainingExercise["modality"],
     notes: row.notes,
     order: row.item_order,
+    plannedExerciseName: row.exercise_name,
     plannedWeightKg: row.planned_weight_kg,
-    previousSetReferences: references
-      .filter((reference) => reference.plan_item_id === row.plan_item_id)
-      .sort((left, right) => left.set_number - right.set_number)
-      .map((reference) => ({
-        actualDistanceMeters: reference.actual_distance_meters,
-        actualDurationSeconds: reference.actual_duration_seconds,
-        actualReps: reference.actual_reps,
-        actualWeightKg: reference.actual_weight_kg,
-        completedAt: reference.completed_at,
-        setNumber: reference.set_number,
-        sourceSessionId: reference.source_session_id,
-      })),
+    previousSetReferences: substitution
+      ? []
+      : references
+          .filter((reference) => reference.plan_item_id === row.plan_item_id)
+          .sort((left, right) => left.set_number - right.set_number)
+          .map((reference) => ({
+            actualDistanceMeters: reference.actual_distance_meters,
+            actualDurationSeconds: reference.actual_duration_seconds,
+            actualReps: reference.actual_reps,
+            actualWeightKg: reference.actual_weight_kg,
+            completedAt: reference.completed_at,
+            setNumber: reference.set_number,
+            sourceSessionId: reference.source_session_id,
+          })),
     repsMax: row.reps_max,
     repsMin: row.reps_min,
     restSeconds: row.rest_seconds,
@@ -185,6 +217,15 @@ function mapRunItem(
       .sort((left, right) => left.set_number - right.set_number)
       .map(mapRunSet),
     startedAt: row.started_at,
+    substitution: substitution
+      ? {
+          alternativeId: substitution.alternative_id,
+          exerciseName: substitution.executed_exercise_name,
+          plannedExerciseName: substitution.planned_exercise_name,
+          reason: substitution.reason,
+          substitutedAt: substitution.substituted_at,
+        }
+      : null,
   };
 }
 
@@ -192,6 +233,7 @@ function buildSessions(
   sessionRows: TrainingPlanSessionRow[],
   itemRows: TrainingPlanItemRow[],
   scheduleRows: TrainingPlanScheduleEntryRow[],
+  alternativeRows: TrainingPlanItemAlternativeRow[],
 ): PracticalTrainingPlanSession[] {
   const weekdayBySession = new Map(
     scheduleRows.map((entry) => [entry.planned_session_id, entry.weekday]),
@@ -203,7 +245,7 @@ function buildSessions(
       items: itemRows
         .filter((item) => item.session_id === session.session_id)
         .sort((left, right) => left.item_order - right.item_order)
-        .map((item) => mapPlanItem(item)),
+        .map((item) => mapPlanItem(item, alternativeRows)),
       name: session.name,
       sessionId: session.session_id,
       weekday: weekdayBySession.get(session.session_id) ?? fallbackWeekday,
@@ -280,6 +322,7 @@ export function createSupabaseTrainingSessionGateway({
       const [
         sessionsResult,
         itemsResult,
+        alternativesResult,
         scheduleResult,
         runResult,
         completedResult,
@@ -296,6 +339,13 @@ export function createSupabaseTrainingSessionGateway({
           )
           .eq("version_id", activeVersionId)
           .order("item_order"),
+        client
+          .from("training_plan_item_alternatives")
+          .select(
+            "alternative_id,plan_item_id,version_id,user_id,alternative_order,exercise_name",
+          )
+          .eq("version_id", activeVersionId)
+          .order("alternative_order"),
         client
           .from("training_plan_schedule_entries")
           .select(
@@ -325,6 +375,7 @@ export function createSupabaseTrainingSessionGateway({
       const queryError =
         sessionsResult.error ??
         itemsResult.error ??
+        alternativesResult.error ??
         scheduleResult.error ??
         runResult.error ??
         completedResult.error;
@@ -336,6 +387,7 @@ export function createSupabaseTrainingSessionGateway({
         (sessionsResult.data ?? []) as TrainingPlanSessionRow[],
         (itemsResult.data ?? []) as TrainingPlanItemRow[],
         (scheduleResult.data ?? []) as TrainingPlanScheduleEntryRow[],
+        (alternativesResult.data ?? []) as TrainingPlanItemAlternativeRow[],
       );
       const runRow = runResult.data as TrainingSessionRunRow | null;
       const lastCompleted =
@@ -343,28 +395,41 @@ export function createSupabaseTrainingSessionGateway({
       let activeRun = null;
 
       if (runRow) {
-        const [runItemsResult, runSetsResult, referencesResult] =
-          await Promise.all([
-            client
-              .from("training_session_run_items")
-              .select(
-                "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
-              )
-              .eq("run_id", runRow.run_id)
-              .order("item_order"),
-            client
-              .from("training_session_run_sets")
-              .select(
-                "set_execution_id,run_id,plan_item_id,user_id,set_number,planned_reps_min,planned_reps_max,actual_reps,planned_weight_kg,actual_weight_kg,planned_duration_seconds,actual_duration_seconds,planned_distance_meters,actual_distance_meters,completed_at,revision,updated_at",
-              )
-              .eq("run_id", runRow.run_id)
-              .order("set_number"),
-            client.rpc("get_previous_training_set_references", {
-              p_run_id: runRow.run_id,
-            }),
-          ]);
+        const [
+          runItemsResult,
+          runSetsResult,
+          referencesResult,
+          substitutionsResult,
+        ] = await Promise.all([
+          client
+            .from("training_session_run_items")
+            .select(
+              "run_id,plan_item_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes,started_at,completed_at",
+            )
+            .eq("run_id", runRow.run_id)
+            .order("item_order"),
+          client
+            .from("training_session_run_sets")
+            .select(
+              "set_execution_id,run_id,plan_item_id,user_id,set_number,planned_reps_min,planned_reps_max,actual_reps,planned_weight_kg,actual_weight_kg,planned_duration_seconds,actual_duration_seconds,planned_distance_meters,actual_distance_meters,completed_at,revision,updated_at",
+            )
+            .eq("run_id", runRow.run_id)
+            .order("set_number"),
+          client.rpc("get_previous_training_set_references", {
+            p_run_id: runRow.run_id,
+          }),
+          client
+            .from("training_session_run_item_substitutions")
+            .select(
+              "run_id,plan_item_id,user_id,alternative_id,operation_id,reason,planned_exercise_name,executed_exercise_name,substituted_at",
+            )
+            .eq("run_id", runRow.run_id),
+        ]);
         const activeRunError =
-          runItemsResult.error ?? runSetsResult.error ?? referencesResult.error;
+          runItemsResult.error ??
+          runSetsResult.error ??
+          referencesResult.error ??
+          substitutionsResult.error;
         if (activeRunError) {
           return failure(activeRunError);
         }
@@ -386,6 +451,10 @@ export function createSupabaseTrainingSessionGateway({
                 (runSetsResult.data ?? []) as TrainingSessionRunSetRow[],
                 (referencesResult.data ??
                   []) as PreviousTrainingSetReferenceRpcRow[],
+                (alternativesResult.data ??
+                  []) as TrainingPlanItemAlternativeRow[],
+                (substitutionsResult.data ??
+                  []) as TrainingSessionRunSubstitutionRow[],
               ),
             ),
           },
@@ -572,6 +641,49 @@ export function createSupabaseTrainingSessionGateway({
     }
   };
 
+  const substituteExerciseAt: ReplayableTrainingSessionGateway["substituteExerciseAt"] =
+    async (input) => {
+      try {
+        const parsed = exerciseSubstitutionInputSchema.parse({
+          alternativeId: input.alternativeId,
+          itemId: input.itemId,
+          reason: input.reason,
+          runId: input.runId,
+        });
+        const client = getClient();
+        const { data, error } = await retryIdempotentSupabaseRequest(() =>
+          client.rpc("substitute_training_exercise", {
+            p_alternative_id: parsed.alternativeId,
+            p_operation_id: `training-substitute:${parsed.runId}:${parsed.itemId}`,
+            p_plan_item_id: parsed.itemId,
+            p_reason: parsed.reason,
+            p_run_id: parsed.runId,
+            p_substituted_at: input.substitutedAt,
+          }),
+        );
+        const row = data?.[0] as TrainingSubstitutionRpcRow | undefined;
+        if (error || !row) {
+          return failure(error);
+        }
+        return {
+          ok: true,
+          value: exerciseSubstitutionResultSchema.parse({
+            alternativeId: row.alternative_id,
+            exerciseName: row.exercise_name,
+            plannedExerciseName: row.planned_exercise_name,
+            reason: row.reason,
+            substitutedAt: row.substituted_at,
+            wasCreated: row.was_created,
+          }),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.name === "ZodError") {
+          return failure(error);
+        }
+        return { ok: false, reason: "configuration" };
+      }
+    };
+
   return {
     cancelOnce,
     load,
@@ -684,6 +796,13 @@ export function createSupabaseTrainingSessionGateway({
         startedAt: now().toISOString(),
       }),
     startWithIdentity,
+
+    substituteExercise: (input) =>
+      substituteExerciseAt({
+        ...input,
+        substitutedAt: now().toISOString(),
+      }),
+    substituteExerciseAt,
 
     async startExercise(runId, itemId) {
       try {

@@ -89,6 +89,18 @@ export interface TrainingPlanItemRow extends Record<string, unknown> {
   version_id: string;
 }
 
+export interface TrainingPlanItemAlternativeRow extends Record<
+  string,
+  unknown
+> {
+  alternative_id: string;
+  alternative_order: number;
+  exercise_name: string;
+  plan_item_id: string;
+  user_id: string;
+  version_id: string;
+}
+
 export interface TrainingSessionRunRow extends Record<string, unknown> {
   operation_id: string;
   paused_at: string | null;
@@ -123,6 +135,35 @@ export interface TrainingSessionRunItemRow extends Record<string, unknown> {
   user_id: string;
 }
 
+export interface TrainingSessionRunSubstitutionRow extends Record<
+  string,
+  unknown
+> {
+  alternative_id: string;
+  executed_exercise_name: string;
+  operation_id: string;
+  plan_item_id: string;
+  planned_exercise_name: string;
+  reason: "comfort" | "equipment_unavailable" | "other" | "preference";
+  run_id: string;
+  substituted_at: string;
+  user_id: string;
+}
+
+export interface TrainingSessionSubstitutionRow extends Record<
+  string,
+  unknown
+> {
+  alternative_id: string;
+  executed_exercise_name: string;
+  plan_item_id: string;
+  planned_exercise_name: string;
+  reason: "comfort" | "equipment_unavailable" | "other" | "preference";
+  session_id: string;
+  substituted_at: string;
+  user_id: string;
+}
+
 export interface TrainingSessionRunSetRow extends Record<string, unknown> {
   actual_distance_meters: number | null;
   actual_duration_seconds: number | null;
@@ -152,6 +193,7 @@ export interface TrainingSessionSetRow extends Record<string, unknown> {
   exercise_name: string;
   exercise_order: number;
   plan_item_id: string;
+  planned_exercise_name: string;
   planned_distance_meters: number | null;
   planned_duration_seconds: number | null;
   planned_reps_max: number | null;
@@ -253,6 +295,15 @@ export interface TrainingPauseRpcRow extends Record<string, unknown> {
   was_changed: boolean;
 }
 
+export interface TrainingSubstitutionRpcRow extends Record<string, unknown> {
+  alternative_id: string;
+  exercise_name: string;
+  planned_exercise_name: string;
+  reason: "comfort" | "equipment_unavailable" | "other" | "preference";
+  substituted_at: string;
+  was_created: boolean;
+}
+
 export interface TrainingPlanImportRpcRow extends Record<string, unknown> {
   item_count: number;
   plan_id: string;
@@ -294,14 +345,17 @@ export interface WebDatabase {
       onboarding_contexts: TableDefinition<OnboardingContextRow>;
       profiles: TableDefinition<ProfileRow>;
       training_plan_items: TableDefinition<TrainingPlanItemRow>;
+      training_plan_item_alternatives: TableDefinition<TrainingPlanItemAlternativeRow>;
       training_plan_schedule_entries: TableDefinition<TrainingPlanScheduleEntryRow>;
       training_plan_sessions: TableDefinition<TrainingPlanSessionRow>;
       training_plan_versions: TableDefinition<TrainingPlanVersionRow>;
       training_plans: TableDefinition<TrainingPlanRow>;
       training_session_run_items: TableDefinition<TrainingSessionRunItemRow>;
+      training_session_run_item_substitutions: TableDefinition<TrainingSessionRunSubstitutionRow>;
       training_session_run_sets: TableDefinition<TrainingSessionRunSetRow>;
       training_session_runs: TableDefinition<TrainingSessionRunRow>;
       training_session_sets: TableDefinition<TrainingSessionSetRow>;
+      training_session_substitutions: TableDefinition<TrainingSessionSubstitutionRow>;
       training_sessions: TableDefinition<CompletedTrainingSessionRow>;
     };
     Views: Record<string, never>;
@@ -361,6 +415,17 @@ export interface WebDatabase {
         Returns: TrainingPlanImportRpcRow[];
       };
       publish_training_plan_version_v2: {
+        Args: {
+          p_change_summary: string;
+          p_content_sha256: string;
+          p_operation_id: string;
+          p_plan_id: string | null;
+          p_plan_name: string;
+          p_sessions: unknown;
+        };
+        Returns: TrainingPlanImportRpcRow[];
+      };
+      publish_training_plan_version_v3: {
         Args: {
           p_change_summary: string;
           p_content_sha256: string;
@@ -513,6 +578,17 @@ export interface WebDatabase {
           p_run_id: string;
         };
         Returns: ExerciseStartRpcRow[];
+      };
+      substitute_training_exercise: {
+        Args: {
+          p_alternative_id: string;
+          p_operation_id: string;
+          p_plan_item_id: string;
+          p_reason: string;
+          p_run_id: string;
+          p_substituted_at: string;
+        };
+        Returns: TrainingSubstitutionRpcRow[];
       };
     };
   };

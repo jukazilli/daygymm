@@ -1055,6 +1055,26 @@ input:focus-visible {
   background: var(--color-canvas);
 }
 
+.approved-alternatives-list,
+.approved-alternatives-list label,
+.exercise-substitution-fields,
+.exercise-substitution-fields label {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.approved-alternative-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.approved-alternative-field .icon-button {
+  min-width: 48px;
+  min-height: 48px;
+}
+
 .load-configuration {
   min-width: 0;
   margin: 0;
@@ -1804,6 +1824,15 @@ button.session-sync-indicator {
   text-align: left;
 }
 
+.exercise-substitution-note {
+  width: min(100%, 30rem);
+  margin: var(--space-2) 0 0;
+  color: var(--color-action-pressed);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  text-align: left;
+}
+
 .exercise-control-bar {
   display: flex;
   justify-content: center;
@@ -2531,6 +2560,17 @@ button.session-sync-indicator {
   margin: 0;
 }
 
+.exercise-substitution-fields select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-text);
+  font: inherit;
+}
+
 .session-dialog p {
   color: var(--color-text-secondary);
   line-height: 1.5;
@@ -2642,6 +2682,36 @@ button.session-sync-indicator {
   background: var(--color-action-soft);
   color: var(--color-action-pressed);
   font-weight: 700;
+}
+
+.training-summary-substitutions {
+  width: 100%;
+  margin-top: var(--space-5);
+}
+
+.training-summary-substitutions h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+}
+
+.training-summary-substitutions ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-summary-substitutions li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.training-summary-substitutions span {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
 }
 
 .today-hero,

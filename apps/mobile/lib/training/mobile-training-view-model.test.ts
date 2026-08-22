@@ -15,6 +15,7 @@ function exercise(
   overrides: Partial<PracticalTrainingExercise> = {},
 ): PracticalTrainingExercise {
   return {
+    approvedAlternatives: [],
     circuitGroup: null,
     completedAt: null,
     distanceMeters: null,
@@ -24,6 +25,7 @@ function exercise(
     modality: "strength",
     notes: null,
     order: 1,
+    plannedExerciseName: "Agachamento",
     plannedWeightKg: 40,
     previousSetReferences: [],
     repsMax: 12,
@@ -33,6 +35,7 @@ function exercise(
     setProgressionKg: 2.5,
     sets: 3,
     startedAt: null,
+    substitution: null,
     ...overrides,
   };
 }

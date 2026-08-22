@@ -1,8 +1,11 @@
 import {
+  exerciseSubstitutionInputSchema,
   setCompletionInputSchema,
   setRevisionInputSchema,
   type ActiveTrainingRun,
   type CompletedTrainingSession,
+  type ExerciseSubstitutionResult,
+  type ExerciseSubstitutionInput,
   type LocalFirstTrainingSessionGateway,
   type PracticalTrainingState,
   type QueuedTrainingOperation,
@@ -23,6 +26,7 @@ import {
   applyCompletedTrainingSetWithRest,
   extendActiveTrainingRest,
   applyFinishedTraining,
+  applyExerciseSubstitution,
   applyRevisedTrainingSet,
   applyStartedExercise,
   applyStartedTraining,
@@ -560,6 +564,53 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
     return revision;
   }
 
+  async substituteExercise(input: ExerciseSubstitutionInput) {
+    let parsed: ReturnType<typeof exerciseSubstitutionInputSchema.parse>;
+    try {
+      parsed = exerciseSubstitutionInputSchema.parse(input);
+    } catch {
+      return { ok: false, reason: "invalid" } as const;
+    }
+    const context = await this.localContext();
+    if (!context) {
+      return this.remote.substituteExercise(parsed);
+    }
+    const exercise = context.snapshot.activeRun?.session.items.find(
+      (item) => item.itemId === parsed.itemId,
+    );
+    const alternative = exercise?.approvedAlternatives.find(
+      (candidate) => candidate.alternativeId === parsed.alternativeId,
+    );
+    if (
+      !exercise ||
+      !alternative ||
+      exercise.setExecutions.length > 0 ||
+      exercise.completedAt ||
+      exercise.substitution
+    ) {
+      return { ok: false, reason: "invalid" } as const;
+    }
+    const substitutedAt = this.now().toISOString();
+    const value: ExerciseSubstitutionResult = {
+      alternativeId: alternative.alternativeId,
+      exerciseName: alternative.exerciseName,
+      plannedExerciseName: exercise.plannedExerciseName,
+      reason: parsed.reason,
+      substitutedAt,
+      wasCreated: true,
+    };
+    const operation = this.operation(
+      "substitute-exercise",
+      { ...parsed, substitutedAt },
+      `training-substitute:${parsed.runId}:${parsed.itemId}`,
+    );
+    const next = applyExerciseSubstitution(context.snapshot, parsed, value);
+    if (!(await this.persist(context.ownerId, operation, next))) {
+      return this.remote.substituteExercise(parsed);
+    }
+    return { ok: true, value } as const;
+  }
+
   async pause(runId: string) {
     const context = await this.localContext();
     if (!context) {
@@ -1054,6 +1105,10 @@ export class TrainingSessionLocalFirstRuntime implements LocalFirstTrainingSessi
           runId: operation.input.runId,
           startedAt: operation.input.startedAt,
         });
+        return result.ok ? { ok: true } : result;
+      }
+      case "substitute-exercise": {
+        const result = await this.remote.substituteExerciseAt(operation.input);
         return result.ok ? { ok: true } : result;
       }
       case "start-exercise": {

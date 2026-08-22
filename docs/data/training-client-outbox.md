@@ -51,7 +51,7 @@ O banco `daygym-training-local`, versão 1, contém:
 - `session-snapshots`: último estado válido da execução, isolado pelo UUID do
   usuário autenticado;
 - `outbox-operations`: payload mínimo de `start-session`, `start-exercise`,
-  `complete-set`, `revise-set`, `pause-session`, `resume-session`,
+  `substitute-exercise`, `complete-set`, `revise-set`, `pause-session`, `resume-session`,
   `cancel-session` ou `finish-session`, com chave idempotente, ordem causal,
   tentativas, próxima tentativa e estado pendente/conflito.
 
@@ -73,12 +73,13 @@ Os testes do gateway local-first cobrem:
 3. início, exercício, pausa, retomada e cancelamento na ordem original;
 4. revisão enfileirada que recebe o ID canônico da série precedente;
 5. conflito preservado até a escolha explícita da versão online;
-6. pendência preservada no logout e retomada pelo mesmo titular;
-7. copy e ações de estado offline/conflito na tela de execução;
-8. RPCs autenticados, timestamps validados e recibo de cancelamento sem acesso
+6. substituição aprovada confirmada offline e reproduzida com o mesmo instante;
+7. pendência preservada no logout e retomada pelo mesmo titular;
+8. copy e ações de estado offline/conflito na tela de execução;
+9. RPCs autenticados, timestamps validados e recibo de cancelamento sem acesso
    anônimo;
-9. hub de treinos disponível pelo snapshot local quando apenas os metadados de
-   origem do plano estão indisponíveis.
+10. hub de treinos disponível pelo snapshot local quando apenas os metadados de
+    origem do plano estão indisponíveis.
 
 ## Modelo no app móvel
 
@@ -236,6 +237,30 @@ descanso, ele fica ao lado de `Continuar`; na lista e na execução mantém a me
 anatomia, preparando a linguagem de controles para superfícies móveis menores
 sem depender somente do desenho do ícone.
 
+### US-010C — substituição aprovada e auditável
+
+- o editor do plano mantém até cinco alternativas por exercício em um popup;
+  cada alternativa troca somente o movimento e herda séries, repetições, carga,
+  progressão e descanso da prescrição imutável;
+- antes da primeira série confirmada, o detalhe oferece o controle compacto
+  `Trocar`; movimentos sem alternativa aprovada explicam a indisponibilidade em
+  vez de aceitar texto arbitrário;
+- a confirmação exige uma alternativa do mesmo item e um motivo estruturado:
+  equipamento indisponível, conforto, preferência ou outro;
+- `substitute-exercise` entra na outbox antes dos comandos posteriores do mesmo
+  exercício e conserva `substitutedAt` absoluto no replay;
+- o snapshot local troca imediatamente o nome executado, preserva
+  `plannedExerciseName` e remove referências de carga do movimento anterior;
+- o servidor recusa substituição depois da primeira série, deduplica pela chave
+  de operação e mantém tabelas separadas para auditoria ativa e canônica;
+- na finalização, o histórico atribui o volume ao movimento executado sem perder
+  o nome originalmente planejado. Cancelar a execução não cria histórico.
+
+O corte está rastreado na
+[issue #44](https://github.com/jukazilli/daygymm/issues/44). PRs elegíveis,
+notas e recomendação explicada de progressão permanecem nos próximos recortes
+da US-010.
+
 ### Correção de abertura offline do PWA
 
 - a sessão Supabase continua persistida, mas sua renovação deixa de bloquear o
@@ -287,11 +312,11 @@ US-009B2b ainda deve executar o
 [roteiro físico de 30 minutos](../runbooks/us-009b2-device-proof.md) sobre um
 development build do commit `ad56772`, com dois fechamentos/reaberturas e zero
 duplicação em pelo menos um aparelho. A segunda plataforma permanece no aceite
-abrangente da FND-017. Substituição com alternativa aprovada, PRs elegíveis,
-notas e recomendação de progressão continuam pertencendo aos próximos recortes
-da US-010. A COR-006 fechou a recomposição temporal, a US-010A acrescentou
+abrangente da FND-017. PRs elegíveis, notas e recomendação de progressão
+continuam pertencendo aos próximos recortes da US-010. A COR-006 fechou a recomposição temporal, a US-010A acrescentou
 ajuste, vibração opcional e resumo essencial, e a US-010B passou a distinguir
-conclusão total de parcial sem inventar volume.
+conclusão total de parcial sem inventar volume. A US-010C restringiu a troca de
+movimento às alternativas aprovadas e preservou a prescrição e a auditoria.
 
 ### Refinamento da execução focada — US-008/US-010
 

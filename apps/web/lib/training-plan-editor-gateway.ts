@@ -16,6 +16,7 @@ import type {
   TrainingPlanArchiveRpcRow,
   TrainingPlanImportRpcRow,
   TrainingPlanItemRow,
+  TrainingPlanItemAlternativeRow,
   TrainingPlanRestoreRpcRow,
   TrainingPlanRow,
   TrainingPlanSessionRow,
@@ -44,9 +45,20 @@ function failure<T>(error: unknown): TrainingPlanResult<T> {
   return { ok: false, reason: failureFromError(error) };
 }
 
-function mapItem(row: TrainingPlanItemRow): TrainingPlanDraftItem {
+function mapItem(
+  row: TrainingPlanItemRow,
+  alternatives: readonly TrainingPlanItemAlternativeRow[],
+): TrainingPlanDraftItem {
   const strength = row.modality === "strength";
   return {
+    alternatives: alternatives
+      .filter((alternative) => alternative.plan_item_id === row.item_id)
+      .sort((left, right) => left.alternative_order - right.alternative_order)
+      .map((alternative) => ({
+        alternativeId: alternative.alternative_id,
+        exerciseName: alternative.exercise_name,
+        order: alternative.alternative_order,
+      })),
     circuitGroup: row.circuit_group,
     distanceMeters: row.distance_meters,
     durationSeconds: row.duration_seconds,
@@ -71,6 +83,11 @@ function rpcSessions(input: PublishTrainingPlanInput) {
     day_order: session.dayOrder,
     items: session.items.map((item, itemIndex) => ({
       circuit_group: item.circuitGroup,
+      alternatives: item.alternatives.map((alternative, index) => ({
+        alternative_id: alternative.alternativeId,
+        exercise_name: alternative.exerciseName,
+        order: index + 1,
+      })),
       distance_meters: item.distanceMeters,
       duration_seconds: item.durationSeconds,
       exercise_name: item.exerciseName,
@@ -204,25 +221,36 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
           return { ok: true, value: null };
         }
         const versionId = plan.active_version_id;
-        const [sessionsResult, itemsResult] = await Promise.all([
-          client
-            .from("training_plan_sessions")
-            .select("session_id,version_id,user_id,day_order,name")
-            .eq("version_id", versionId)
-            .order("day_order"),
-          client
-            .from("training_plan_items")
-            .select(
-              "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,load_mode,load_increment_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
-            )
-            .eq("version_id", versionId)
-            .order("item_order"),
-        ]);
-        const queryError = sessionsResult.error ?? itemsResult.error;
+        const [sessionsResult, itemsResult, alternativesResult] =
+          await Promise.all([
+            client
+              .from("training_plan_sessions")
+              .select("session_id,version_id,user_id,day_order,name")
+              .eq("version_id", versionId)
+              .order("day_order"),
+            client
+              .from("training_plan_items")
+              .select(
+                "item_id,session_id,version_id,user_id,item_order,exercise_name,modality,sets,reps_min,reps_max,planned_weight_kg,load_mode,load_increment_kg,set_progression_kg,duration_seconds,distance_meters,rest_seconds,circuit_group,notes",
+              )
+              .eq("version_id", versionId)
+              .order("item_order"),
+            client
+              .from("training_plan_item_alternatives")
+              .select(
+                "alternative_id,plan_item_id,version_id,user_id,alternative_order,exercise_name",
+              )
+              .eq("version_id", versionId)
+              .order("alternative_order"),
+          ]);
+        const queryError =
+          sessionsResult.error ?? itemsResult.error ?? alternativesResult.error;
         if (queryError) {
           return failure(queryError);
         }
         const items = (itemsResult.data ?? []) as TrainingPlanItemRow[];
+        const alternatives = (alternativesResult.data ??
+          []) as TrainingPlanItemAlternativeRow[];
         return {
           ok: true,
           value: trainingPlanDraftSchema.parse({
@@ -235,7 +263,7 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
               dayOrder: session.day_order,
               items: items
                 .filter((item) => item.session_id === session.session_id)
-                .map(mapItem),
+                .map((item) => mapItem(item, alternatives)),
               name: session.name,
               sessionId: session.session_id,
             })),
@@ -261,7 +289,7 @@ export function createWebTrainingPlanEditorGateway(): TrainingPlanEditorGateway 
         });
         const client = getWebSupabaseClient();
         const { data, error } = await retryIdempotentSupabaseRequest(() =>
-          client.rpc("publish_training_plan_version_v2", {
+          client.rpc("publish_training_plan_version_v3", {
             p_change_summary: input.changeSummary,
             p_content_sha256: contentSha256,
             p_operation_id: input.operationId,

@@ -50,8 +50,37 @@ export const previousTrainingSetReferenceSchema = z
   })
   .strict();
 
+export const trainingSubstitutionReasonSchema = z.enum([
+  "equipment_unavailable",
+  "comfort",
+  "preference",
+  "other",
+]);
+
+export const approvedExerciseAlternativeSchema = z
+  .object({
+    alternativeId: uuidSchema,
+    exerciseName: z.string().min(1).max(120),
+    order: z.number().int().min(1).max(5),
+  })
+  .strict();
+
+export const exerciseSubstitutionSchema = z
+  .object({
+    alternativeId: uuidSchema,
+    exerciseName: z.string().min(1).max(120),
+    plannedExerciseName: z.string().min(1).max(120),
+    reason: trainingSubstitutionReasonSchema,
+    substitutedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
 export const practicalTrainingExerciseSchema = z
   .object({
+    approvedAlternatives: z
+      .array(approvedExerciseAlternativeSchema)
+      .max(5)
+      .default([]),
     circuitGroup: z.string().min(1).max(40).nullable(),
     completedAt: z.string().datetime({ offset: true }).nullable(),
     distanceMeters: z.number().int().min(1).max(100_000).nullable(),
@@ -62,6 +91,7 @@ export const practicalTrainingExerciseSchema = z
     modality: trainingModalitySchema,
     notes: z.string().max(500).nullable(),
     order: z.number().int().min(1).max(100),
+    plannedExerciseName: z.string().min(1).max(120).optional(),
     plannedWeightKg: optionalWeightSchema,
     previousSetReferences: z.array(previousTrainingSetReferenceSchema).max(20),
     repsMax: z.number().int().min(1).max(1_000).nullable(),
@@ -70,8 +100,13 @@ export const practicalTrainingExerciseSchema = z
     sets: z.number().int().min(1).max(20),
     setExecutions: z.array(practicalTrainingSetSchema).max(20),
     startedAt: z.string().datetime({ offset: true }).nullable(),
+    substitution: exerciseSubstitutionSchema.nullable().default(null),
   })
-  .strict();
+  .strict()
+  .transform((exercise) => ({
+    ...exercise,
+    plannedExerciseName: exercise.plannedExerciseName ?? exercise.exerciseName,
+  }));
 
 export const practicalTrainingPlanSessionSchema = z
   .object({
@@ -211,6 +246,19 @@ export const setRevisionSchema = z
   })
   .strict();
 
+export const exerciseSubstitutionInputSchema = z
+  .object({
+    alternativeId: uuidSchema,
+    itemId: uuidSchema,
+    reason: trainingSubstitutionReasonSchema,
+    runId: uuidSchema,
+  })
+  .strict();
+
+export const exerciseSubstitutionResultSchema = exerciseSubstitutionSchema
+  .extend({ wasCreated: z.boolean() })
+  .strict();
+
 export const trainingCompletionStatusSchema = z.enum(["complete", "partial"]);
 
 export const completedTrainingSessionSchema = z
@@ -246,6 +294,19 @@ export type SetCompletionInput = z.infer<typeof setCompletionInputSchema>;
 export type SetCompletion = z.infer<typeof setCompletionSchema>;
 export type SetRevisionInput = z.infer<typeof setRevisionInputSchema>;
 export type SetRevision = z.infer<typeof setRevisionSchema>;
+export type ApprovedExerciseAlternative = z.infer<
+  typeof approvedExerciseAlternativeSchema
+>;
+export type ExerciseSubstitution = z.infer<typeof exerciseSubstitutionSchema>;
+export type ExerciseSubstitutionInput = z.infer<
+  typeof exerciseSubstitutionInputSchema
+>;
+export type ExerciseSubstitutionResult = z.infer<
+  typeof exerciseSubstitutionResultSchema
+>;
+export type TrainingSubstitutionReason = z.infer<
+  typeof trainingSubstitutionReasonSchema
+>;
 export type CompletedTrainingSession = z.infer<
   typeof completedTrainingSessionSchema
 >;
@@ -309,6 +370,9 @@ export interface TrainingSessionGateway {
     runId: string,
     itemId: string,
   ): Promise<TrainingSessionResult<ExerciseStart>>;
+  substituteExercise?(
+    input: ExerciseSubstitutionInput,
+  ): Promise<TrainingSessionResult<ExerciseSubstitutionResult>>;
 }
 
 export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway {
@@ -334,11 +398,20 @@ export interface ReplayableTrainingSessionGateway extends TrainingSessionGateway
     readonly runId: string;
     readonly startedAt: string;
   }): Promise<TrainingSessionResult<ActiveTrainingRun>>;
+  substituteExerciseAt(
+    input: ExerciseSubstitutionInput & { readonly substitutedAt: string },
+  ): Promise<TrainingSessionResult<ExerciseSubstitutionResult>>;
+  substituteExercise(
+    input: ExerciseSubstitutionInput,
+  ): Promise<TrainingSessionResult<ExerciseSubstitutionResult>>;
 }
 
 export type TrainingSessionConflictResolution = "retry" | "use-server";
 
 export interface LocalFirstTrainingSessionGateway extends TrainingSessionGateway {
+  substituteExercise(
+    input: ExerciseSubstitutionInput,
+  ): Promise<TrainingSessionResult<ExerciseSubstitutionResult>>;
   adjustRest(
     runId: string,
     additionalSeconds: number,

@@ -11,6 +11,7 @@ const session = {
   dayOrder: 1,
   items: [
     {
+      approvedAlternatives: [],
       circuitGroup: null,
       completedAt: null,
       distanceMeters: null,
@@ -21,6 +22,7 @@ const session = {
       modality: "strength",
       notes: null,
       order: 1,
+      plannedExerciseName: "Agachamento",
       plannedWeightKg: 40,
       previousSetReferences: [],
       repsMax: 12,
@@ -29,6 +31,7 @@ const session = {
       sets: 3,
       setExecutions: [],
       startedAt: null,
+      substitution: null,
     },
   ],
   name: "Treino A",

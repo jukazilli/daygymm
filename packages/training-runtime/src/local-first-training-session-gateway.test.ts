@@ -20,6 +20,7 @@ function activeState(): PracticalTrainingState {
     dayOrder: 1,
     items: [
       {
+        approvedAlternatives: [],
         circuitGroup: null,
         completedAt: null,
         distanceMeters: null,
@@ -29,6 +30,7 @@ function activeState(): PracticalTrainingState {
         modality: "strength" as const,
         notes: null,
         order: 1,
+        plannedExerciseName: "Agachamento",
         plannedWeightKg: 40,
         previousSetReferences: [],
         repsMax: 12,
@@ -38,6 +40,7 @@ function activeState(): PracticalTrainingState {
         sets: 2,
         setExecutions: [],
         startedAt: "2026-08-15T20:01:00.000Z",
+        substitution: null,
       },
     ],
     name: "Treino A",
@@ -198,6 +201,8 @@ function remoteGateway(
     start: failure,
     startExercise: failure,
     startWithIdentity: failure,
+    substituteExercise: failure,
+    substituteExerciseAt: failure,
     ...overrides,
   } as ReplayableTrainingSessionGateway;
 }
@@ -265,6 +270,69 @@ describe("TrainingSessionLocalFirstRuntime", () => {
       pendingCount: 2,
       status: "offline",
     });
+  });
+
+  it("confirms an approved substitution offline and replays the same audit", async () => {
+    const snapshot = activeState();
+    snapshot.activeRun!.session.items[0]!.approvedAlternatives = [
+      {
+        alternativeId: "61000000-0000-4000-8000-000000000008",
+        exerciseName: "Leg press 45",
+        order: 1,
+      },
+    ];
+    await store.saveSnapshot(ownerId, snapshot);
+    const connectivity = new MutableConnectivity(false);
+    const substituteExerciseAt = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        alternativeId: "61000000-0000-4000-8000-000000000008",
+        exerciseName: "Leg press 45",
+        plannedExerciseName: "Agachamento",
+        reason: "equipment_unavailable",
+        substitutedAt: "2026-08-15T20:02:00.000Z",
+        wasCreated: true,
+      },
+    });
+    const remote = remoteGateway({ substituteExerciseAt });
+    const gateway = localGateway(store, connectivity, remote);
+
+    const result = await gateway.substituteExercise({
+      alternativeId: "61000000-0000-4000-8000-000000000008",
+      itemId,
+      reason: "equipment_unavailable",
+      runId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        exerciseName: "Leg press 45",
+        plannedExerciseName: "Agachamento",
+      },
+    });
+    expect(
+      store.snapshots.get(ownerId)?.activeRun?.session.items[0],
+    ).toMatchObject({
+      exerciseName: "Leg press 45",
+      previousSetReferences: [],
+      substitution: { reason: "equipment_unavailable" },
+    });
+    expect(store.operations.values().next().value).toMatchObject({
+      kind: "substitute-exercise",
+      input: { substitutedAt: "2026-08-15T20:02:00.000Z" },
+    });
+
+    connectivity.setOnline(true);
+    await gateway.synchronize();
+
+    expect(substituteExerciseAt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alternativeId: "61000000-0000-4000-8000-000000000008",
+        substitutedAt: "2026-08-15T20:02:00.000Z",
+      }),
+    );
+    expect(store.operations.size).toBe(0);
   });
 
   it("restores an absolute rest deadline after reopening and removes it when dismissed", async () => {
